@@ -5,7 +5,8 @@ resources:
   - namespace.yaml
   - imagestream.yaml
   - scc-anyuid.yaml
-  # Chart uses Helm pre-install Secret hooks; Argo CD deletes those after PreSync.
-  # Keep equivalent Secrets as normal resources so Conjur pods can start.
+  # Chart pre-install Secret hooks are incompatible with Argo CD (deleted after PreSync).
+  # Secrets + rendered conjur-oss chart (helm template --skip-tests, hooks stripped).
   - helm-secrets.yaml
+  - rendered-release.yaml
   - route.yaml

@@ -1,12 +1,13 @@
 # CyberArk Conjur OSS Helm values for OpenShift cluster east (demo).
 # Chart: https://cyberark.github.io/helm-charts — conjur-oss
 #
+# Source of truth for GitOps is rendered-release.yaml + helm-secrets.yaml
+# (Argo CD deletes Helm pre-install Secret hooks). Re-render after value changes:
+#   helm template conjur-oss cyberark/conjur-oss --version 2.1.1 \
+#     -n banking-conjur -f helm-values.yaml --skip-tests
+#
 # Apps never talk to Conjur directly. External Secrets Operator syncs
 # Conjur variables into Kubernetes Secrets consumed by workloads.
-#
-# Uses Docker Hub images via ImageStreams + anyuid SCC (demo). Official
-# OCP path uses registry.connect.redhat.com/cyberark/{conjur,conjur-nginx}
-# with openshift.enabled=true when Connect entitlements are available.
 
 account:
   name: banking

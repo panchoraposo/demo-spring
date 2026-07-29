@@ -10,47 +10,6 @@ metadata:
     argocd.argoproj.io/sync-wave: "1"
 spec:
   project: default
-  sources:
-    - repoURL: https://cyberark.github.io/helm-charts
-      chart: conjur-oss
-      targetRevision: 2.1.1
-      helm:
-        releaseName: conjur-oss
-        valueFiles:
-          - $values/gitops/components/conjur/helm-values.yaml
-    - repoURL: https://github.com/panchoraposo/demo-spring.git
-      targetRevision: main
-      ref: values
-  destination:
-    server: https://kubernetes.default.svc
-    namespace: banking-conjur
-  syncPolicy:
-    automated:
-      prune: true
-      selfHeal: true
-    syncOptions:
-      - CreateNamespace=true
-      # Pre-install Secret hooks are also materialized by Application conjur-route.
-      - FailOnSharedResource=false
-  ignoreDifferences:
-    - group: ""
-      kind: Secret
-      jqPathExpressions:
-        - .data
-        - .metadata.annotations
----
-apiVersion: argoproj.io/v1alpha1
-kind: Application
-metadata:
-  name: conjur-route
-  namespace: openshift-gitops
-  labels:
-    app.kubernetes.io/part-of: banking-demo
-    cluster: east
-  annotations:
-    argocd.argoproj.io/sync-wave: "1"
-spec:
-  project: default
   source:
     repoURL: https://github.com/panchoraposo/demo-spring.git
     targetRevision: main
@@ -64,3 +23,4 @@ spec:
       selfHeal: true
     syncOptions:
       - CreateNamespace=true
+      - ServerSideApply=true
