@@ -22,7 +22,8 @@ spec:
     spec:
       containers:
         - name: postgresql
-          # Red Hat Ecosystem Catalog: rhel10/postgresql-16
+          # PoC: keep Ecosystem Catalog rhel10/postgresql-16 (not Hardened Images PG18).
+          # Decision: docs/postgresql-image.md
           # https://catalog.redhat.com/en/software/containers/rhel10/postgresql-16/677d13af607921b4d74fca88
           image: registry.redhat.io/rhel10/postgresql-16:latest
           imagePullPolicy: IfNotPresent

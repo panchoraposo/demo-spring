@@ -1,0 +1,13 @@
+# S3 bucket from ODF Multicloud Object Gateway for RHTPA object store.
+apiVersion: objectbucket.io/v1alpha1
+kind: ObjectBucketClaim
+metadata:
+  name: tpa-storage
+  namespace: trusted-profile-analyzer
+  labels:
+    app.kubernetes.io/part-of: banking-demo
+  annotations:
+    argocd.argoproj.io/sync-options: SkipDryRunOnMissingResource=true
+spec:
+  generateBucketName: trustify-banking-tpa
+  storageClassName: openshift-storage.noobaa.io

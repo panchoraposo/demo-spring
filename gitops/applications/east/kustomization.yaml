@@ -9,6 +9,7 @@ resources:
   - eso-operand.yaml
   # wave 2
   - mesh.yaml
+  - devspaces.yaml
   # wave 3
   - external-secrets-config.yaml
   # wave 4+

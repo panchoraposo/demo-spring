@@ -1,0 +1,82 @@
+# trustify-dependency-analytics middleware: Dev Spaces RHDA plugin → private TPA.
+# Point CheCluster / .vscode settings at the Route URL below.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: rhda-backend
+  namespace: trusted-profile-analyzer
+  labels:
+    app.kubernetes.io/name: rhda-backend
+    app.kubernetes.io/part-of: banking-demo
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: rhda-backend
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: rhda-backend
+    spec:
+      containers:
+        - name: rhda-backend
+          image: quay.io/tssc_demos/trustify-dependency-analytics:v2.0.0
+          ports:
+            - containerPort: 8080
+              name: http
+          env:
+            - name: TPA_URL
+              value: http://banking-tpa-server.trusted-profile-analyzer.svc:8080
+            - name: QUARKUS_HTTP_PORT
+              value: "8080"
+          resources:
+            requests:
+              cpu: 100m
+              memory: 256Mi
+            limits:
+              cpu: 500m
+              memory: 1Gi
+          readinessProbe:
+            httpGet:
+              path: /q/health/ready
+              port: http
+            initialDelaySeconds: 15
+            periodSeconds: 10
+          livenessProbe:
+            httpGet:
+              path: /q/health/live
+              port: http
+            initialDelaySeconds: 30
+            periodSeconds: 20
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: rhda-backend
+  namespace: trusted-profile-analyzer
+  labels:
+    app.kubernetes.io/name: rhda-backend
+spec:
+  ports:
+    - name: http
+      port: 8080
+      targetPort: http
+  selector:
+    app.kubernetes.io/name: rhda-backend
+---
+apiVersion: route.openshift.io/v1
+kind: Route
+metadata:
+  name: rhda-backend
+  namespace: trusted-profile-analyzer
+  labels:
+    app.kubernetes.io/name: rhda-backend
+spec:
+  to:
+    kind: Service
+    name: rhda-backend
+  port:
+    targetPort: http
+  tls:
+    termination: edge
+    insecureEdgeTerminationPolicy: Redirect

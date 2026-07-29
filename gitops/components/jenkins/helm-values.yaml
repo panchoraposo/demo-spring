@@ -57,7 +57,7 @@ controller:
     limits:
       cpu: "2"
       memory: 2Gi
-  # Inject GitHub PAT for JCasC credential github-ci (GitOps push).
+  # Inject GitHub PAT + optional Quay robot / cosign key for supply-chain stage.
   containerEnv:
     - name: GITHUB_CI_USERNAME
       valueFrom:
@@ -71,6 +71,24 @@ controller:
           name: github-ci
           key: token
           optional: true
+    - name: QUAY_CI_USER
+      valueFrom:
+        secretKeyRef:
+          name: quay-ci
+          key: username
+          optional: true
+    - name: QUAY_CI_TOKEN
+      valueFrom:
+        secretKeyRef:
+          name: quay-ci
+          key: password
+          optional: true
+    - name: COSIGN_PRIVATE_KEY
+      valueFrom:
+        secretKeyRef:
+          name: cosign-signing-key
+          key: cosign.key
+          optional: true
   sidecars:
     configAutoReload:
       enabled: false
@@ -81,7 +99,7 @@ controller:
     configScripts:
       banking-demo: |
         jenkins:
-          systemMessage: "Banking Demo CI — per-app pipelines (git → image → GitOps)"
+          systemMessage: "Banking Demo CI — build → Quay SBOM/attest/sign (RHTAS) → GitOps"
           crumbIssuer:
             standard: {}
         credentials:
@@ -94,10 +112,21 @@ controller:
                       username: "${GITHUB_CI_USERNAME:-git}"
                       password: "${GITHUB_CI_TOKEN:-replace-me}"
                       description: "GitHub PAT for GitOps tag-bump commits"
+                  - usernamePassword:
+                      scope: GLOBAL
+                      id: quay-ci
+                      username: "${QUAY_CI_USER:-banking+ci}"
+                      password: "${QUAY_CI_TOKEN:-replace-me}"
+                      description: "Quay robot for push of images/sbom/sig/att"
+                  - string:
+                      scope: GLOBAL
+                      id: cosign-private-key
+                      secret: "${COSIGN_PRIVATE_KEY:-}"
+                      description: "Cosign private key PEM for CI signing (Rekor via RHTAS)"
         jobs:
           - script: |
               pipelineJob('banking-service-ci') {
-                description('CI for apps/banking-service → ImageStream → GitOps')
+                description('CI for apps/banking-service → Build → Quay (sbom/attest/sign) → GitOps')
                 parameters {
                   booleanParam('FORCE_BUILD', true, 'Build even without path changes')
                   stringParam('GIT_BRANCH', 'main', 'Branch for GitOps commits')
@@ -128,7 +157,7 @@ controller:
               }
           - script: |
               pipelineJob('api-gateway-ci') {
-                description('CI for apps/api-gateway → ImageStream → GitOps')
+                description('CI for apps/api-gateway → Build → Quay (sbom/attest/sign) → GitOps')
                 parameters {
                   booleanParam('FORCE_BUILD', true, 'Build even without path changes')
                   stringParam('GIT_BRANCH', 'main', 'Branch for GitOps commits')

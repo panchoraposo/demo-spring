@@ -60,7 +60,7 @@ oc -n banking-conjur delete job conjur-bootstrap --ignore-not-found
 oc -n openshift-gitops annotate application conjur-config argocd.argoproj.io/refresh=hard --overwrite
 ```
 
-PostgreSQL uses the catalog image `registry.redhat.io/rhel10/postgresql-16`. Credentials come from Conjur via External Secrets (not from Git).
+PostgreSQL uses the catalog image `registry.redhat.io/rhel10/postgresql-16` for this PoC (not Hardened Images). Credentials come from Conjur via External Secrets (not from Git). See [postgresql-image.md](postgresql-image.md).
 
 ## 4. Build application images (first time)
 

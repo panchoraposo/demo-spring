@@ -30,3 +30,63 @@ subjects:
   - kind: ServiceAccount
     name: jenkins
     namespace: banking-ci
+---
+# Discover Quay route + RHTAS Fulcio/Rekor/TUF URLs during sign/attest stage.
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: jenkins-supply-chain-read
+  namespace: quay-enterprise
+  labels:
+    app.kubernetes.io/part-of: banking-demo
+rules:
+  - apiGroups: ["route.openshift.io"]
+    resources: ["routes"]
+    verbs: ["get", "list"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: jenkins-supply-chain-quay
+  namespace: quay-enterprise
+  labels:
+    app.kubernetes.io/part-of: banking-demo
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: jenkins-supply-chain-read
+subjects:
+  - kind: ServiceAccount
+    name: jenkins
+    namespace: banking-ci
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: jenkins-rhtas-read
+  namespace: trusted-artifact-signer
+  labels:
+    app.kubernetes.io/part-of: banking-demo
+rules:
+  - apiGroups: ["rhtas.redhat.com"]
+    resources: ["fulcios", "rekors", "tufs", "securesigns"]
+    verbs: ["get", "list"]
+  - apiGroups: ["route.openshift.io"]
+    resources: ["routes"]
+    verbs: ["get", "list"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: jenkins-rhtas-read
+  namespace: trusted-artifact-signer
+  labels:
+    app.kubernetes.io/part-of: banking-demo
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: jenkins-rhtas-read
+subjects:
+  - kind: ServiceAccount
+    name: jenkins
+    namespace: banking-ci

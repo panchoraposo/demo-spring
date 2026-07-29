@@ -69,7 +69,7 @@ flowchart TB
 | Secrets sync | External Secrets Operator for Red Hat OpenShift |
 | Secrets backend | CyberArk Conjur OSS (Helm chart, GitOps Application on acm) |
 | Identity (OIDC) | Red Hat build of Keycloak (`rhbk-operator`) — **per spoke** |
-| Banking DB | [`registry.redhat.io/rhel10/postgresql-16`](https://catalog.redhat.com/en/software/containers/rhel10/postgresql-16/677d13af607921b4d74fca88) — **per spoke** |
+| Banking DB | [`registry.redhat.io/rhel10/postgresql-16`](https://catalog.redhat.com/en/software/containers/rhel10/postgresql-16/677d13af607921b4d74fca88) — **per spoke** (PoC; see [postgresql-image.md](postgresql-image.md)) |
 | App runtime images | UBI 9 OpenJDK 21 |
 | CI | Jenkins on acm via Helm + OpenShift BuildConfig |
 
