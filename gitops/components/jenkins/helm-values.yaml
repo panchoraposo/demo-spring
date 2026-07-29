@@ -1,9 +1,8 @@
 # Values for the Jenkins Helm chart (charts.jenkins.io).
 # Admin credentials come from ExternalSecret jenkins-admin (Vault via ESO).
 #
-# Note: registry.redhat.io/ocp-tools-4/jenkins-rhel8 is not drop-in compatible with
-# charts.jenkins.io (different entrypoint/args). For this demo we run the upstream
-# LTS image on OpenShift with anyuid SCC on ServiceAccount jenkins.
+# Use Jenkins LTS + empty installPlugins so the chart init container does not
+# pull :latest plugins that require a newer core than the current LTS.
 
 controller:
   componentName: jenkins-controller
@@ -19,13 +18,12 @@ controller:
   serviceType: ClusterIP
   ingress:
     enabled: false
-  installPlugins:
-    - kubernetes:latest
-    - git:latest
-    - workflow-aggregator:latest
-    - credentials-binding:latest
-    - configuration-as-code:latest
+  # Avoid plugin-manager failures against LTS; plugins can be added later in the UI.
+  installPlugins: []
+  additionalPlugins: []
   initializeOnce: true
+  overwritePlugins: false
+  overwritePluginsFromImage: false
   containerSecurityContext:
     runAsUser: 1000
     runAsGroup: 1000
@@ -55,11 +53,7 @@ controller:
             url: https://jenkins-banking-ci.apps.cluster-4487j.4487j.sandbox2772.opentlc.com/
 
 agent:
-  enabled: true
-  image:
-    registry: docker.io
-    repository: jenkins/inbound-agent
-    tag: "3283.v92c105e0f819-8"
+  enabled: false
 
 persistence:
   enabled: true
