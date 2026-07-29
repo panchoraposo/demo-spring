@@ -1,13 +1,16 @@
 # Values for the Jenkins Helm chart (charts.jenkins.io).
 # Admin credentials come from ExternalSecret jenkins-admin (Vault via ESO).
-# Images come from the OpenShift samples ImageStreams (redhat.io ocp-tools-4).
+#
+# Note: registry.redhat.io/ocp-tools-4/jenkins-rhel8 is not drop-in compatible with
+# charts.jenkins.io (different entrypoint/args). For this demo we run the upstream
+# LTS image on OpenShift with anyuid SCC on ServiceAccount jenkins.
 
 controller:
   componentName: jenkins-controller
   image:
-    registry: image-registry.openshift-image-registry.svc:5000
-    repository: openshift/jenkins
-    tag: "2"
+    registry: docker.io
+    repository: jenkins/jenkins
+    tag: "2.492.3-lts-jdk21"
     pullPolicy: IfNotPresent
   admin:
     existingSecret: jenkins-admin
@@ -16,10 +19,13 @@ controller:
   serviceType: ClusterIP
   ingress:
     enabled: false
-  installPlugins: []
-  # OpenShift Jenkins image ships with curated plugins; avoid upstream plugin manager conflicts.
+  installPlugins:
+    - kubernetes:latest
+    - git:latest
+    - workflow-aggregator:latest
+    - credentials-binding:latest
+    - configuration-as-code:latest
   initializeOnce: true
-  # OpenShift SCC: allow the chart's UID 1000 (pair with anyuid on SA jenkins).
   containerSecurityContext:
     runAsUser: 1000
     runAsGroup: 1000
@@ -34,7 +40,6 @@ controller:
     limits:
       cpu: "2"
       memory: 2Gi
-  # Disable config-reload sidecar (kiwigrid) for a simpler OpenShift demo.
   sidecars:
     configAutoReload:
       enabled: false
@@ -47,14 +52,14 @@ controller:
           systemMessage: "Banking Demo CI — OpenShift cluster east"
         unclassified:
           location:
-            url: https://jenkins.apps.cluster-4487j.4487j.sandbox2772.opentlc.com/
+            url: https://jenkins-banking-ci.apps.cluster-4487j.4487j.sandbox2772.opentlc.com/
 
 agent:
   enabled: true
   image:
-    registry: image-registry.openshift-image-registry.svc:5000
-    repository: openshift/jenkins-agent-base
-    tag: latest
+    registry: docker.io
+    repository: jenkins/inbound-agent
+    tag: "3283.v92c105e0f819-8"
 
 persistence:
   enabled: true
