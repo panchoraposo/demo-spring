@@ -31,7 +31,8 @@ data:
 
         - !permit
           role: !host eso
-          privileges: [ read ]
+          # execute is required to fetch variable values; read alone is metadata only.
+          privileges: [ read, execute ]
           resources:
             - !variable postgresql/database-name
             - !variable postgresql/database-user
