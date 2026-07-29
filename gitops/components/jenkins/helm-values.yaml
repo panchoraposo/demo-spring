@@ -1,0 +1,47 @@
+# Values for the Jenkins Helm chart (charts.jenkins.io).
+# Admin credentials come from ExternalSecret jenkins-admin (Vault via ESO).
+
+controller:
+  componentName: jenkins-controller
+  image:
+    registry: registry.redhat.io
+    repository: ocp-tools-4/jenkins-rhel8
+    tag: latest
+  admin:
+    existingSecret: jenkins-admin
+    userKey: jenkins-admin-user
+    passwordKey: jenkins-admin-password
+  serviceType: ClusterIP
+  ingress:
+    enabled: false
+  installPlugins: []
+  # OpenShift Jenkins image ships with curated plugins; avoid upstream plugin manager conflicts.
+  initializeOnce: true
+  resources:
+    requests:
+      cpu: 500m
+      memory: 1Gi
+    limits:
+      cpu: "2"
+      memory: 2Gi
+  JCasC:
+    confd:
+      enabled: false
+    configScripts:
+      banking-demo: |
+        jenkins:
+          systemMessage: "Banking Demo CI — OpenShift cluster east"
+        unclassified:
+          location:
+            url: https://jenkins.apps.cluster-4487j.4487j.sandbox2772.opentlc.com/
+
+agent:
+  enabled: true
+  image:
+    registry: registry.redhat.io
+    repository: ocp-tools-4/jenkins-agent-base-rhel8
+    tag: latest
+
+persistence:
+  enabled: true
+  size: 20Gi

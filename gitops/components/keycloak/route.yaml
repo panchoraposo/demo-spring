@@ -1,0 +1,16 @@
+apiVersion: route.openshift.io/v1
+kind: Route
+metadata:
+  name: banking-keycloak
+  namespace: banking-idp
+  labels:
+    app.kubernetes.io/name: keycloak
+spec:
+  to:
+    kind: Service
+    name: banking-keycloak-service
+  port:
+    targetPort: http
+  tls:
+    termination: edge
+    insecureEdgeTerminationPolicy: Redirect

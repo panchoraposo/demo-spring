@@ -1,0 +1,19 @@
+apiVersion: build.openshift.io/v1
+kind: BuildConfig
+metadata:
+  name: api-gateway
+  namespace: banking-apps
+  labels:
+    app.kubernetes.io/name: api-gateway
+spec:
+  output:
+    to:
+      kind: ImageStreamTag
+      name: api-gateway:latest
+  source:
+    type: Binary
+  strategy:
+    type: Docker
+    dockerStrategy:
+      dockerfilePath: Dockerfile
+  runPolicy: Serial

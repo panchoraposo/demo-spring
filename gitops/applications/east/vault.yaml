@@ -1,0 +1,58 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: vault
+  namespace: openshift-gitops
+  labels:
+    app.kubernetes.io/part-of: banking-demo
+    cluster: east
+  annotations:
+    argocd.argoproj.io/sync-wave: "1"
+spec:
+  project: default
+  sources:
+    - repoURL: https://helm.releases.hashicorp.com
+      chart: vault
+      targetRevision: 0.29.1
+      helm:
+        releaseName: vault
+        valueFiles:
+          - $values/gitops/components/vault/helm-values.yaml
+    - repoURL: https://github.com/panchoraposo/demo-spring.git
+      targetRevision: main
+      ref: values
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: banking-vault
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true
+---
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: vault-route
+  namespace: openshift-gitops
+  labels:
+    app.kubernetes.io/part-of: banking-demo
+    cluster: east
+  annotations:
+    argocd.argoproj.io/sync-wave: "1"
+spec:
+  project: default
+  source:
+    repoURL: https://github.com/panchoraposo/demo-spring.git
+    targetRevision: main
+    path: gitops/components/vault
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: banking-vault
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true

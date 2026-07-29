@@ -1,0 +1,19 @@
+apiVersion: build.openshift.io/v1
+kind: BuildConfig
+metadata:
+  name: banking-service
+  namespace: banking-apps
+  labels:
+    app.kubernetes.io/name: banking-service
+spec:
+  output:
+    to:
+      kind: ImageStreamTag
+      name: banking-service:latest
+  source:
+    type: Binary
+  strategy:
+    type: Docker
+    dockerStrategy:
+      dockerfilePath: Dockerfile
+  runPolicy: Serial

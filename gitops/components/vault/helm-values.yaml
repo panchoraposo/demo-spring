@@ -1,0 +1,60 @@
+# HashiCorp Vault Helm values for OpenShift cluster east (standalone demo).
+# Chart: https://helm.releases.hashicorp.com — vault
+
+global:
+  enabled: true
+  tlsDisable: true
+  openshift: true
+
+injector:
+  enabled: false
+
+csi:
+  enabled: false
+
+server:
+  enabled: true
+  image:
+    repository: hashicorp/vault
+    tag: "1.17.6"
+  resources:
+    requests:
+      memory: 256Mi
+      cpu: 250m
+    limits:
+      memory: 512Mi
+      cpu: "1"
+  readinessProbe:
+    enabled: true
+    path: "/v1/sys/health?standbyok=true&sealedcode=204&uninitcode=204"
+  livenessProbe:
+    enabled: true
+    path: "/v1/sys/health?standbyok=true"
+    initialDelaySeconds: 60
+  dataStorage:
+    enabled: true
+    size: 10Gi
+  standalone:
+    enabled: true
+    config: |
+      ui = true
+      listener "tcp" {
+        tls_disable = 1
+        address = "[::]:8200"
+        cluster_address = "[::]:8201"
+      }
+      storage "file" {
+        path = "/vault/data"
+      }
+  ha:
+    enabled: false
+  service:
+    enabled: true
+    port: 8200
+    targetPort: 8200
+  ui:
+    enabled: true
+
+ui:
+  enabled: true
+  serviceType: ClusterIP

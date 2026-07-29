@@ -1,0 +1,30 @@
+# App-of-apps root Application for cluster east.
+# Apply after OpenShift GitOps is installed:
+#   oc apply -f gitops/bootstrap/root-app.yaml -n openshift-gitops
+#
+# Replace https://github.com/panchoraposo/demo-spring.git before applying (or use scripts/bootstrap-east.sh).
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: banking-demo-root
+  namespace: openshift-gitops
+  labels:
+    app.kubernetes.io/part-of: banking-demo
+    cluster: east
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  project: default
+  source:
+    repoURL: https://github.com/panchoraposo/demo-spring.git
+    targetRevision: main
+    path: gitops/applications/east
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: openshift-gitops
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true

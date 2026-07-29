@@ -1,0 +1,15 @@
+# Placeholder NetworkPolicy allowing Jenkins agents to reach the internal registry.
+# Adjust to your cluster NetworkPolicy posture as needed.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-jenkins-egress
+  namespace: banking-ci
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: jenkins
+  policyTypes:
+    - Egress
+  egress:
+    - {}

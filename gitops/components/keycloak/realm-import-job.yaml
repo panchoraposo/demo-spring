@@ -1,0 +1,56 @@
+# Imports the banking realm after Keycloak is ready.
+# Uses the Red Hat build of Keycloak image via the operator-managed pod credentials.
+apiVersion: k8s.keycloak.org/v2alpha1
+kind: KeycloakRealmImport
+metadata:
+  name: banking-realm
+  namespace: banking-idp
+  labels:
+    app.kubernetes.io/part-of: banking-demo
+spec:
+  keycloakCRName: banking-keycloak
+  realm:
+    realm: banking
+    enabled: true
+    sslRequired: external
+    registrationAllowed: false
+    loginWithEmailAllowed: true
+    roles:
+      realm:
+        - name: bank-user
+          description: Standard banking API consumer
+        - name: bank-admin
+          description: Banking API administrator
+    clients:
+      - clientId: banking-gateway
+        name: Banking API Gateway
+        enabled: true
+        publicClient: false
+        secret: banking-gateway-secret-change-me
+        directAccessGrantsEnabled: true
+        serviceAccountsEnabled: true
+        standardFlowEnabled: true
+        protocol: openid-connect
+        redirectUris: ["*"]
+        webOrigins: ["*"]
+      - clientId: banking-cli
+        name: Banking CLI / demo client
+        enabled: true
+        publicClient: true
+        directAccessGrantsEnabled: true
+        standardFlowEnabled: true
+        protocol: openid-connect
+        redirectUris: ["*"]
+        webOrigins: ["*"]
+    users:
+      - username: teller
+        enabled: true
+        email: teller@bank.demo
+        firstName: Demo
+        lastName: Teller
+        credentials:
+          - type: password
+            value: teller-change-me
+            temporary: false
+        realmRoles:
+          - bank-user

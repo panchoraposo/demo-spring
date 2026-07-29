@@ -1,0 +1,37 @@
+# JenkinsPipeline strategy BuildConfig.
+# OpenShift uses the Jenkins instance in banking-ci to execute ci/Jenkinsfile.
+apiVersion: build.openshift.io/v1
+kind: BuildConfig
+metadata:
+  name: banking-ci-pipeline
+  namespace: banking-ci
+  labels:
+    app.kubernetes.io/part-of: banking-demo
+    app.kubernetes.io/component: ci
+spec:
+  failedBuildsHistoryLimit: 5
+  successfulBuildsHistoryLimit: 5
+  runPolicy: Serial
+  source:
+    type: Git
+    git:
+      uri: https://github.com/panchoraposo/demo-spring.git
+      ref: main
+    contextDir: /
+  strategy:
+    type: JenkinsPipeline
+    jenkinsPipelineStrategy:
+      jenkinsfilePath: ci/Jenkinsfile
+      env:
+        - name: https://github.com/panchoraposo/demo-spring.git
+          value: https://github.com/panchoraposo/demo-spring.git
+        - name: GIT_BRANCH
+          value: main
+  triggers:
+    - type: ConfigChange
+    - type: GitHub
+      github:
+        secret: banking-github-webhook
+    - type: Generic
+      generic:
+        secret: banking-generic-webhook

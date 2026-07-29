@@ -1,0 +1,15 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+namespace: banking-apps
+
+resources:
+  - ../../base
+  - imagestream.yaml
+
+images:
+  - name: image-registry.openshift-image-registry.svc:5000/banking-apps/api-gateway
+    newTag: latest
+
+commonLabels:
+  cluster: east

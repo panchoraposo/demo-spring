@@ -1,0 +1,36 @@
+server:
+  port: 8080
+
+spring:
+  application:
+    name: api-gateway
+  cloud:
+    gateway:
+      routes:
+        - id: banking-service
+          uri: ${BANKING_SERVICE_URI:http://banking-service:8080}
+          predicates:
+            - Path=/api/**
+          filters:
+            - RemoveRequestHeader=Cookie
+            # Authorization Bearer JWT is forwarded by default to the banking service
+  security:
+    oauth2:
+      resourceserver:
+        jwt:
+          issuer-uri: ${OIDC_ISSUER_URI:http://localhost:8081/realms/banking}
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info
+  endpoint:
+    health:
+      probes:
+        enabled: true
+
+logging:
+  level:
+    org.springframework.cloud.gateway: INFO
+    org.springframework.security: INFO

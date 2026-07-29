@@ -1,0 +1,20 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+resources:
+  # wave 0
+  - platform-operators.yaml
+  # wave 1
+  - eso-operand.yaml
+  - vault.yaml
+  # wave 2
+  - vault-config.yaml
+  # wave 3
+  - external-secrets-config.yaml
+  # wave 4+
+  - postgresql.yaml
+  - jenkins.yaml
+  - keycloak.yaml
+  - banking-service.yaml
+  - api-gateway.yaml
+  - ci-buildconfig.yaml

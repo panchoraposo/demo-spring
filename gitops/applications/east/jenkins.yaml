@@ -1,0 +1,58 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: jenkins
+  namespace: openshift-gitops
+  labels:
+    app.kubernetes.io/part-of: banking-demo
+    cluster: east
+  annotations:
+    argocd.argoproj.io/sync-wave: "4"
+spec:
+  project: default
+  sources:
+    - repoURL: https://charts.jenkins.io
+      chart: jenkins
+      targetRevision: 5.8.27
+      helm:
+        releaseName: jenkins
+        valueFiles:
+          - $values/gitops/components/jenkins/helm-values.yaml
+    - repoURL: https://github.com/panchoraposo/demo-spring.git
+      targetRevision: main
+      ref: values
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: banking-ci
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true
+---
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: jenkins-route
+  namespace: openshift-gitops
+  labels:
+    app.kubernetes.io/part-of: banking-demo
+    cluster: east
+  annotations:
+    argocd.argoproj.io/sync-wave: "5"
+spec:
+  project: default
+  source:
+    repoURL: https://github.com/panchoraposo/demo-spring.git
+    targetRevision: main
+    path: gitops/components/jenkins
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: banking-ci
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true
