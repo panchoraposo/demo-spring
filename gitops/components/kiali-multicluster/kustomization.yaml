@@ -5,5 +5,6 @@ resources:
   - subscription-kiali.yaml
   - namespace.yaml
   - kiali.yaml
+  - ossmconsole.yaml
   # Remote cluster kubeconfig Secrets (kiali.io/multiCluster=true) are created by
   # scripts/mesh/sync-kiali-multicluster-secrets.sh — not stored in Git.

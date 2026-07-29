@@ -16,15 +16,26 @@ Patterns adapted from [ossm3-ambient-mode](https://github.com/panchoraposo/ossm3
 
 PostgreSQL and Keycloak Services are **not** labeled `istio.io/global` — failover is mesh traffic only.
 
-## Intentionally omitted: `meshNetworks` / network topology labels
+## Multi-network (overlapping pod CIDRs)
 
-In ambient mode, enabling `global.meshNetworks` and `topology.istio.io/network` has caused ztunnel to prefix VIPs in a way that breaks waypoint L7 interception (seen on OSSM 3.2 / Istio 1.27 ambient demos). This repo relies on:
+Sandboxes typically reuse the same pod CIDR on every cluster. Ambient then **must** send
+cross-cluster traffic through the east-west HBONE gateway (`gatewayClassName: istio-east-west`)
+with a **shared root CA**.
 
-- multi-primary remote secrets (`scripts/mesh/exchange-remote-secrets.sh`)
-- `istio.io/global: "true"` on `banking-service`
-- east-west HBONE gateway + passthrough Route
+Required once after both meshes are Ready:
 
-Do **not** re-enable `meshNetworks` without re-validating waypoints on OSSM 3.4.
+```bash
+scripts/mesh/sync-shared-cacerts.sh          # shared root → istio-system/cacerts
+scripts/mesh/exchange-remote-secrets.sh      # east ↔ west istiod peering
+```
+
+GitOps sets `AMBIENT_ENABLE_MULTI_NETWORK=true`, `topology.istio.io/network` on
+`istio-system` + the EW Gateway, and `global.network` per overlay (`network1` / `network2`).
+
+Do **not** label application namespaces with `topology.istio.io/network` unless you have
+re-validated waypoint L7 (historically VIP prefix issues on older OSSM ambient builds).
+Classic `global.meshNetworks` maps are still omitted — ambient multi-network uses the
+pilot env flag + EW Gateway discovery instead.
 
 ## Locality failover note
 

@@ -7,10 +7,12 @@ metadata:
   namespace: istio-system
   labels:
     app.kubernetes.io/part-of: banking-demo
+    topology.istio.io/network: CLUSTER_NETWORK
   annotations:
     networking.istio.io/service-type: LoadBalancer
 spec:
-  gatewayClassName: istio-waypoint
+  # Ambient multi-network east-west class (not istio-waypoint).
+  gatewayClassName: istio-east-west
   listeners:
     - name: mesh
       port: 15008

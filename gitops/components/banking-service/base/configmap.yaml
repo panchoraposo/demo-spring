@@ -7,3 +7,5 @@ data:
   # Bound by Spring Boot relaxed binding (resourceserver JWT)
   SPRING_SECURITY_OAUTH2_RESOURCESERVER_JWT_ISSUER_URI: http://keycloak-banking.apps.cluster-4487j.4487j.sandbox2772.opentlc.com/realms/banking
   SPRING_SECURITY_OAUTH2_RESOURCESERVER_JWT_JWK_SET_URI: http://banking-keycloak-service.banking-idp.svc:8080/realms/banking/protocol/openid-connect/certs
+  # Mesh failover: accept JWTs issued by either spoke Keycloak (comma-separated).
+  OIDC_TRUSTED_ISSUERS: http://keycloak-banking.apps.cluster-4487j.4487j.sandbox2772.opentlc.com/realms/banking,http://keycloak-banking.apps.cluster-mj6n9.mj6n9.sandbox990.opentlc.com/realms/banking

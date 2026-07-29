@@ -1,0 +1,20 @@
+# OpenShift Service Mesh Console (OSSMC) dynamic plugin for the acm hub console.
+# Requires Kiali Operator + Kiali Server (this component). After Ready, refresh
+# the OpenShift console to see the Service Mesh navigation category.
+apiVersion: kiali.io/v1alpha1
+kind: OSSMConsole
+metadata:
+  name: ossmconsole
+  namespace: openshift-operators
+  labels:
+    app.kubernetes.io/part-of: banking-demo
+    cluster: acm
+  annotations:
+    argocd.argoproj.io/sync-options: SkipDryRunOnMissingResource=true
+    argocd.argoproj.io/sync-wave: "1"
+spec:
+  version: default
+  kiali:
+    serviceName: kiali
+    serviceNamespace: istio-system
+    servicePort: 20001

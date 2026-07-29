@@ -17,5 +17,9 @@ spec:
         clusterName: CLUSTER_NAME
     pilot:
       trustedZtunnelNamespace: ztunnel
+      env:
+        # Required for ambient multi-network (overlapping pod CIDRs → EW HBONE).
+        AMBIENT_ENABLE_MULTI_NETWORK: "true"
+        AMBIENT_ENABLE_BAGGAGE: "true"
     meshConfig:
       trustDomain: cluster.local

@@ -20,6 +20,9 @@ patches:
       - op: replace
         path: /data/SPRING_SECURITY_OAUTH2_RESOURCESERVER_JWT_ISSUER_URI
         value: http://keycloak-banking.apps.cluster-mj6n9.mj6n9.sandbox990.opentlc.com/realms/banking
+      - op: replace
+        path: /data/OIDC_TRUSTED_ISSUERS
+        value: http://keycloak-banking.apps.cluster-4487j.4487j.sandbox2772.opentlc.com/realms/banking,http://keycloak-banking.apps.cluster-mj6n9.mj6n9.sandbox990.opentlc.com/realms/banking
 
 commonLabels:
   cluster: west

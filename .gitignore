@@ -26,6 +26,7 @@ Thumbs.db
 *.pem
 *.key
 local.properties
+.mesh-certs/
 
 # Maven
 .mvn/wrapper/maven-wrapper.jar

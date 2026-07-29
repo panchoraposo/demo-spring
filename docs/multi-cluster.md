@@ -6,7 +6,7 @@ Prep layout for RHACM ApplicationSets plus per-spoke data/IdP. **Do not apply** 
 
 | Cluster | Role | Workloads |
 | --- | --- | --- |
-| **acm** | Hub | RHACM, GitOps, Conjur, Jenkins, ODF, Quay, RHTAS, TPA, hub Kiali MC |
+| **acm** | Hub | RHACM, GitOps, Gitea, Conjur, Jenkins, ODF, Quay, RHTAS, TPA, hub Kiali MC + OSSMC |
 | **east** | Spoke | GitOps, ESO, OSSM 3.4 ambient, Dev Spaces, PostgreSQL, Keycloak, Spring apps |
 | **west** | Spoke | Same as east (independent DB + IdP) |
 
@@ -15,7 +15,7 @@ Prep layout for RHACM ApplicationSets plus per-spoke data/IdP. **Do not apply** 
 ## Bootstrap order
 
 1. Install RHACM on **acm**; join **east** and **west** as ManagedClusters.
-2. Install OpenShift GitOps on acm; run [`scripts/bootstrap-acm.sh`](../scripts/bootstrap-acm.sh) (or apply [`gitops/bootstrap/acm-root.yaml`](../gitops/bootstrap/acm-root.yaml)).
+2. Install OpenShift GitOps on acm; run [`scripts/bootstrap-acm.sh`](../scripts/bootstrap-acm.sh) (installs Gitea, seeds `banking/demo-spring`, stores CI PAT in Conjur, applies acm-root).
 3. Label spokes and apply Placement + ApplicationSets:
 
 ```bash
@@ -35,8 +35,12 @@ oc --context acm apply -k gitops/acm
    - `REPLACE_ME_ACM_APPS_DOMAIN` in spoke [`ClusterSecretStore`](../gitops/components/external-secrets/clustersecretstore-conjur.yaml)
    - `REPLACE_ME_WEST_APPS_DOMAIN` in api-gateway west overlay
 6. After Conjur bootstrap on acm: [`scripts/sync-conjur-creds-to-spokes.sh`](../scripts/sync-conjur-creds-to-spokes.sh)
-7. After both meshes are Ready: [`scripts/mesh/exchange-remote-secrets.sh`](../scripts/mesh/exchange-remote-secrets.sh)
-8. Optional hub Kiali secrets: [`scripts/mesh/sync-kiali-multicluster-secrets.sh`](../scripts/mesh/sync-kiali-multicluster-secrets.sh)
+7. After both meshes are Ready:
+   - Shared CA: [`scripts/mesh/sync-shared-cacerts.sh`](../scripts/mesh/sync-shared-cacerts.sh)
+   - Peering: [`scripts/mesh/exchange-remote-secrets.sh`](../scripts/mesh/exchange-remote-secrets.sh)
+8. Hub Kiali multi-cluster secrets: [`scripts/mesh/sync-kiali-multicluster-secrets.sh`](../scripts/mesh/sync-kiali-multicluster-secrets.sh) (feeds OSSMC / Service Mesh console on acm).
+9. Live failover demo: [`scripts/demo-mesh-failover.sh`](../scripts/demo-mesh-failover.sh)
+10. After Jenkins / Quay / RHTAS Routes exist: [`scripts/apply-console-banners.sh`](../scripts/apply-console-banners.sh) (spoke banners + ApplicationMenu ConsoleLinks).
 
 Spoke GitOps prerequisite: Subscription in [`gitops/platform/operators-spoke`](../gitops/platform/operators-spoke) (synced once Applications start).
 
@@ -50,17 +54,31 @@ Spoke GitOps prerequisite: Subscription in [`gitops/platform/operators-spoke`](.
 - [ ] Passthrough Route `istio-eastwestgateway` (HTTPS→HBONE) present on both spokes
 - [ ] Remote secrets exchanged both directions
 - [ ] DestinationRule `banking-service-failover` present
-- [ ] Do **not** enable `meshNetworks` / `topology.istio.io/network` until waypoints are re-validated (ambient VIP caveat)
+- [ ] Shared `cacerts` installed (`scripts/mesh/sync-shared-cacerts.sh`)
+- [ ] EW Gateway `gatewayClassName: istio-east-west` + `AMBIENT_ENABLE_MULTI_NETWORK=true`
+- [ ] Hub Kiali Ready with remote secrets for east/west
 
-## Failover demo
+## Failover demo (Kiali + mesh)
+
+Interactive presenter script (traffic loop, scale-down, recover):
 
 ```bash
-# From a client in-mesh (or via api-gateway on east) call banking-service.
+./scripts/demo-mesh-failover.sh
+```
+
+Kiali on ACM: `https://$(oc --context acm -n istio-system get route kiali -o jsonpath='{.spec.host}')`
+
+Manual equivalent:
+
+```bash
+# Pause Argo self-heal, then drain local banking-service
+oc --context east -n openshift-gitops patch applications.argoproj.io banking-service \
+  --type merge -p '{"spec":{"syncPolicy":null}}'
 oc --context east -n banking-apps scale deploy/banking-service --replicas=0
 
-# Traffic to host banking-service.banking-apps.svc.cluster.local should fail over to west
-# (outlierDetection + localityLbSetting.failoverPriority).
-# West serves its own PostgreSQL/Keycloak — expect different data / issuer.
+# api-gateway on east keeps calling banking-service.banking-apps.svc.cluster.local;
+# ambient multi-network + DestinationRule should shift to west endpoints (EW HBONE).
+# West PG data may differ; JWT issuers are trusted on both spokes (OIDC_TRUSTED_ISSUERS).
 
 oc --context east -n banking-apps scale deploy/banking-service --replicas=1
 ```
@@ -76,7 +94,10 @@ scripts/mirror-image-to-spokes.sh banking-service <tag>
 scripts/mirror-image-to-spokes.sh api-gateway <tag>
 ```
 
-Console banners: `scripts/apply-console-banners.sh` (acm text: **Hub Cluster**).
+Console UX on acm:
+- Banner **Hub Cluster** — GitOps [`gitops/components/console-banners`](../gitops/components/console-banners) (+ script for east/west).
+- ApplicationMenu links (Gitea, Jenkins, Quay, Rekor) — [`scripts/apply-console-links.sh`](../scripts/apply-console-links.sh) (Gitea also created by `bootstrap-gitea.sh`).
+- Service Mesh console (OSSMC) — [`gitops/components/kiali-multicluster/ossmconsole.yaml`](../gitops/components/kiali-multicluster/ossmconsole.yaml); refresh the OpenShift console after the plugin is Ready.
 
 ## Repo paths
 

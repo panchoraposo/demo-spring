@@ -26,6 +26,22 @@ patches:
       - op: replace
         path: /spec/values/ztunnel/multiCluster/clusterName
         value: east
+  - target:
+      kind: Namespace
+      name: istio-system
+    patch: |-
+      - op: replace
+        path: /metadata/labels/topology.istio.io~1network
+        value: network1
+  - target:
+      group: gateway.networking.k8s.io
+      version: v1
+      kind: Gateway
+      name: istio-eastwestgateway
+    patch: |-
+      - op: replace
+        path: /metadata/labels/topology.istio.io~1network
+        value: network1
 
 commonLabels:
   cluster: east

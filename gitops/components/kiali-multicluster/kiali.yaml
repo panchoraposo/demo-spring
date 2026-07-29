@@ -1,7 +1,6 @@
-# Hub Kiali multi-cluster skeleton.
-# Requires Kiali Operator / OSSM observability on acm.
-# Populate remote kubeconfig Secrets with label kiali.io/multiCluster=true
-# via scripts/mesh/sync-kiali-multicluster-secrets.sh
+# Hub Kiali multi-cluster — observes east + west (ignore_home_cluster).
+# Remote kubeconfig Secrets (label kiali.io/multiCluster=true) are created by
+# scripts/mesh/sync-kiali-multicluster-secrets.sh (cluster-admin reader SA).
 apiVersion: kiali.io/v1alpha1
 kind: Kiali
 metadata:
@@ -10,14 +9,19 @@ metadata:
   labels:
     app.kubernetes.io/part-of: banking-demo
     cluster: acm
+  annotations:
+    argocd.argoproj.io/sync-wave: "1"
+    argocd.argoproj.io/sync-options: SkipDryRunOnMissingResource=true
 spec:
+  # Anonymous keeps live demos friction-free; switch to openshift for workshops with SSO.
   auth:
-    strategy: openshift
+    strategy: anonymous
   deployment:
     accessible_namespaces:
       - '**'
     cluster_wide_access: true
     instance_name: kiali
+    view_only_mode: true
   clustering:
     ignore_home_cluster: true
     autodetect_secrets:
@@ -25,3 +29,13 @@ spec:
       label: kiali.io/multiCluster=true
   kubernetes_config:
     cluster_name: acm
+  external_services:
+    # Traffic rates need a federated Prometheus (e.g. promxy). Topology / config
+    # graphs work without it; enable when hub metrics fan-out is available.
+    prometheus:
+      enabled: false
+      is_core: false
+    grafana:
+      enabled: false
+    tracing:
+      enabled: false

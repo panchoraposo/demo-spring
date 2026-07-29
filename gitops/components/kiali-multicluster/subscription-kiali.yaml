@@ -5,12 +5,16 @@ metadata:
   labels:
     app.kubernetes.io/part-of: banking-demo
     cluster: acm
+  annotations:
+    argocd.argoproj.io/sync-wave: "0"
 ---
 apiVersion: operators.coreos.com/v1
 kind: OperatorGroup
 metadata:
   name: kiali-operator-group
   namespace: kiali-operator
+  annotations:
+    argocd.argoproj.io/sync-wave: "0"
 spec: {}
 ---
 apiVersion: operators.coreos.com/v1alpha1
@@ -20,6 +24,8 @@ metadata:
   namespace: kiali-operator
   labels:
     app.kubernetes.io/part-of: banking-demo
+  annotations:
+    argocd.argoproj.io/sync-wave: "0"
 spec:
   channel: stable
   name: kiali-ossm
