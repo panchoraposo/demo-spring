@@ -11,9 +11,7 @@ spring:
           uri: ${BANKING_SERVICE_URI:http://banking-service:8080}
           predicates:
             - Path=/api/**
-          filters:
-            - RemoveRequestHeader=Cookie
-            # Authorization Bearer JWT is forwarded by default to the banking service
+          # Authorization Bearer JWT is forwarded by default to the banking service
   security:
     oauth2:
       resourceserver:
