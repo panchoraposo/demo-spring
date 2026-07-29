@@ -107,7 +107,7 @@ controller:
                         branches('*/main')
                         extensions {
                           pathRestriction {
-                            includedRegions('apps/banking-service/.*\nci/Jenkinsfile.banking-service\nci/vars/appPipeline.groovy')
+                            includedRegions('apps/banking-service/.*\nci/Jenkinsfile.banking-service')
                             excludedRegions('')
                           }
                         }
@@ -134,7 +134,7 @@ controller:
                         branches('*/main')
                         extensions {
                           pathRestriction {
-                            includedRegions('apps/api-gateway/.*\nci/Jenkinsfile.api-gateway\nci/vars/appPipeline.groovy')
+                            includedRegions('apps/api-gateway/.*\nci/Jenkinsfile.api-gateway')
                             excludedRegions('')
                           }
                         }

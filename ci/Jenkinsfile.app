@@ -1,4 +1,5 @@
-// CI for api-gateway: git → OpenShift image build/push → GitOps newTag.
+// Shared per-app CI. APP_NAME is set by the Jenkins job (banking-service | api-gateway).
+// Flow: git change → OpenShift image build/push → GitOps newTag commit → Argo refresh.
 
 pipeline {
   agent any
@@ -16,7 +17,7 @@ pipeline {
   }
 
   environment {
-    APP = "api-gateway"
+    APP = "${env.APP_NAME}"
     APPS_NS = 'banking-apps'
     GITOPS_NS = 'openshift-gitops'
     IMAGE_TAG = "${env.BUILD_NUMBER}"
@@ -50,9 +51,9 @@ pipeline {
       when {
         anyOf {
           expression { return params.FORCE_BUILD }
-          changeset "apps/api-gateway/**"
+          changeset "apps/${env.APP_NAME}/**"
           changeset "ci/Jenkinsfile.app"
-          changeset "ci/Jenkinsfile.api-gateway"
+          changeset "ci/Jenkinsfile.${env.APP_NAME}"
         }
       }
       stages {

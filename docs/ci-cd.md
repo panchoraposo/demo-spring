@@ -38,10 +38,10 @@ Defined via JCasC Job DSL in [`gitops/components/jenkins/helm-values.yaml`](../g
 
 | Job | Jenkinsfile | Polls paths |
 | --- | --- | --- |
-| `banking-service-ci` | [`ci/Jenkinsfile.banking-service`](../ci/Jenkinsfile.banking-service) | `apps/banking-service/**`, shared CI scripts |
-| `api-gateway-ci` | [`ci/Jenkinsfile.api-gateway`](../ci/Jenkinsfile.api-gateway) | `apps/api-gateway/**`, shared CI scripts |
+| `banking-service-ci` | [`ci/Jenkinsfile.banking-service`](../ci/Jenkinsfile.banking-service) | `apps/banking-service/**` |
+| `api-gateway-ci` | [`ci/Jenkinsfile.api-gateway`](../ci/Jenkinsfile.api-gateway) | `apps/api-gateway/**` |
 
-Shared logic: [`ci/vars/appPipeline.groovy`](../ci/vars/appPipeline.groovy).
+Template used to keep both files aligned: [`ci/Jenkinsfile.app`](../ci/Jenkinsfile.app).
 
 SCM poll interval: every ~3 minutes (`H/3 * * * *`). Manual **Build with Parameters** (`FORCE_BUILD=true`) always builds.
 
