@@ -27,13 +27,14 @@ server:
     limits:
       memory: 512Mi
       cpu: "1"
+  # Treat sealed/uninitialized as ready so the pod survives until bootstrap unseals Vault.
   readinessProbe:
     enabled: true
     path: "/v1/sys/health?standbyok=true&sealedcode=204&uninitcode=204"
   livenessProbe:
     enabled: true
-    path: "/v1/sys/health?standbyok=true"
-    initialDelaySeconds: 60
+    path: "/v1/sys/health?standbyok=true&sealedcode=204&uninitcode=204"
+    initialDelaySeconds: 120
   dataStorage:
     enabled: true
     size: 10Gi
