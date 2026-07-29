@@ -4,6 +4,7 @@ metadata:
   name: banking-service-config
 data:
   SPRING_DATASOURCE_URL: jdbc:postgresql://postgresql.banking-db.svc.cluster.local:5432/banking
-  # Replace apps.cluster-4487j.4487j.sandbox2772.opentlc.com after bootstrap
-  # Match Keycloak realm issuer (http + configured hostname).
+  # Must match the `iss` claim issued by Keycloak
   OIDC_ISSUER_URI: http://keycloak-banking.apps.cluster-4487j.4487j.sandbox2772.opentlc.com/realms/banking
+  # Fetch keys via the in-cluster Service (avoid Route HTTP->HTTPS redirect issues)
+  OIDC_JWK_SET_URI: http://banking-keycloak-service.banking-idp.svc:8080/realms/banking/protocol/openid-connect/certs

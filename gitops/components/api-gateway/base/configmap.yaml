@@ -5,3 +5,4 @@ metadata:
 data:
   BANKING_SERVICE_URI: http://banking-service.banking-apps.svc.cluster.local:8080
   OIDC_ISSUER_URI: http://keycloak-banking.apps.cluster-4487j.4487j.sandbox2772.opentlc.com/realms/banking
+  OIDC_JWK_SET_URI: http://banking-keycloak-service.banking-idp.svc:8080/realms/banking/protocol/openid-connect/certs
