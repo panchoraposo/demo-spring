@@ -1,0 +1,27 @@
+# Hub Kiali multi-cluster skeleton.
+# Requires Kiali Operator / OSSM observability on acm.
+# Populate remote kubeconfig Secrets with label kiali.io/multiCluster=true
+# via scripts/mesh/sync-kiali-multicluster-secrets.sh
+apiVersion: kiali.io/v1alpha1
+kind: Kiali
+metadata:
+  name: kiali
+  namespace: istio-system
+  labels:
+    app.kubernetes.io/part-of: banking-demo
+    cluster: acm
+spec:
+  auth:
+    strategy: openshift
+  deployment:
+    accessible_namespaces:
+      - '**'
+    cluster_wide_access: true
+    instance_name: kiali
+  clustering:
+    ignore_home_cluster: true
+    autodetect_secrets:
+      enabled: true
+      label: kiali.io/multiCluster=true
+  kubernetes_config:
+    cluster_name: acm

@@ -1,0 +1,55 @@
+# East-west HBONE gateway for multi-primary ambient peering.
+# Peering secrets are exchanged by scripts/mesh/exchange-remote-secrets.sh (not applied here).
+apiVersion: gateway.networking.k8s.io/v1
+kind: Gateway
+metadata:
+  name: istio-eastwestgateway
+  namespace: istio-system
+  labels:
+    app.kubernetes.io/part-of: banking-demo
+  annotations:
+    networking.istio.io/service-type: LoadBalancer
+spec:
+  gatewayClassName: istio-waypoint
+  listeners:
+    - name: mesh
+      port: 15008
+      protocol: HBONE
+      tls:
+        mode: Terminate
+        options:
+          gateway.istio.io/tls-terminate-mode: ISTIO_MUTUAL
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: istio-eastwestgateway-https
+  namespace: istio-system
+  labels:
+    app.kubernetes.io/part-of: banking-demo
+spec:
+  selector:
+    gateway.networking.k8s.io/gateway-name: istio-eastwestgateway
+  ports:
+    - name: mesh-https
+      port: 443
+      protocol: TCP
+      targetPort: 15008
+---
+# Passthrough Route for cross-cluster HBONE (same pattern as ossm3-ambient-mode).
+apiVersion: route.openshift.io/v1
+kind: Route
+metadata:
+  name: istio-eastwestgateway
+  namespace: istio-system
+  labels:
+    app.kubernetes.io/part-of: banking-demo
+spec:
+  to:
+    kind: Service
+    name: istio-eastwestgateway-https
+  port:
+    targetPort: mesh-https
+  tls:
+    termination: passthrough
+  wildcardPolicy: None

@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
-# Bootstrap the banking demo on OpenShift cluster east.
-# Prerequisites: oc logged in; cluster-admin; pull secret for registry.redhat.io
+# DEPRECATED for multi-cluster: prefer scripts/bootstrap-acm.sh + gitops/acm ApplicationSets.
+# This script only applies the east spoke root (no Conjur/Jenkins on east).
+# Prerequisites: oc logged in; cluster-admin; Conjur reachable from acm; pull secret for registry.redhat.io
 set -euo pipefail
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"

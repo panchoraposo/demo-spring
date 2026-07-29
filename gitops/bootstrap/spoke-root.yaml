@@ -1,0 +1,30 @@
+# Optional manual spoke bootstrap when ApplicationSets are not yet wired.
+# Copy and set CLUSTER_NAME to east or west, then:
+#   oc --context "$CLUSTER_NAME" apply -f spoke-root-$CLUSTER_NAME.yaml -n openshift-gitops
+#
+# Prefer RHACM ApplicationSet banking-spoke-roots (gitops/acm/applicationsets).
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: banking-demo-root
+  namespace: openshift-gitops
+  labels:
+    app.kubernetes.io/part-of: banking-demo
+    cluster: CLUSTER_NAME
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  project: default
+  source:
+    repoURL: https://github.com/panchoraposo/demo-spring.git
+    targetRevision: main
+    path: gitops/applications/CLUSTER_NAME
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: openshift-gitops
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true

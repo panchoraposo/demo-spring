@@ -1,8 +1,10 @@
-# App-of-apps root Application for cluster east.
-# Apply after OpenShift GitOps is installed:
+# DEPRECATED for multi-cluster: use gitops/bootstrap/acm-root.yaml on acm and
+# RHACM ApplicationSets (gitops/acm) for east/west.
+#
+# Kept for emergency single-spoke bootstrap of east only (spoke apps — no Conjur/Jenkins):
 #   oc apply -f gitops/bootstrap/root-app.yaml -n openshift-gitops
 #
-# Replace https://github.com/panchoraposo/demo-spring.git before applying (or use scripts/bootstrap-east.sh).
+# Conjur + Jenkins must already be reachable on acm (ClusterSecretStore URL + creds synced).
 apiVersion: argoproj.io/v1alpha1
 kind: Application
 metadata:

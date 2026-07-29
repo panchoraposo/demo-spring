@@ -1,20 +1,18 @@
 apiVersion: kustomize.config.k8s.io/v1beta1
 kind: Kustomization
 
+# Spoke east — no Conjur/Jenkins (those live on acm).
 resources:
   # wave 0
   - platform-operators.yaml
   # wave 1
   - eso-operand.yaml
-  - conjur.yaml
   # wave 2
-  - conjur-config.yaml
+  - mesh.yaml
   # wave 3
   - external-secrets-config.yaml
   # wave 4+
   - postgresql.yaml
-  - jenkins.yaml
   - keycloak.yaml
   - banking-service.yaml
   - api-gateway.yaml
-  - ci-buildconfig.yaml

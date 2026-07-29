@@ -13,7 +13,7 @@ spec:
   source:
     repoURL: https://github.com/panchoraposo/demo-spring.git
     targetRevision: main
-    path: gitops/platform/operators
+    path: gitops/platform/operators-spoke
   destination:
     server: https://kubernetes.default.svc
     namespace: openshift-operators

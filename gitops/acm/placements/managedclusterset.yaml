@@ -1,0 +1,17 @@
+apiVersion: cluster.open-cluster-management.io/v1beta2
+kind: ManagedClusterSet
+metadata:
+  name: banking-spokes
+  labels:
+    app.kubernetes.io/part-of: banking-demo
+---
+# Binding must live in the same namespace as Placement (openshift-gitops).
+apiVersion: cluster.open-cluster-management.io/v1beta2
+kind: ManagedClusterSetBinding
+metadata:
+  name: banking-spokes
+  namespace: openshift-gitops
+  labels:
+    app.kubernetes.io/part-of: banking-demo
+spec:
+  clusterSet: banking-spokes

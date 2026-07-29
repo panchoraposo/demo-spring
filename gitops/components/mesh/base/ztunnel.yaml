@@ -1,0 +1,19 @@
+apiVersion: sailoperator.io/v1
+kind: ZTunnel
+metadata:
+  name: default
+  namespace: istio-system
+  labels:
+    app.kubernetes.io/part-of: banking-demo
+spec:
+  namespace: ztunnel
+  version: v1.30-latest
+  profile: ambient
+  values:
+    ztunnel:
+      multiCluster:
+        clusterName: CLUSTER_NAME
+  podMetadata:
+    annotations:
+      sidecar.istio.io/inject: "false"
+      ambient.istio.io/redirection: "disabled"

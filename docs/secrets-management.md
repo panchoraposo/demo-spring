@@ -1,82 +1,87 @@
 # Secrets management (CyberArk Conjur + External Secrets)
 
-This demo keeps credentials out of Git. **CyberArk Conjur OSS** stores secret values; the **External Secrets Operator for Red Hat OpenShift** synchronizes them into namespace `Secret` objects consumed by workloads.
+This demo keeps credentials out of Git. **CyberArk Conjur OSS** on cluster **acm** stores secret values; the **External Secrets Operator** on acm and on each spoke synchronizes them into namespace `Secret` objects.
 
 **Applications never call Conjur (or any vault) directly.** Only ESO authenticates to Conjur and materializes Kubernetes Secrets.
 
 ```mermaid
 flowchart LR
-  Argo[OpenShift GitOps] --> ConjurHelm[Conjur OSS Helm]
-  Argo --> Boot[conjur-bootstrap Job]
-  Argo --> ESOCfg[ClusterSecretStore + ExternalSecrets]
-  Boot -->|policy + variables + host API key| Conjur[CyberArk Conjur]
-  Boot -->|conjur-creds| ESOCreds[Secret in external-secrets]
-  ESO[ESO controllers] -->|apikey auth host/banking/eso| Conjur
-  ESO --> K8sSecrets[Namespace Secrets]
-  K8sSecrets --> Apps[PostgreSQL / Keycloak / Spring / Jenkins]
+  ArgoHub[GitOps on acm] --> ConjurHelm[Conjur OSS]
+  ArgoHub --> Boot[conjur-bootstrap Job]
+  Boot -->|policy + host API key| Conjur[CyberArk Conjur]
+  Boot -->|conjur-creds| HubESO[ESO on acm]
+  Sync[sync-conjur-creds-to-spokes.sh] -->|creds + CA| SpokeESO[ESO on east/west]
+  HubESO -->|ClusterSecretStore local SVC| Conjur
+  SpokeESO -->|ClusterSecretStore Conjur Route| Conjur
+  SpokeESO --> AppSecrets[PG / Keycloak / Spring Secrets]
+  HubESO --> CiSecrets[Jenkins / github-ci Secrets]
 ```
 
 | Piece | Location |
 | --- | --- |
-| Conjur OSS | [`gitops/components/conjur/`](../gitops/components/conjur/) (rendered Helm chart + Secrets; see `helm-values.yaml`) |
-| Conjur Route + ImageStreams | same folder (`route.yaml`, `imagestream.yaml`) |
-| Policy / seed / ESO host | [`gitops/components/conjur-config/`](../gitops/components/conjur-config/) Job |
-| `ClusterSecretStore` + `ExternalSecret`s | [`gitops/components/external-secrets/`](../gitops/components/external-secrets/) |
+| Conjur OSS | [`gitops/components/conjur/`](../gitops/components/conjur/) on **acm** |
+| Policy / seed / ESO host | [`gitops/components/conjur-config/`](../gitops/components/conjur-config/) on **acm** |
+| Hub `ClusterSecretStore` + Jenkins ES | [`gitops/components/external-secrets-hub/`](../gitops/components/external-secrets-hub/) |
+| Spoke `ClusterSecretStore` + app ES | [`gitops/components/external-secrets/`](../gitops/components/external-secrets/) |
 
-## Sync waves
+## Hub vs spoke
+
+| Cluster | Conjur URL in ClusterSecretStore | ExternalSecrets |
+| --- | --- | --- |
+| acm | `https://conjur-oss.banking-conjur.svc` | jenkins-admin, github-ci |
+| east / west | `https://conjur-oss-banking-conjur.REPLACE_ME_ACM_APPS_DOMAIN` | postgresql, keycloak, banking-service |
+
+After Conjur bootstrap on acm, copy credentials:
+
+```bash
+scripts/sync-conjur-creds-to-spokes.sh
+```
+
+That creates `external-secrets/conjur-creds` and `external-secrets/conjur-ssl-ca` on each spoke. Spokes must reach the acm Conjur Route over HTTPS.
+
+## Sync waves (acm)
 
 | Wave | Applications |
 | --- | --- |
-| 1 | `eso-operand`, `conjur`, `conjur-route` |
+| 1 | `eso-operand`, `conjur` |
 | 2 | `conjur-config` (bootstrap Job) |
-| 3 | `external-secrets-config` (`ClusterSecretStore` + `ExternalSecret`s) |
+| 3 | `external-secrets-config` (hub store + Jenkins secrets) |
+| 4+ | Jenkins, CI BuildConfigs |
 
 ## Conjur variables (account `banking`)
 
 | Variable ID | Consumed by |
 | --- | --- |
-| `banking/postgresql/*` | `ExternalSecret/postgresql-credentials` → `banking-db` |
-| `banking/keycloak-db/*` | `ExternalSecret/keycloak-db-secret` → `banking-idp` |
-| `banking/keycloak-admin/*` | `ExternalSecret/keycloak-admin` → `banking-idp` |
-| `banking/banking-service/*` | `ExternalSecret/banking-service-db` → `banking-apps` |
-| `banking/jenkins/*` | `ExternalSecret/jenkins-admin` → `banking-ci` |
-
-Each Conjur variable maps 1:1 to an `ExternalSecret` `remoteRef.key` (no Vault-style `property` field).
+| `banking/postgresql/*` | Spoke `ExternalSecret/postgresql-credentials` |
+| `banking/keycloak-db/*` | Spoke `ExternalSecret/keycloak-db-secret` |
+| `banking/keycloak-admin/*` | Spoke `ExternalSecret/keycloak-admin` |
+| `banking/banking-service/*` | Spoke `ExternalSecret/banking-service-db` |
+| `banking/jenkins/*` | Hub `ExternalSecret/jenkins-admin` |
+| `banking/github-ci/*` | Hub `ExternalSecret/github-ci` |
 
 ## Bootstrap behaviour
 
-Conjur runs as a single Helm release (`conjur-oss`) with TLS terminated by the chart’s nginx sidecar. On first sync, Job `conjur-bootstrap`:
+On first sync on acm, Job `conjur-bootstrap`:
 
 1. Waits for the Conjur Deployment and HTTPS endpoint
-2. Retrieves the `admin` API key via `conjurctl` in the Conjur pod
+2. Retrieves the `admin` API key via `conjurctl`
 3. Loads policy `banking` (variables + host `banking/eso`)
 4. Seeds demo secret values
-5. Rotates the API key for `host/banking/eso` and stores it in Secret `external-secrets/conjur-creds`
-
-To re-run bootstrap after a failure:
+5. Stores host API key in Secret `external-secrets/conjur-creds`
 
 ```bash
-oc -n banking-conjur delete job conjur-bootstrap --ignore-not-found
-oc -n openshift-gitops annotate application conjur-config argocd.argoproj.io/refresh=hard --overwrite
+oc --context acm -n banking-conjur delete job conjur-bootstrap --ignore-not-found
+oc --context acm -n openshift-gitops annotate application conjur-config argocd.argoproj.io/refresh=hard --overwrite
 ```
 
-## ESO `ClusterSecretStore`
-
-`ClusterSecretStore/conjur-backend` uses Conjur **apikey** auth:
-
-- Account: `banking`
-- Host: `host/banking/eso` (from `conjur-creds`)
-- URL: `https://conjur-oss.banking-conjur.svc`
-- CA: chart Secret `banking-conjur/conjur-oss-conjur-ssl-ca-cert`
+## Verify
 
 ```bash
-oc get pods -n banking-conjur
-oc get job -n banking-conjur
-oc get secret conjur-creds -n external-secrets
-oc get clustersecretstore conjur-backend
-oc get externalsecret -A
+oc --context acm get pods -n banking-conjur
+oc --context acm get secret conjur-creds -n external-secrets
+oc --context east get clustersecretstore conjur-backend
+oc --context east get externalsecret -A
+oc --context west get externalsecret -A
 ```
 
-## Future multi-cluster
-
-Keep the same `ExternalSecret` manifests. Point each spoke’s `ClusterSecretStore` at a reachable Conjur (or CyberArk Secrets Manager). Optionally add cloud `ClusterSecretStore`s later without changing application Deployments.
+See also [multi-cluster.md](multi-cluster.md).

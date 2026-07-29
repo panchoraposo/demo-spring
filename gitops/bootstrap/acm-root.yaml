@@ -1,0 +1,31 @@
+# Hub app-of-apps for cluster acm (Conjur, Jenkins, hub ESO, Kiali MC config).
+# Apply after OpenShift GitOps is installed on acm:
+#   oc --context acm apply -f gitops/bootstrap/acm-root.yaml -n openshift-gitops
+#
+# Then apply ACM Placement + ApplicationSets (once east/west have joined):
+#   oc --context acm apply -k gitops/acm
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: banking-demo-acm-root
+  namespace: openshift-gitops
+  labels:
+    app.kubernetes.io/part-of: banking-demo
+    cluster: acm
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  project: default
+  source:
+    repoURL: https://github.com/panchoraposo/demo-spring.git
+    targetRevision: main
+    path: gitops/applications/acm
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: openshift-gitops
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true

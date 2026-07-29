@@ -1,11 +1,11 @@
 apiVersion: kustomize.config.k8s.io/v1beta1
 kind: Kustomization
 
+# Spoke ExternalSecrets (postgresql / keycloak / banking-service).
+# Jenkins + github-ci secrets live in external-secrets-hub on acm.
 resources:
   - namespaces.yaml
   - clustersecretstore-conjur.yaml
   - externalsecret-postgresql.yaml
   - externalsecret-keycloak.yaml
   - externalsecret-banking-service.yaml
-  - externalsecret-jenkins.yaml
-  - externalsecret-github-ci.yaml

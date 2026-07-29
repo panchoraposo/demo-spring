@@ -1,0 +1,25 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+namespace: banking-apps
+
+resources:
+  - ../../base
+  - namespace.yaml
+  - imagestream.yaml
+
+images:
+  - name: image-registry.openshift-image-registry.svc:5000/banking-apps/banking-service
+    newTag: latest
+
+patches:
+  - target:
+      kind: ConfigMap
+      name: banking-service-config
+    patch: |-
+      - op: replace
+        path: /data/SPRING_SECURITY_OAUTH2_RESOURCESERVER_JWT_ISSUER_URI
+        value: http://keycloak-banking.apps.cluster-mj6n9.mj6n9.sandbox990.opentlc.com/realms/banking
+
+commonLabels:
+  cluster: west

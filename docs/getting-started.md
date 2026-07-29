@@ -1,9 +1,13 @@
-# Getting started (cluster east)
+# Getting started
+
+For the **acm / east / west** layout, follow [multi-cluster.md](multi-cluster.md) first (hub Conjur + Jenkins, spoke apps, mesh peering).
+
+The steps below are the legacy **single-spoke east** path. After the multi-cluster cutover, Conjur/Jenkins are **not** on east — use acm bootstrap instead of `bootstrap-east.sh`.
 
 ## Prerequisites
 
 - OpenShift 4.14+ with cluster-admin (ESO GA channels typically need a recent OCP; use `stable-v1` when available)
-- `oc` logged into **east**
+- `oc` logged into the target cluster (**acm** for hub, **east**/**west** for spokes)
 - Cluster pull secret able to pull from `registry.redhat.io` and Docker Hub (Conjur / nginx / postgres ImageStreams, or mirror them)
 - This repository pushed to a Git remote reachable by OpenShift GitOps and Jenkins
 

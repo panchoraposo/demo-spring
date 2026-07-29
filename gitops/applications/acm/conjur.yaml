@@ -5,7 +5,7 @@ metadata:
   namespace: openshift-gitops
   labels:
     app.kubernetes.io/part-of: banking-demo
-    cluster: east
+    cluster: acm
   annotations:
     argocd.argoproj.io/sync-wave: "1"
 spec:

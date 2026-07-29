@@ -1,0 +1,23 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: banking-ci
+  labels:
+    app.kubernetes.io/part-of: banking-demo
+    cluster: acm
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: banking-apps
+  labels:
+    app.kubernetes.io/part-of: banking-demo
+    cluster: acm
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: external-secrets
+  labels:
+    app.kubernetes.io/part-of: banking-demo
+    cluster: acm

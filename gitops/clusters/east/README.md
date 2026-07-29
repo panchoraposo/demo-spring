@@ -1,17 +1,23 @@
-# Cluster east
-
-Current demo target. All Applications under [`../applications/east`](../applications/east) deploy here.
+# Cluster east (spoke)
 
 | Namespace | Contents |
 | --- | --- |
-| `openshift-gitops` | OpenShift GitOps + root/child Applications |
-| `external-secrets-operator` | ESO Operator Subscription |
-| `external-secrets` | ESO operand controllers |
-| `banking-conjur` | CyberArk Conjur OSS + bootstrap Job + UI Route |
-| `banking-db` | PostgreSQL 16 (catalog image); secrets from ESO |
-| `banking-idp` | Red Hat build of Keycloak; secrets from ESO |
-| `banking-apps` | api-gateway + banking-service |
-| `banking-ci` | Jenkins + pipeline BuildConfig |
-| `rhbk-operator` | RHBK Operator subscription |
+| `openshift-gitops` | OpenShift GitOps (Applications from ACM ApplicationSet or spoke-root) |
+| `external-secrets-operator` / `external-secrets` | ESO → Conjur on **acm** |
+| `istio-system` / `istio-cni` / `ztunnel` | OSSM 3.4 ambient |
+| `banking-db` | PostgreSQL 16 (local; not failed over) |
+| `banking-idp` | Red Hat build of Keycloak (local issuer) |
+| `banking-apps` | api-gateway + banking-service (ambient + global Service) |
 
-West and ACM placements will be added in a later iteration.
+Conjur and Jenkins are **not** installed here (hub only).
+
+## Prerequisites before sync
+
+1. OpenShift GitOps Operator installed.
+2. `REPLACE_ME_ACM_APPS_DOMAIN` set in spoke `ClusterSecretStore` (commit or sed).
+3. `scripts/sync-conjur-creds-to-spokes.sh` copied `conjur-creds` + CA from acm.
+4. Mesh peering after west is up: `scripts/mesh/exchange-remote-secrets.sh`.
+
+## Kube context
+
+Expected local kubeconfig context name: **`east`**.

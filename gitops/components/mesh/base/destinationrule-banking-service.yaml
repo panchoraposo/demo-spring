@@ -1,0 +1,28 @@
+# Mesh traffic failover (not data failover). Independent PG/Keycloak per spoke.
+# When local banking-service endpoints are unhealthy/ejected, locality prefers the peer cluster.
+apiVersion: networking.istio.io/v1
+kind: DestinationRule
+metadata:
+  name: banking-service-failover
+  namespace: banking-apps
+  labels:
+    app.kubernetes.io/part-of: banking-demo
+spec:
+  host: banking-service.banking-apps.svc.cluster.local
+  trafficPolicy:
+    connectionPool:
+      http:
+        http1MaxPendingRequests: 32
+        http2MaxRequests: 64
+    outlierDetection:
+      consecutive5xxErrors: 3
+      interval: 5s
+      baseEjectionTime: 30s
+      maxEjectionPercent: 100
+      minHealthPercent: 0
+    loadBalancer:
+      simple: LEAST_REQUEST
+      localityLbSetting:
+        enabled: true
+        failoverPriority:
+          - topology.istio.io/cluster

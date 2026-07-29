@@ -20,7 +20,7 @@ controller:
     enabled: false
   # Builds run on the controller (no separate agents).
   numExecutors: 2
-  jenkinsUrl: https://jenkins-banking-ci.apps.cluster-4487j.4487j.sandbox2772.opentlc.com/
+  jenkinsUrl: https://jenkins-banking-ci.apps.cluster-k7kqp.k7kqp.sandbox3321.opentlc.com/
   # Chart maps proxyCompatability → excludeClientIPFromCrumb, removed in current LTS CasC schema.
   csrf:
     defaultCrumbIssuer:

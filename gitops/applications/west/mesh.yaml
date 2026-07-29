@@ -1,25 +1,32 @@
 apiVersion: argoproj.io/v1alpha1
 kind: Application
 metadata:
-  name: ci-buildconfig
+  name: mesh
   namespace: openshift-gitops
   labels:
     app.kubernetes.io/part-of: banking-demo
-    cluster: east
+    cluster: west
   annotations:
-    argocd.argoproj.io/sync-wave: "8"
+    argocd.argoproj.io/sync-wave: "2"
 spec:
   project: default
   source:
     repoURL: https://github.com/panchoraposo/demo-spring.git
     targetRevision: main
-    path: ci/buildconfig
+    path: gitops/components/mesh/overlays/west
   destination:
     server: https://kubernetes.default.svc
-    namespace: banking-ci
+    namespace: istio-system
   syncPolicy:
     automated:
       prune: true
       selfHeal: true
     syncOptions:
       - CreateNamespace=true
+      - ServerSideApply=true
+    retry:
+      limit: 10
+      backoff:
+        duration: 30s
+        factor: 2
+        maxDuration: 10m

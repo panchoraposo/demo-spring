@@ -1,4 +1,5 @@
-// Template for per-app CI (copy into Jenkinsfile.<app>): git → OpenShift image build/push → GitOps newTag.
+// Template for per-app CI (copy into Jenkinsfile.<app>): git → OpenShift image build/push → GitOps newTag (east+west).
+// Concrete jobs: Jenkinsfile.banking-service / Jenkinsfile.api-gateway
 
 pipeline {
   agent any
@@ -30,7 +31,6 @@ pipeline {
       }
     }
 
-
     stage('Install oc') {
       steps {
         sh '''
@@ -47,12 +47,7 @@ pipeline {
 
     stage('CI') {
       when {
-        anyOf {
-          expression { return params.FORCE_BUILD }
-          changeset "apps/${env.APP_NAME}/**"
-          changeset "ci/Jenkinsfile.app"
-          changeset "ci/Jenkinsfile.${env.APP_NAME}"
-        }
+        expression { return params.FORCE_BUILD || env.APP_NAME }
       }
       stages {
         stage('Build & push image') {
@@ -78,32 +73,31 @@ pipeline {
             )]) {
               sh '''
                 set -euo pipefail
-                OVERLAY="gitops/components/${APP}/overlays/east/kustomization.yaml"
-                test -f "${OVERLAY}"
-                sed -i.bak -E "s/newTag:.*/newTag: ${IMAGE_TAG}/" "${OVERLAY}"
-                rm -f "${OVERLAY}.bak"
+                OVERLAY_EAST="gitops/components/${APP}/overlays/east/kustomization.yaml"
+                OVERLAY_WEST="gitops/components/${APP}/overlays/west/kustomization.yaml"
+                test -f "${OVERLAY_EAST}"
+                test -f "${OVERLAY_WEST}"
+                sed -i.bak -E "s/newTag:.*/newTag: ${IMAGE_TAG}/" "${OVERLAY_EAST}" "${OVERLAY_WEST}"
+                rm -f "${OVERLAY_EAST}.bak" "${OVERLAY_WEST}.bak"
 
                 if [ "${GIT_PASSWORD}" = "replace-me" ] || [ -z "${GIT_PASSWORD}" ]; then
                   echo "WARN: github-ci token not configured; skipping git push of newTag=${IMAGE_TAG}."
-                  echo "Set Conjur banking/github-ci/token (GitHub PAT, repo scope) for GitOps promotion."
                   echo "SKIP_GIT_PUSH=1" > .ci-gitops-status
                   exit 0
                 fi
 
                 git config user.email "jenkins@banking-demo.local"
                 git config user.name "Jenkins CI"
-                git add "${OVERLAY}"
+                git add "${OVERLAY_EAST}" "${OVERLAY_WEST}"
                 if git diff --staged --quiet; then
-                  echo "No GitOps changes to commit"
                   echo "SKIP_GIT_PUSH=0" > .ci-gitops-status
                   exit 0
                 fi
-                git commit -m "ci(${APP}): promote image to ${IMAGE_TAG} (${GIT_COMMIT_SHORT})"
+                git commit -m "ci(${APP}): promote image to ${IMAGE_TAG} on east+west (${GIT_COMMIT_SHORT})"
                 AUTH_URL="https://${GIT_USERNAME}:${GIT_PASSWORD}@github.com/panchoraposo/demo-spring.git"
                 if git push "${AUTH_URL}" "HEAD:${GIT_BRANCH}"; then
                   echo "SKIP_GIT_PUSH=0" > .ci-gitops-status
                 else
-                  echo "WARN: git push failed; image ${APP}:${IMAGE_TAG} is in the registry."
                   echo "SKIP_GIT_PUSH=1" > .ci-gitops-status
                 fi
               '''
@@ -116,27 +110,14 @@ pipeline {
             sh '''
               set -euo pipefail
               export PATH="${WORKSPACE}/.tools:${PATH}"
-              oc -n "${GITOPS_NS}" annotate application "${APP}" \
-                argocd.argoproj.io/refresh=hard --overwrite || true
-              if [ -f .ci-gitops-status ] && grep -q SKIP_GIT_PUSH=1 .ci-gitops-status; then
-                echo "GitOps tag bump was skipped; rolling out Deployment to pull ImageStream :latest."
-                oc -n "${APPS_NS}" rollout restart "deploy/${APP}" || true
-              else
-                echo "OpenShift GitOps will deploy ${APP}:${IMAGE_TAG} from Git."
-              fi
+              for app in "${APP}" "banking-east-root" "banking-west-root"; do
+                oc -n "${GITOPS_NS}" annotate application "${app}" \
+                  argocd.argoproj.io/refresh=hard --overwrite || true
+              done
             '''
           }
         }
       }
-    }
-  }
-
-  post {
-    success {
-      echo "CI OK for ${env.APP}: image tag=${env.IMAGE_TAG}. Deployment is GitOps-owned."
-    }
-    unsuccessful {
-      echo "CI finished with status ${currentBuild.currentResult} for ${env.APP}."
     }
   }
 }

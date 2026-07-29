@@ -2,13 +2,16 @@
 
 ## Design
 
+Jenkins and BuildConfigs run on hub cluster **acm**. Pipelines bump image tags on **both** spoke overlays so RHACM/GitOps refreshes east and west.
+
 | Stage | Tool | Responsibility |
 | --- | --- | --- |
 | Detect change | Jenkins SCM poll (path-filtered) | Fire only the app pipeline whose paths changed |
-| Checkout | Jenkins | Fetch source from Git |
-| Image build + push | OpenShift BuildConfig (Docker binary) | Build UBI image into `banking-apps` ImageStream |
-| GitOps update | Jenkins | Commit `newTag` in that app’s east overlay |
-| Deploy | OpenShift GitOps | Sync Application → Deployment on cluster **east** |
+| Checkout | Jenkins on acm | Fetch source from Git |
+| Image build + push | OpenShift BuildConfig on acm | Build UBI image into acm `banking-apps` ImageStream |
+| GitOps update | Jenkins | Commit `newTag` in east **and** west overlays |
+| Deploy | OpenShift GitOps on spokes | Sync Applications → Deployments |
+| Mirror (if needed) | `scripts/mirror-image-to-spokes.sh` | Copy image from acm registry to spoke registries |
 
 Jenkins does **not** `oc apply` app manifests. GitOps owns cluster state.
 
@@ -16,20 +19,21 @@ Jenkins does **not** `oc apply` app manifests. GitOps owns cluster state.
 sequenceDiagram
   participant Dev as Developer
   participant Git as Git repo
-  participant J as Jenkins
+  participant J as Jenkins on acm
   participant BC as BuildConfig
-  participant Reg as ImageStream
-  participant Argo as OpenShift GitOps
-  participant East as Cluster east
+  participant Reg as acm ImageStream
+  participant ArgoE as GitOps east
+  participant ArgoW as GitOps west
 
   Dev->>Git: push apps/banking-service/**
-  J->>Git: SCM poll (path filter)
-  J->>J: banking-service-ci
+  J->>Git: SCM poll
   J->>BC: oc start-build --from-dir
   BC->>Reg: tag latest + BUILD_NUMBER
-  J->>Git: commit newTag bump
-  Argo->>Git: refresh
-  Argo->>East: sync Deployment
+  J->>Git: commit newTag on east+west overlays
+  ArgoE->>Git: refresh
+  ArgoW->>Git: refresh
+  ArgoE->>ArgoE: sync Deployment
+  ArgoW->>ArgoW: sync Deployment
 ```
 
 ## Jenkins jobs
@@ -41,40 +45,24 @@ Defined via JCasC Job DSL in [`gitops/components/jenkins/helm-values.yaml`](../g
 | `banking-service-ci` | [`ci/Jenkinsfile.banking-service`](../ci/Jenkinsfile.banking-service) | `apps/banking-service/**` |
 | `api-gateway-ci` | [`ci/Jenkinsfile.api-gateway`](../ci/Jenkinsfile.api-gateway) | `apps/api-gateway/**` |
 
-Template used to keep both files aligned: [`ci/Jenkinsfile.app`](../ci/Jenkinsfile.app).
-
 SCM poll interval: every ~3 minutes (`H/3 * * * *`). Manual **Build with Parameters** (`FORCE_BUILD=true`) always builds.
 
 ## Image BuildConfigs
 
-Binary Docker BuildConfigs in `banking-apps` (synced from [`ci/buildconfig/`](../ci/buildconfig/)):
+Binary Docker BuildConfigs in acm `banking-apps` (synced from [`ci/buildconfig/`](../ci/buildconfig/)):
 
 - `banking-service`
 - `api-gateway`
 
 ## GitHub credentials (GitOps push)
 
-Jenkins credential id `github-ci` (username + PAT) comes from Secret `banking-ci/github-ci` via External Secrets / Conjur (`banking/github-ci/*`).
+Jenkins credential id `github-ci` comes from Secret `banking-ci/github-ci` via External Secrets / Conjur on **acm**.
 
-Set a real PAT (repo scope) in Conjur, then refresh:
-
-```bash
-# After storing the token in Conjur (or patching the Secret):
-oc -n banking-ci get secret github-ci
-# Restart Jenkins so JCasC/env picks up a rotated token if needed:
-oc -n banking-ci delete pod jenkins-0
-```
-
-Without a valid token, image build still works; the **GitOps update** stage fails until the PAT is configured.
-
-## Triggering
-
-- **Automatic:** push to `main` under the app’s path → matching Jenkins job on next poll  
-- **Manual:** Jenkins UI → `banking-service-ci` / `api-gateway-ci` → Build with Parameters  
+Without a valid PAT, image build still works; GitOps update is skipped and the pipeline may `rollout restart` on acm only. Mirror to spokes separately if needed.
 
 ## Image tags
 
-Overlays under `gitops/components/<app>/overlays/east/kustomization.yaml`:
+Overlays under `gitops/components/<app>/overlays/{east,west}/kustomization.yaml`:
 
 ```yaml
 images:
@@ -82,4 +70,9 @@ images:
     newTag: <BUILD_NUMBER>
 ```
 
-Argo CD reconciles Deployments when `newTag` changes.
+If spokes cannot pull from the acm registry:
+
+```bash
+scripts/mirror-image-to-spokes.sh banking-service <BUILD_NUMBER>
+scripts/mirror-image-to-spokes.sh api-gateway <BUILD_NUMBER>
+```

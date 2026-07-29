@@ -1,0 +1,21 @@
+apiVersion: sailoperator.io/v1
+kind: Istio
+metadata:
+  name: default
+  namespace: istio-system
+  labels:
+    app.kubernetes.io/part-of: banking-demo
+spec:
+  version: v1.30-latest
+  profile: ambient
+  values:
+    global:
+      meshID: banking-mesh
+      network: CLUSTER_NETWORK
+      multiCluster:
+        enabled: true
+        clusterName: CLUSTER_NAME
+    pilot:
+      trustedZtunnelNamespace: ztunnel
+    meshConfig:
+      trustDomain: cluster.local

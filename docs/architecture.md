@@ -2,59 +2,60 @@
 
 ## Overview
 
-This demo runs on a single OpenShift cluster (**east**) and shows a banking API stack secured with OIDC JWTs, backed by PostgreSQL, fronted by Spring Cloud Gateway, and delivered with OpenShift GitOps plus Jenkins CI. Credentials are sourced from **CyberArk Conjur** via the **External Secrets Operator for Red Hat OpenShift**. Spring apps never talk to Conjur; they only mount Kubernetes Secrets that ESO materializes.
+This demo targets three OpenShift clusters:
+
+| Cluster | Role |
+| --- | --- |
+| **acm** | RHACM hub, CyberArk Conjur, Jenkins CI, hub Kiali multi-cluster |
+| **east** / **west** | Spokes with OpenShift GitOps, ESO, OSSM 3.4 ambient, PostgreSQL, Keycloak, Spring apps |
+
+Credentials are sourced from **CyberArk Conjur** on the hub via the **External Secrets Operator** on each cluster. Spring apps never talk to Conjur; they only mount Kubernetes Secrets that ESO materializes.
+
+**Traffic failover ≠ data failover.** Mesh locality can send `banking-service` traffic to the peer spoke; each spoke keeps its own PostgreSQL and Keycloak issuer.
 
 ```mermaid
 flowchart TB
-  subgraph east [Cluster east]
-    subgraph gitopsNS [openshift-gitops]
-      RootApp[Root Application]
-      Argo[OpenShift GitOps]
-    end
-    subgraph conjurNS [banking-conjur]
-      Conjur[CyberArk Conjur OSS]
-    end
-    subgraph esoNS [external-secrets]
-      ESO[ESO controllers]
-    end
-    subgraph ciNS [banking-ci]
-      Jenkins[Jenkins Helm]
-      BC[BuildConfig pipeline]
-    end
-    subgraph idpNS [banking-idp]
-      RHBK[Red Hat build of Keycloak]
-      KCDB[(PostgreSQL for RHBK)]
-    end
-    subgraph dbNS [banking-db]
-      PG[(PostgreSQL 16 rhel10)]
-    end
-    subgraph appsNS [banking-apps]
-      GW[api-gateway]
-      BS[banking-service]
-    end
+  subgraph acmHub [Cluster acm]
+    ACM[RHACM ApplicationSets]
+    Conjur[CyberArk Conjur]
+    Jenkins[Jenkins CI]
+    KialiHub[Kiali multi-cluster]
   end
 
-  Client --> GW
-  GW --> BS
-  BS --> PG
-  GW --> RHBK
-  BS --> RHBK
-  ESO --> Conjur
-  ESO --> PG
-  ESO --> RHBK
-  ESO --> BS
-  ESO --> Jenkins
-  BC --> Jenkins
-  Jenkins -->|commit image tags| GitRepo[Git repository]
-  GitRepo --> Argo
-  RootApp --> Argo
-  Argo --> Conjur
-  Argo --> ESO
-  Argo --> PG
-  Argo --> RHBK
-  Argo --> GW
-  Argo --> BS
-  Argo --> Jenkins
+  subgraph eastSpoke [Cluster east]
+    ArgoE[OpenShift GitOps]
+    MeshE[OSSM 3.4 ambient]
+    PGE[(PostgreSQL)]
+    KCE[Keycloak]
+    GWE[api-gateway]
+    BSE[banking-service]
+  end
+
+  subgraph westSpoke [Cluster west]
+    ArgoW[OpenShift GitOps]
+    MeshW[OSSM 3.4 ambient]
+    PGW[(PostgreSQL)]
+    KCW[Keycloak]
+    GWW[api-gateway]
+    BSW[banking-service]
+  end
+
+  ACM --> ArgoE
+  ACM --> ArgoW
+  Conjur --> ESO_E[ESO east]
+  Conjur --> ESO_W[ESO west]
+  GWE --> BSE
+  BSE --> PGE
+  GWE --> KCE
+  BSE --> KCE
+  GWW --> BSW
+  BSW --> PGW
+  GWW --> KCW
+  BSW --> KCW
+  MeshE <-->|HBONE peering| MeshW
+  Jenkins -->|newTag east+west| GitRepo[Git repository]
+  GitRepo --> ArgoE
+  GitRepo --> ArgoW
 ```
 
 ## Red Hat / catalog components
@@ -62,47 +63,41 @@ flowchart TB
 | Concern | Component |
 | --- | --- |
 | Container platform | Red Hat OpenShift |
+| Multi-cluster | Red Hat Advanced Cluster Management (RHACM) |
 | GitOps | OpenShift GitOps Operator (Argo CD) |
+| Service mesh | OpenShift Service Mesh 3.4 (Sail, ambient, Istio ~1.30) |
 | Secrets sync | External Secrets Operator for Red Hat OpenShift |
-| Secrets backend | CyberArk Conjur OSS (Helm chart, GitOps Application) |
-| Identity (OIDC) | Red Hat build of Keycloak (`rhbk-operator`) |
-| Banking DB | [`registry.redhat.io/rhel10/postgresql-16`](https://catalog.redhat.com/en/software/containers/rhel10/postgresql-16/677d13af607921b4d74fca88) |
-| Keycloak DB | Same PostgreSQL 16 catalog image |
-| App runtime images | UBI 9 OpenJDK 21 (`registry.access.redhat.com/ubi9/openjdk-21`) |
-| CI | Jenkins via Helm, images from `registry.redhat.io/ocp-tools-4/*` |
-| Pipelines trigger | OpenShift `BuildConfig` (`JenkinsPipeline` strategy) |
+| Secrets backend | CyberArk Conjur OSS (Helm chart, GitOps Application on acm) |
+| Identity (OIDC) | Red Hat build of Keycloak (`rhbk-operator`) — **per spoke** |
+| Banking DB | [`registry.redhat.io/rhel10/postgresql-16`](https://catalog.redhat.com/en/software/containers/rhel10/postgresql-16/677d13af607921b4d74fca88) — **per spoke** |
+| App runtime images | UBI 9 OpenJDK 21 |
+| CI | Jenkins on acm via Helm + OpenShift BuildConfig |
 
-## App-of-apps
+## GitOps ownership
 
-1. Bootstrap installs/ensures OpenShift GitOps.
-2. Root Application `banking-demo-root` points at `gitops/applications/east`.
-3. Child Applications sync in waves:
-   - `0` platform operators (RHBK, ESO Subscription, GitOps)
-   - `1` ESO operand (`ExternalSecretsConfig`) + Conjur Helm + Conjur Route
-   - `2` Conjur bootstrap (policy, seed variables, ESO host credentials)
-   - `3` `ClusterSecretStore` + `ExternalSecret`s
-   - `4` PostgreSQL + Jenkins
-   - `5` Keycloak (+ Jenkins Route)
-   - `6` banking-service
-   - `7` api-gateway
-   - `8` CI BuildConfigs
+1. **acm:** [`gitops/bootstrap/acm-root.yaml`](../gitops/bootstrap/acm-root.yaml) → [`gitops/applications/acm`](../gitops/applications/acm) (Conjur, Jenkins, hub ESO, Kiali).
+2. **RHACM:** [`gitops/acm`](../gitops/acm) Placement + ApplicationSet `banking-spoke-roots` generates Applications that sync `gitops/applications/{{east|west}}` to each ManagedCluster.
+3. **Spoke waves (east/west):**
+   - `0` platform operators (RHBK, ESO, Sail, GitOps)
+   - `1` ESO operand
+   - `2` mesh (Istio / CNI / ZTunnel / east-west GW / DestinationRule)
+   - `3` `ClusterSecretStore` + app `ExternalSecret`s (Conjur URL → acm)
+   - `4+` PostgreSQL, Keycloak, banking-service, api-gateway
 
-Details: [secrets-management.md](secrets-management.md).
+Details: [secrets-management.md](secrets-management.md), [multi-cluster.md](multi-cluster.md).
 
 ## Security model
 
-- Clients obtain an access token from Keycloak realm `banking` (password grant via `banking-cli` for demos, or confidential client `banking-gateway`).
+- Clients obtain an access token from the **local** Keycloak realm `banking`.
 - **api-gateway** validates the JWT (`issuer-uri`) and proxies `/api/**` to **banking-service**.
-- **banking-service** is also an OAuth2 resource server and validates the same issuer.
+- **banking-service** is also an OAuth2 resource server.
 - Actuator health endpoints remain unauthenticated for probes.
-- Database and admin passwords are not stored in Git; Conjur is the source of truth, synced by ESO.
+- Database and admin passwords are not stored in Git; Conjur on acm is the source of truth.
 
-## Future multi-cluster
+## Mesh failover
 
-Placeholders and labels use `cluster: east` so a later phase can add:
+- `banking-service` Service: `istio.io/global=true` + waypoint
+- DestinationRule: `outlierDetection` + `localityLbSetting.failoverPriority: topology.istio.io/cluster`
+- PostgreSQL / Keycloak Services stay local (no global label)
 
-- `gitops/applications/west` for a second spoke (AWS or GCP)
-- ACM ApplicationSets / Placement for a hub cluster
-- Per-spoke `ClusterSecretStore` pointing at Conjur (or cloud secret managers)
-
-No west/ACM resources are active in the current scope.
+See [multi-cluster.md](multi-cluster.md) for the scale-to-zero demo.

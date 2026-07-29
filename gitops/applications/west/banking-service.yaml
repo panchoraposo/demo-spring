@@ -1,31 +1,25 @@
 apiVersion: argoproj.io/v1alpha1
 kind: Application
 metadata:
-  name: conjur-config
+  name: banking-service
   namespace: openshift-gitops
   labels:
     app.kubernetes.io/part-of: banking-demo
-    cluster: east
+    cluster: west
   annotations:
-    argocd.argoproj.io/sync-wave: "2"
+    argocd.argoproj.io/sync-wave: "6"
 spec:
   project: default
   source:
     repoURL: https://github.com/panchoraposo/demo-spring.git
     targetRevision: main
-    path: gitops/components/conjur-config
+    path: gitops/components/banking-service/overlays/west
   destination:
     server: https://kubernetes.default.svc
-    namespace: banking-conjur
+    namespace: banking-apps
   syncPolicy:
     automated:
       prune: true
       selfHeal: true
     syncOptions:
       - CreateNamespace=true
-    retry:
-      limit: 5
-      backoff:
-        duration: 30s
-        factor: 2
-        maxDuration: 5m

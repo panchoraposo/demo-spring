@@ -1,11 +1,11 @@
 apiVersion: kustomize.config.k8s.io/v1beta1
 kind: Kustomization
 
+# Compatibility alias — same as operators-spoke.
 resources:
   - namespace-rhbk.yaml
   - subscription-rhbk.yaml
   - namespace-eso.yaml
   - subscription-eso.yaml
-  # OpenShift GitOps is typically installed once via OperatorHub before the root app.
-  # Keep this Subscription for declarative drift control when desired.
   - subscription-openshift-gitops.yaml
+  - subscription-sail.yaml

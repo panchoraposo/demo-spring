@@ -1,11 +1,6 @@
 apiVersion: kustomize.config.k8s.io/v1beta1
 kind: Kustomization
 
+# Compatibility alias → east overlay
 resources:
-  - namespace.yaml
-  - keycloak-db.yaml
-  - keycloak.yaml
-  - realm-import-job.yaml
-  - route.yaml
-  # Credentials: ExternalSecrets keycloak-db-secret / keycloak-admin
-
+  - overlays/east

@@ -1,0 +1,26 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: istio-system
+  labels:
+    app.kubernetes.io/part-of: banking-demo
+    openshift.io/cluster-monitoring: "true"
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: istio-cni
+  labels:
+    app.kubernetes.io/part-of: banking-demo
+    pod-security.kubernetes.io/enforce: privileged
+    openshift.io/cluster-monitoring: "true"
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: ztunnel
+  labels:
+    app.kubernetes.io/part-of: banking-demo
+    pod-security.kubernetes.io/enforce: privileged
+    istio-discovery: enabled
+    istio.io/dataplane-mode: ambient

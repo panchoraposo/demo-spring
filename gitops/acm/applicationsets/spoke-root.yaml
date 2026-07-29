@@ -1,0 +1,47 @@
+# ApplicationSet on hub OpenShift GitOps.
+# Prerequisites:
+# 1. ManagedClusters east/west labeled banking-demo/role=spoke and banking-demo/region=<name>
+# 2. Placement banking-spokes decides those clusters
+# 3. Hub Argo has cluster secrets for east/west (ACM GitOps Cluster addon or manual)
+# 4. OpenShift GitOps installed on each spoke (operators-spoke Subscription)
+#
+# Each decision creates an Application that syncs gitops/applications/<cluster> to that cluster.
+apiVersion: argoproj.io/v1alpha1
+kind: ApplicationSet
+metadata:
+  name: banking-spoke-roots
+  namespace: openshift-gitops
+  labels:
+    app.kubernetes.io/part-of: banking-demo
+spec:
+  generators:
+    - clusterDecisionResource:
+        configMapRef: acm-placement
+        labelSelector:
+          matchLabels:
+            cluster.open-cluster-management.io/placement: banking-spokes
+        requeueAfterSeconds: 180
+  template:
+    metadata:
+      name: 'banking-{{name}}-root'
+      namespace: openshift-gitops
+      labels:
+        app.kubernetes.io/part-of: banking-demo
+        cluster: '{{name}}'
+      finalizers:
+        - resources-finalizer.argocd.argoproj.io
+    spec:
+      project: default
+      source:
+        repoURL: https://github.com/panchoraposo/demo-spring.git
+        targetRevision: main
+        path: 'gitops/applications/{{name}}'
+      destination:
+        server: '{{server}}'
+        namespace: openshift-gitops
+      syncPolicy:
+        automated:
+          prune: true
+          selfHeal: true
+        syncOptions:
+          - CreateNamespace=true

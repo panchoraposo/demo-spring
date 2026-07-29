@@ -4,7 +4,6 @@ metadata:
   name: banking-db
   labels:
     app.kubernetes.io/part-of: banking-demo
-    cluster: east
 ---
 apiVersion: v1
 kind: Namespace
@@ -12,7 +11,6 @@ metadata:
   name: banking-idp
   labels:
     app.kubernetes.io/part-of: banking-demo
-    cluster: east
 ---
 apiVersion: v1
 kind: Namespace
@@ -20,12 +18,5 @@ metadata:
   name: banking-apps
   labels:
     app.kubernetes.io/part-of: banking-demo
-    cluster: east
----
-apiVersion: v1
-kind: Namespace
-metadata:
-  name: banking-ci
-  labels:
-    app.kubernetes.io/part-of: banking-demo
-    cluster: east
+    istio.io/dataplane-mode: ambient
+    istio-discovery: enabled
