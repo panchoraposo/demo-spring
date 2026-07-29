@@ -18,8 +18,8 @@ flowchart LR
 
 | Piece | Location |
 | --- | --- |
-| Conjur OSS (Helm) | [`gitops/components/conjur/helm-values.yaml`](../gitops/components/conjur/helm-values.yaml) via Application `conjur` |
-| Conjur Route + ImageStreams | [`gitops/components/conjur/`](../gitops/components/conjur/) |
+| Conjur OSS | [`gitops/components/conjur/`](../gitops/components/conjur/) (rendered Helm chart + Secrets; see `helm-values.yaml`) |
+| Conjur Route + ImageStreams | same folder (`route.yaml`, `imagestream.yaml`) |
 | Policy / seed / ESO host | [`gitops/components/conjur-config/`](../gitops/components/conjur-config/) Job |
 | `ClusterSecretStore` + `ExternalSecret`s | [`gitops/components/external-secrets/`](../gitops/components/external-secrets/) |
 

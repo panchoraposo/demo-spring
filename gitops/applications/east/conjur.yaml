@@ -24,3 +24,31 @@ spec:
     syncOptions:
       - CreateNamespace=true
       - ServerSideApply=true
+  ignoreDifferences:
+    - group: image.openshift.io
+      kind: ImageStream
+      jqPathExpressions:
+        - .status
+        - .metadata.annotations
+    - group: ""
+      kind: PersistentVolumeClaim
+      jqPathExpressions:
+        - .status
+        - .spec.volumeName
+        - .metadata.annotations
+    - group: ""
+      kind: Secret
+      jqPathExpressions:
+        - .metadata.annotations
+        - .metadata.labels
+    - group: apps
+      kind: Deployment
+      jqPathExpressions:
+        - .spec.template.metadata.annotations
+        - .metadata.annotations
+    - group: apps
+      kind: StatefulSet
+      jqPathExpressions:
+        - .spec.template.metadata.annotations
+        - .metadata.annotations
+
