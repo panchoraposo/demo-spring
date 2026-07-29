@@ -12,7 +12,7 @@ pipeline {
 
   parameters {
     booleanParam(name: 'FORCE_BUILD', defaultValue: true, description: 'Build even without path changes (default true for manual runs)')
-    string(name: 'GIT_BRANCH', defaultValue: 'main', description: 'Branch for GitOps commits')
+    string(name: 'GITOPS_BRANCH', defaultValue: 'main', description: 'Branch for GitOps commits')
   }
 
   environment {
@@ -118,7 +118,7 @@ pipeline {
                 fi
                 git commit -m "ci(${APP}): promote signed image ${IMAGE_TAG} on east+west (${GIT_COMMIT_SHORT})"
                 AUTH_URL="https://${GIT_USERNAME}:${GIT_PASSWORD}@github.com/panchoraposo/demo-spring.git"
-                if git push "${AUTH_URL}" "HEAD:${GIT_BRANCH}"; then
+                if git push "${AUTH_URL}" "HEAD:${GITOPS_BRANCH}"; then
                   echo "SKIP_GIT_PUSH=0" > .ci-gitops-status
                 else
                   echo "SKIP_GIT_PUSH=1" > .ci-gitops-status

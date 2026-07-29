@@ -129,7 +129,7 @@ controller:
                 description('CI for apps/banking-service → Build → Quay (sbom/attest/sign) → GitOps')
                 parameters {
                   booleanParam('FORCE_BUILD', true, 'Build even without path changes')
-                  stringParam('GIT_BRANCH', 'main', 'Branch for GitOps commits')
+                  stringParam('GITOPS_BRANCH', 'main', 'Branch for GitOps commits')
                 }
                 definition {
                   cpsScm {
@@ -160,7 +160,7 @@ controller:
                 description('CI for apps/api-gateway → Build → Quay (sbom/attest/sign) → GitOps')
                 parameters {
                   booleanParam('FORCE_BUILD', true, 'Build even without path changes')
-                  stringParam('GIT_BRANCH', 'main', 'Branch for GitOps commits')
+                  stringParam('GITOPS_BRANCH', 'main', 'Branch for GitOps commits')
                 }
                 definition {
                   cpsScm {
