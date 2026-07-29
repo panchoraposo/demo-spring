@@ -23,7 +23,8 @@ metadata:
   labels:
     app.kubernetes.io/part-of: banking-demo
 spec:
-  channel: stable-4.18
+  # Match hub OCP minor (4.20 → stable-4.20). stable-4.18 is not published.
+  channel: stable-4.20
   name: odf-operator
   source: redhat-operators
   sourceNamespace: openshift-marketplace

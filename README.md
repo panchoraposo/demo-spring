@@ -93,6 +93,7 @@ See [docs/multi-cluster.md](docs/multi-cluster.md), [docs/supply-chain.md](docs/
 - [Getting started](docs/getting-started.md)
 - [Secrets management](docs/secrets-management.md)
 - [CI/CD](docs/ci-cd.md)
+- [Conjur PAT + secret sync demo](docs/conjur-pat-and-sync.md)
 - [API reference](docs/api-reference.md)
 - [PostgreSQL image recommendation (PoC)](docs/postgresql-image.md)
 

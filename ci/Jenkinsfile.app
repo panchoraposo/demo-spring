@@ -58,7 +58,7 @@ pipeline {
               set -euo pipefail
               export PATH="${TOOLS_DIR}:${PATH}"
               oc whoami
-              oc project "${APPS_NS}"
+              # Prefer -n over `oc project` — Jenkins home kubeconfig can be corrupt/incomplete.
               oc start-build "${APP}" --from-dir="apps/${APP}" --follow --wait -n "${APPS_NS}"
               oc tag "${APPS_NS}/${APP}:latest" "${APPS_NS}/${APP}:${IMAGE_TAG}" -n "${APPS_NS}"
               oc get istag "${APP}:${IMAGE_TAG}" -n "${APPS_NS}"
