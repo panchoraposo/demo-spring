@@ -1,12 +1,14 @@
 # Values for the Jenkins Helm chart (charts.jenkins.io).
 # Admin credentials come from ExternalSecret jenkins-admin (Vault via ESO).
+# Images come from the OpenShift samples ImageStreams (redhat.io ocp-tools-4).
 
 controller:
   componentName: jenkins-controller
   image:
-    registry: registry.redhat.io
-    repository: ocp-tools-4/jenkins-rhel8
-    tag: latest
+    registry: image-registry.openshift-image-registry.svc:5000
+    repository: openshift/jenkins
+    tag: "2"
+    pullPolicy: IfNotPresent
   admin:
     existingSecret: jenkins-admin
     userKey: jenkins-admin-user
@@ -17,6 +19,14 @@ controller:
   installPlugins: []
   # OpenShift Jenkins image ships with curated plugins; avoid upstream plugin manager conflicts.
   initializeOnce: true
+  # OpenShift SCC: allow the chart's UID 1000 (pair with anyuid on SA jenkins).
+  containerSecurityContext:
+    runAsUser: 1000
+    runAsGroup: 1000
+    allowPrivilegeEscalation: false
+  podSecurityContext:
+    runAsUser: 1000
+    fsGroup: 1000
   resources:
     requests:
       cpu: 500m
@@ -24,6 +34,10 @@ controller:
     limits:
       cpu: "2"
       memory: 2Gi
+  # Disable config-reload sidecar (kiwigrid) for a simpler OpenShift demo.
+  sidecars:
+    configAutoReload:
+      enabled: false
   JCasC:
     confd:
       enabled: false
@@ -38,8 +52,8 @@ controller:
 agent:
   enabled: true
   image:
-    registry: registry.redhat.io
-    repository: ocp-tools-4/jenkins-agent-base-rhel8
+    registry: image-registry.openshift-image-registry.svc:5000
+    repository: openshift/jenkins-agent-base
     tag: latest
 
 persistence:
