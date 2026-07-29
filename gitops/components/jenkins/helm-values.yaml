@@ -98,6 +98,10 @@ controller:
           - script: |
               pipelineJob('banking-service-ci') {
                 description('CI for apps/banking-service → ImageStream → GitOps')
+                parameters {
+                  booleanParam('FORCE_BUILD', true, 'Build even without path changes')
+                  stringParam('GIT_BRANCH', 'main', 'Branch for GitOps commits')
+                }
                 definition {
                   cpsScm {
                     scm {
@@ -125,6 +129,10 @@ controller:
           - script: |
               pipelineJob('api-gateway-ci') {
                 description('CI for apps/api-gateway → ImageStream → GitOps')
+                parameters {
+                  booleanParam('FORCE_BUILD', true, 'Build even without path changes')
+                  stringParam('GIT_BRANCH', 'main', 'Branch for GitOps commits')
+                }
                 definition {
                   cpsScm {
                     scm {
