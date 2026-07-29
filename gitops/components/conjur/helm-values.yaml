@@ -59,6 +59,10 @@ ssl:
   hostname: conjur-oss.banking-conjur.svc
   altNames:
     - conjur.banking-conjur.svc
+    - conjur-oss
+    - conjur-oss.banking-conjur
+    - conjur-oss.banking-conjur.svc.cluster.local
+    - conjur-banking-conjur.apps.cluster-k7kqp.k7kqp.sandbox3321.opentlc.com
   expiration: 365
 
 rbac:
