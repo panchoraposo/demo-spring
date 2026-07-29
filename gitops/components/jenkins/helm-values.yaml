@@ -20,6 +20,7 @@ controller:
     enabled: false
   # Builds run on the controller (no separate agents).
   numExecutors: 2
+  jenkinsUrl: https://jenkins-banking-ci.apps.cluster-4487j.4487j.sandbox2772.opentlc.com/
   # Use plugin-installation-manager with latest-tested plugins for this LTS line.
   installLatestPlugins: true
   installPlugins:
@@ -76,9 +77,6 @@ controller:
       banking-demo: |
         jenkins:
           systemMessage: "Banking Demo CI — per-app pipelines (git → image → GitOps)"
-        unclassified:
-          location:
-            url: https://jenkins-banking-ci.apps.cluster-4487j.4487j.sandbox2772.opentlc.com/
         credentials:
           system:
             domainCredentials:
