@@ -49,20 +49,24 @@ data:
       fi
     done
 
-    POD="$(oc get pod -n "${NS}" -l app.kubernetes.io/name=conjur-oss -o jsonpath='{.items[0].metadata.name}')"
-    if [[ -z "${POD}" ]]; then
-      POD="$(oc get pod -n "${NS}" -l app=conjur-oss -o jsonpath='{.items[0].metadata.name}')"
-    fi
-    echo "Using Conjur pod ${POD}"
-
     echo "Retrieving admin API key..."
     ADMIN_API_KEY=""
-    for i in $(seq 1 36); do
-      ADMIN_API_KEY="$(oc exec -n "${NS}" "${POD}" -c conjur-oss -- \
-        conjurctl role retrieve-key "${ACCOUNT}:user:admin" 2>/dev/null || true)"
-      ADMIN_API_KEY="$(printf '%s' "${ADMIN_API_KEY}" | tr -d '\r\n')"
-      if [[ -n "${ADMIN_API_KEY}" ]]; then
-        break
+    POD=""
+    for i in $(seq 1 60); do
+      POD="$(oc get pod -n "${NS}" -l app=conjur-oss --field-selector=status.phase=Running \
+        -o jsonpath='{.items[0].metadata.name}' 2>/dev/null || true)"
+      if [[ -z "${POD}" ]]; then
+        POD="$(oc get pod -n "${NS}" -l app.kubernetes.io/name=conjur-oss --field-selector=status.phase=Running \
+          -o jsonpath='{.items[0].metadata.name}' 2>/dev/null || true)"
+      fi
+      if [[ -n "${POD}" ]]; then
+        ADMIN_API_KEY="$(oc exec -n "${NS}" "${POD}" -c conjur-oss -- \
+          conjurctl role retrieve-key "${ACCOUNT}:user:admin" 2>/dev/null || true)"
+        ADMIN_API_KEY="$(printf '%s' "${ADMIN_API_KEY}" | tr -d '\r\n')"
+        if [[ -n "${ADMIN_API_KEY}" ]]; then
+          echo "Using Conjur pod ${POD}"
+          break
+        fi
       fi
       sleep 5
     done

@@ -30,6 +30,14 @@ spec:
       selfHeal: true
     syncOptions:
       - CreateNamespace=true
+      # Pre-install Secret hooks are also materialized by Application conjur-route.
+      - FailOnSharedResource=false
+  ignoreDifferences:
+    - group: ""
+      kind: Secret
+      jqPathExpressions:
+        - .data
+        - .metadata.annotations
 ---
 apiVersion: argoproj.io/v1alpha1
 kind: Application

@@ -18,6 +18,10 @@ logLevel: info
 # Demo fixed data key (32-byte base64). Rotate for any non-demo use.
 dataKey: "Yl/ai1C4jVUkqqLorR52RocmN8pm4LQD+EAwLlf/StM="
 
+# Must match Secret conjur-oss-conjur-database-password / database-url in helm-secrets.yaml
+database:
+  password: conjur-db-change-me
+
 openshift:
   enabled: false
 
