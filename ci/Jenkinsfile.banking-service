@@ -1,0 +1,2 @@
+// Per-app CI (Pipeline script from SCM; full checkout via lightweight(false)).
+load('ci/vars/appPipeline.groovy').call('banking-service')

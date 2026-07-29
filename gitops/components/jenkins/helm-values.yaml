@@ -1,8 +1,8 @@
 # Values for the Jenkins Helm chart (charts.jenkins.io).
 # Admin credentials come from ExternalSecret jenkins-admin (Conjur via ESO).
 #
-# Use Jenkins LTS + empty installPlugins so the chart init container does not
-# pull :latest plugins that require a newer core than the current LTS.
+# Jobs are defined in JCasC (Job DSL). OpenShift JenkinsPipeline sync is NOT used
+# (this is upstream Jenkins LTS, not the OpenShift Jenkins image).
 
 controller:
   componentName: jenkins-controller
@@ -18,12 +18,24 @@ controller:
   serviceType: ClusterIP
   ingress:
     enabled: false
-  # Avoid plugin-manager failures against LTS; plugins can be added later in the UI.
-  installPlugins: []
+  # Use plugin-installation-manager with latest-tested plugins for this LTS line.
+  installLatestPlugins: true
+  installPlugins:
+    - kubernetes
+    - workflow-aggregator
+    - git
+    - configuration-as-code
+    - job-dsl
+    - credentials-binding
+    - plain-credentials
+    - pipeline-stage-view
+    - github
+    - credentials
   additionalPlugins: []
-  initializeOnce: true
-  overwritePlugins: false
-  overwritePluginsFromImage: false
+  initializeOnce: false
+  overwritePlugins: true
+  overwritePluginsFromImage: true
+
   containerSecurityContext:
     runAsUser: 1000
     runAsGroup: 1000
@@ -38,6 +50,20 @@ controller:
     limits:
       cpu: "2"
       memory: 2Gi
+  # Inject GitHub PAT for JCasC credential github-ci (GitOps push).
+  containerEnv:
+    - name: GITHUB_CI_USERNAME
+      valueFrom:
+        secretKeyRef:
+          name: github-ci
+          key: username
+          optional: true
+    - name: GITHUB_CI_TOKEN
+      valueFrom:
+        secretKeyRef:
+          name: github-ci
+          key: token
+          optional: true
   sidecars:
     configAutoReload:
       enabled: false
@@ -47,10 +73,76 @@ controller:
     configScripts:
       banking-demo: |
         jenkins:
-          systemMessage: "Banking Demo CI — OpenShift cluster east"
+          systemMessage: "Banking Demo CI — per-app pipelines (git → image → GitOps)"
+          numExecutors: 2
         unclassified:
           location:
             url: https://jenkins-banking-ci.apps.cluster-4487j.4487j.sandbox2772.opentlc.com/
+        credentials:
+          system:
+            domainCredentials:
+              - credentials:
+                  - usernamePassword:
+                      scope: GLOBAL
+                      id: github-ci
+                      username: "${GITHUB_CI_USERNAME:-git}"
+                      password: "${GITHUB_CI_TOKEN:-replace-me}"
+                      description: "GitHub PAT for GitOps tag-bump commits"
+        jobs:
+          - script: |
+              pipelineJob('banking-service-ci') {
+                description('CI for apps/banking-service → ImageStream → GitOps')
+                definition {
+                  cpsScm {
+                    scm {
+                      git {
+                        remote {
+                          url('https://github.com/panchoraposo/demo-spring.git')
+                        }
+                        branches('*/main')
+                        extensions {
+                          pathRestriction {
+                            includedRegions('apps/banking-service/.*\nci/Jenkinsfile.banking-service\nci/vars/appPipeline.groovy')
+                            excludedRegions('')
+                          }
+                        }
+                      }
+                    }
+                    scriptPath('ci/Jenkinsfile.banking-service')
+                    lightweight(false)
+                  }
+                }
+                triggers {
+                  scm('H/3 * * * *')
+                }
+              }
+          - script: |
+              pipelineJob('api-gateway-ci') {
+                description('CI for apps/api-gateway → ImageStream → GitOps')
+                definition {
+                  cpsScm {
+                    scm {
+                      git {
+                        remote {
+                          url('https://github.com/panchoraposo/demo-spring.git')
+                        }
+                        branches('*/main')
+                        extensions {
+                          pathRestriction {
+                            includedRegions('apps/api-gateway/.*\nci/Jenkinsfile.api-gateway\nci/vars/appPipeline.groovy')
+                            excludedRegions('')
+                          }
+                        }
+                      }
+                    }
+                    scriptPath('ci/Jenkinsfile.api-gateway')
+                    lightweight(false)
+                  }
+                }
+                triggers {
+                  scm('H/3 * * * *')
+                }
+              }
 
 agent:
   enabled: false

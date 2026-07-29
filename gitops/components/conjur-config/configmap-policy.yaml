@@ -23,6 +23,8 @@ data:
         - !variable banking-service/SPRING_DATASOURCE_PASSWORD
         - !variable jenkins/jenkins-admin-user
         - !variable jenkins/jenkins-admin-password
+        - !variable github-ci/username
+        - !variable github-ci/token
 
         - !host
           id: eso
@@ -46,3 +48,5 @@ data:
             - !variable banking-service/SPRING_DATASOURCE_PASSWORD
             - !variable jenkins/jenkins-admin-user
             - !variable jenkins/jenkins-admin-password
+            - !variable github-ci/username
+            - !variable github-ci/token

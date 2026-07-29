@@ -60,17 +60,15 @@ PostgreSQL uses the catalog image `registry.redhat.io/rhel10/postgresql-16`. Cre
 
 ## 4. Build application images (first time)
 
-Until Jenkins runs, start binary builds manually:
+Prefer Jenkins jobs (see [ci-cd.md](ci-cd.md)): `banking-service-ci` and `api-gateway-ci` in the Jenkins UI. They poll Git for path changes and push ImageStream tags, then bump GitOps `newTag`.
+
+Configure Secret `banking-ci/github-ci` (via Conjur `banking/github-ci/token`) with a GitHub PAT so the GitOps commit stage can push.
+
+Manual image build without Jenkins:
 
 ```bash
 oc -n banking-apps start-build banking-service --from-dir=apps/banking-service --follow
 oc -n banking-apps start-build api-gateway --from-dir=apps/api-gateway --follow
-```
-
-Or trigger the Jenkins pipeline BuildConfig:
-
-```bash
-oc -n banking-ci start-build banking-ci-pipeline --follow
 ```
 
 ## 5. Obtain a JWT and call APIs

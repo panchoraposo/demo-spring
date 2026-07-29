@@ -3,8 +3,6 @@ kind: Kustomization
 
 resources:
   - namespace.yaml
-  - serviceaccount.yaml
   - rolebinding.yaml
-  - buildconfig-pipeline.yaml
   - buildconfig-banking-service.yaml
   - buildconfig-api-gateway.yaml

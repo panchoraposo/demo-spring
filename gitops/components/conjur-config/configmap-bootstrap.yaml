@@ -125,6 +125,9 @@ data:
     set_var "banking/banking-service/SPRING_DATASOURCE_PASSWORD" "banking-demo-change-me"
     set_var "banking/jenkins/jenkins-admin-user" "admin"
     set_var "banking/jenkins/jenkins-admin-password" "ChangeMeOnFirstLogin!"
+    # Replace token with a GitHub PAT (repo scope) so Jenkins can push GitOps tag bumps.
+    set_var "banking/github-ci/username" "git"
+    set_var "banking/github-ci/token" "replace-me"
 
     echo "Rotating API key for host banking/eso..."
     # Re-auth in case token TTL is short

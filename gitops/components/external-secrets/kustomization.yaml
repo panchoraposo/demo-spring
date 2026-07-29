@@ -8,3 +8,4 @@ resources:
   - externalsecret-keycloak.yaml
   - externalsecret-banking-service.yaml
   - externalsecret-jenkins.yaml
+  - externalsecret-github-ci.yaml
