@@ -14,7 +14,7 @@ spec:
   backgroundColor: '${bg}'
 YAML
 }
-apply_banner acm "ACM Cluster" "#6A00FF"
+apply_banner acm "Hub Cluster" "#6A00FF"
 apply_banner east "East Cluster" "#0088CE"
 apply_banner west "West Cluster" "#3E8635"
 echo "Console banners applied on acm, east, west."

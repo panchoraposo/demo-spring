@@ -1,0 +1,11 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+# RHTPA supporting resources + RHDA backend for Dev Spaces Dependency Analytics.
+# Apply TrustedProfileAnalyzer CR from trustedprofileanalyzer.sample.yaml after
+# aligning fields with the installed operator CSV sample (Tech Preview CRD).
+resources:
+  - objectbucketclaim.yaml
+  - secrets.yaml
+  - postgresql.yaml
+  - rhda-backend.yaml

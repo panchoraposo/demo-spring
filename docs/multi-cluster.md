@@ -6,8 +6,8 @@ Prep layout for RHACM ApplicationSets plus per-spoke data/IdP. **Do not apply** 
 
 | Cluster | Role | Workloads |
 | --- | --- | --- |
-| **acm** | Hub | RHACM, OpenShift GitOps, Conjur, Jenkins, hub Kiali MC |
-| **east** | Spoke | GitOps, ESO, OSSM 3.4 ambient, PostgreSQL, Keycloak, Spring apps |
+| **acm** | Hub | RHACM, GitOps, Conjur, Jenkins, ODF, Quay, RHTAS, TPA, hub Kiali MC |
+| **east** | Spoke | GitOps, ESO, OSSM 3.4 ambient, Dev Spaces, PostgreSQL, Keycloak, Spring apps |
 | **west** | Spoke | Same as east (independent DB + IdP) |
 
 **Failover is mesh traffic only.** Scaling east `banking-service` to 0 lets ambient locality send traffic to west endpoints. PostgreSQL and Keycloak are **not** shared; clients that land on west use west Keycloak (different issuer).
@@ -65,14 +65,18 @@ oc --context east -n banking-apps scale deploy/banking-service --replicas=0
 oc --context east -n banking-apps scale deploy/banking-service --replicas=1
 ```
 
-## CI images
+## CI images / supply chain
 
-Jenkins on **acm** builds into acm `banking-apps` ImageStreams and bumps `newTag` on **both** east and west overlays. If spoke registries cannot pull from acm, run:
+Jenkins on **acm** builds via OpenShift BuildConfigs, mirrors to **Quay**, generates SBOM + attestation + signature (RHTAS), then bumps `newTag`/`newName` on **both** east and west overlays. Details: [ci-cd.md](ci-cd.md), [supply-chain.md](supply-chain.md).
+
+Legacy ImageStream mirror (if Quay is not yet Ready):
 
 ```bash
 scripts/mirror-image-to-spokes.sh banking-service <tag>
 scripts/mirror-image-to-spokes.sh api-gateway <tag>
 ```
+
+Console banners: `scripts/apply-console-banners.sh` (acm text: **Hub Cluster**).
 
 ## Repo paths
 

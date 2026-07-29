@@ -1,4 +1,4 @@
-// Template for per-app CI (copy into Jenkinsfile.<app>): git → OpenShift image build/push → GitOps newTag (east+west).
+// Template for per-app CI: OpenShift Build → Quay SBOM/attest/sign (RHTAS) → GitOps.
 // Concrete jobs: Jenkinsfile.banking-service / Jenkinsfile.api-gateway
 
 pipeline {
@@ -6,7 +6,7 @@ pipeline {
 
   options {
     disableConcurrentBuilds()
-    timeout(time: 45, unit: 'MINUTES')
+    timeout(time: 60, unit: 'MINUTES')
     buildDiscarder(logRotator(numToKeepStr: '20'))
   }
 
@@ -20,6 +20,8 @@ pipeline {
     APPS_NS = 'banking-apps'
     GITOPS_NS = 'openshift-gitops'
     IMAGE_TAG = "${env.BUILD_NUMBER}"
+    QUAY_ORG = 'banking'
+    TOOLS_DIR = "${env.WORKSPACE}/.tools"
   }
 
   stages {
@@ -35,12 +37,12 @@ pipeline {
       steps {
         sh '''
           set -euo pipefail
-          mkdir -p "${WORKSPACE}/.tools"
-          if [ ! -x "${WORKSPACE}/.tools/oc" ]; then
+          mkdir -p "${TOOLS_DIR}"
+          if [ ! -x "${TOOLS_DIR}/oc" ]; then
             curl -fsSL "https://mirror.openshift.com/pub/openshift-v4/clients/ocp/stable/openshift-client-linux.tar.gz" \
-              | tar -xz -C "${WORKSPACE}/.tools" oc
+              | tar -xz -C "${TOOLS_DIR}" oc
           fi
-          "${WORKSPACE}/.tools/oc" version --client
+          "${TOOLS_DIR}/oc" version --client
         '''
       }
     }
@@ -54,12 +56,33 @@ pipeline {
           steps {
             sh '''
               set -euo pipefail
-              export PATH="${WORKSPACE}/.tools:${PATH}"
+              export PATH="${TOOLS_DIR}:${PATH}"
               oc whoami
               oc project "${APPS_NS}"
               oc start-build "${APP}" --from-dir="apps/${APP}" --follow --wait -n "${APPS_NS}"
               oc tag "${APPS_NS}/${APP}:latest" "${APPS_NS}/${APP}:${IMAGE_TAG}" -n "${APPS_NS}"
               oc get istag "${APP}:${IMAGE_TAG}" -n "${APPS_NS}"
+            '''
+          }
+        }
+
+        stage('SBOM, attest & sign') {
+          steps {
+            sh '''
+              set -euo pipefail
+              export PATH="${TOOLS_DIR}:${PATH}"
+              if [ -z "${QUAY_HOST:-}" ]; then
+                QUAY_HOST="$(oc -n quay-enterprise get route -l quay-component=quay -o jsonpath='{.items[0].spec.host}' 2>/dev/null || true)"
+              fi
+              if [ -z "${QUAY_HOST:-}" ]; then
+                echo "WARN: Quay not ready; skip sign/attest"
+                exit 0
+              fi
+              export QUAY_HOST
+              chmod +x ci/scripts/sign-and-attest.sh
+              APP="${APP}" IMAGE_TAG="${IMAGE_TAG}" APPS_NS="${APPS_NS}" \
+                QUAY_HOST="${QUAY_HOST}" QUAY_ORG="${QUAY_ORG}" TOOLS_DIR="${TOOLS_DIR}" \
+                ci/scripts/sign-and-attest.sh
             '''
           }
         }
@@ -93,7 +116,7 @@ pipeline {
                   echo "SKIP_GIT_PUSH=0" > .ci-gitops-status
                   exit 0
                 fi
-                git commit -m "ci(${APP}): promote image to ${IMAGE_TAG} on east+west (${GIT_COMMIT_SHORT})"
+                git commit -m "ci(${APP}): promote signed image ${IMAGE_TAG} on east+west (${GIT_COMMIT_SHORT})"
                 AUTH_URL="https://${GIT_USERNAME}:${GIT_PASSWORD}@github.com/panchoraposo/demo-spring.git"
                 if git push "${AUTH_URL}" "HEAD:${GIT_BRANCH}"; then
                   echo "SKIP_GIT_PUSH=0" > .ci-gitops-status
@@ -109,7 +132,7 @@ pipeline {
           steps {
             sh '''
               set -euo pipefail
-              export PATH="${WORKSPACE}/.tools:${PATH}"
+              export PATH="${TOOLS_DIR}:${PATH}"
               for app in "${APP}" "banking-east-root" "banking-west-root"; do
                 oc -n "${GITOPS_NS}" annotate application "${app}" \
                   argocd.argoproj.io/refresh=hard --overwrite || true

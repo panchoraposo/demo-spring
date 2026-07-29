@@ -1,6 +1,6 @@
 # Cluster west (spoke)
 
-Mirror of [east](../east/README.md) with independent PostgreSQL + Keycloak.
+Mirror of [east](../east/README.md) with independent PostgreSQL + Keycloak and Dev Spaces.
 
 | Overlay | Path |
 | --- | --- |

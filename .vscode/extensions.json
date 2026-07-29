@@ -1,0 +1,14 @@
+{
+  "recommendations": [
+    "redhat.java",
+    "vscjava.vscode-java-debug",
+    "vscjava.vscode-java-test",
+    "vscjava.vscode-java-dependency",
+    "vscjava.vscode-maven",
+    "vmware.vscode-spring-boot",
+    "vscjava.vscode-spring-boot-dashboard",
+    "vscjava.vscode-spring-initializr",
+    "redhat.fabric8-analytics",
+    "redhat.vscode-yaml"
+  ]
+}

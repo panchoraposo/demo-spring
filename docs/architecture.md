@@ -6,8 +6,8 @@ This demo targets three OpenShift clusters:
 
 | Cluster | Role |
 | --- | --- |
-| **acm** | RHACM hub, CyberArk Conjur, Jenkins CI, hub Kiali multi-cluster |
-| **east** / **west** | Spokes with OpenShift GitOps, ESO, OSSM 3.4 ambient, PostgreSQL, Keycloak, Spring apps |
+| **acm** | RHACM hub, Conjur, Jenkins, ODF, Quay, RHTAS, TPA, hub Kiali |
+| **east** / **west** | Spokes with GitOps, ESO, OSSM 3.4 ambient, Dev Spaces, PostgreSQL, Keycloak, Spring apps |
 
 Credentials are sourced from **CyberArk Conjur** on the hub via the **External Secrets Operator** on each cluster. Spring apps never talk to Conjur; they only mount Kubernetes Secrets that ESO materializes.
 
@@ -71,7 +71,12 @@ flowchart TB
 | Identity (OIDC) | Red Hat build of Keycloak (`rhbk-operator`) — **per spoke** |
 | Banking DB | [`registry.redhat.io/rhel10/postgresql-16`](https://catalog.redhat.com/en/software/containers/rhel10/postgresql-16/677d13af607921b4d74fca88) — **per spoke** |
 | App runtime images | UBI 9 OpenJDK 21 |
-| CI | Jenkins on acm via Helm + OpenShift BuildConfig |
+| Object storage | OpenShift Data Foundation (Multicloud Object Gateway) on acm |
+| Container registry | Red Hat Quay on acm (SBOM, signature, attestation) |
+| Artifact signing | Red Hat Trusted Artifact Signer (Securesign) |
+| Dependency analytics | Red Hat Trusted Profile Analyzer + RHDA backend |
+| Developer workspaces | OpenShift Dev Spaces on east/west |
+| CI | Jenkins on acm + OpenShift BuildConfig → Quay sign/attest |
 
 ## GitOps ownership
 

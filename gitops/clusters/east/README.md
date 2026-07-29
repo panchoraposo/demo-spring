@@ -8,8 +8,9 @@
 | `banking-db` | PostgreSQL 16 (local; not failed over) |
 | `banking-idp` | Red Hat build of Keycloak (local issuer) |
 | `banking-apps` | api-gateway + banking-service (ambient + global Service) |
+| `openshift-devspaces` | OpenShift Dev Spaces (Spring + RHDA → TPA on acm) |
 
-Conjur and Jenkins are **not** installed here (hub only).
+Conjur, Jenkins, Quay, RHTAS, and TPA are **not** installed here (hub only).
 
 ## Prerequisites before sync
 

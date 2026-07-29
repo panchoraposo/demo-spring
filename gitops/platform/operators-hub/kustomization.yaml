@@ -1,8 +1,12 @@
 apiVersion: kustomize.config.k8s.io/v1beta1
 kind: Kustomization
 
-# Hub (acm): ESO for Conjur→Jenkins secrets; GitOps for drift control.
+# Hub (acm): ESO, GitOps, ODF (Quay/TPA object storage), Quay, RHTAS, RHTPA.
 resources:
   - namespace-eso.yaml
   - subscription-eso.yaml
   - subscription-openshift-gitops.yaml
+  - namespace-odf.yaml
+  - namespace-quay.yaml
+  - namespace-rhtas.yaml
+  - namespace-rhtpa.yaml

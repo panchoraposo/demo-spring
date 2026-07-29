@@ -16,6 +16,9 @@ The steps below are the legacy **single-spoke east** path. After the multi-clust
 ```bash
 export GIT_REPO_URL="https://github.com/<org>/demo-spring.git"
 export CLUSTER_DOMAIN="apps.east.example.com"   # oc get ingresses.config.openshift.io cluster -o jsonpath='{.spec.domain}'
+# Optional after acm TPA/RHDA and OIDC are known:
+# export RHDA_BACKEND_URL="https://rhda-backend-trusted-profile-analyzer.apps...."
+# export OIDC_ISSUER_URL="https://keycloak..../realms/trusted-artifact-signer"
 
 ./scripts/set-placeholders.sh
 git add -A && git commit -m "chore: set east cluster placeholders" && git push

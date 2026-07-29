@@ -1,0 +1,115 @@
+# Lightweight PostgreSQL for RHTPA advisory/analytics data (demo scale).
+apiVersion: v1
+kind: Secret
+metadata:
+  name: postgresql-credentials
+  namespace: trusted-profile-analyzer
+  labels:
+    app.kubernetes.io/part-of: banking-demo
+type: Opaque
+stringData:
+  db.host: tpa-postgresql
+  db.name: rhtpadb
+  db.user: tpa
+  db.password: replace-me-tpa-db
+  db.port: "5432"
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: postgresql-admin-credentials
+  namespace: trusted-profile-analyzer
+  labels:
+    app.kubernetes.io/part-of: banking-demo
+type: Opaque
+stringData:
+  db.host: tpa-postgresql
+  db.name: rhtpadb
+  db.user: postgres
+  db.password: replace-me-tpa-admin
+  db.port: "5432"
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: tpa-postgresql
+  namespace: trusted-profile-analyzer
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 20Gi
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: tpa-postgresql
+  namespace: trusted-profile-analyzer
+  labels:
+    app.kubernetes.io/name: tpa-postgresql
+    app.kubernetes.io/part-of: banking-demo
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: tpa-postgresql
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: tpa-postgresql
+    spec:
+      containers:
+        - name: postgresql
+          image: registry.redhat.io/rhel10/postgresql-16:latest
+          ports:
+            - containerPort: 5432
+          env:
+            - name: POSTGRESQL_USER
+              valueFrom:
+                secretKeyRef:
+                  name: postgresql-credentials
+                  key: db.user
+            - name: POSTGRESQL_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: postgresql-credentials
+                  key: db.password
+            - name: POSTGRESQL_DATABASE
+              valueFrom:
+                secretKeyRef:
+                  name: postgresql-credentials
+                  key: db.name
+            - name: POSTGRESQL_ADMIN_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: postgresql-admin-credentials
+                  key: db.password
+          volumeMounts:
+            - name: data
+              mountPath: /var/lib/pgsql/data
+          resources:
+            requests:
+              cpu: 250m
+              memory: 512Mi
+            limits:
+              cpu: "1"
+              memory: 2Gi
+      volumes:
+        - name: data
+          persistentVolumeClaim:
+            claimName: tpa-postgresql
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: tpa-postgresql
+  namespace: trusted-profile-analyzer
+  labels:
+    app.kubernetes.io/name: tpa-postgresql
+spec:
+  ports:
+    - port: 5432
+      targetPort: 5432
+  selector:
+    app.kubernetes.io/name: tpa-postgresql

@@ -9,7 +9,9 @@ target/
 # IDE
 .idea/
 *.iml
-.vscode/
+.vscode/*
+!.vscode/extensions.json
+!.vscode/settings.json
 *.swp
 .project
 .classpath
