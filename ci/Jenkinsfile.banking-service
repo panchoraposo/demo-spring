@@ -83,16 +83,29 @@ pipeline {
                 sed -i.bak -E "s/newTag:.*/newTag: ${IMAGE_TAG}/" "${OVERLAY}"
                 rm -f "${OVERLAY}.bak"
 
+                if [ "${GIT_PASSWORD}" = "replace-me" ] || [ -z "${GIT_PASSWORD}" ]; then
+                  echo "WARN: github-ci token not configured; skipping git push of newTag=${IMAGE_TAG}."
+                  echo "Set Conjur banking/github-ci/token (GitHub PAT, repo scope) for GitOps promotion."
+                  echo "SKIP_GIT_PUSH=1" > .ci-gitops-status
+                  exit 0
+                fi
+
                 git config user.email "jenkins@banking-demo.local"
                 git config user.name "Jenkins CI"
                 git add "${OVERLAY}"
                 if git diff --staged --quiet; then
                   echo "No GitOps changes to commit"
+                  echo "SKIP_GIT_PUSH=0" > .ci-gitops-status
                   exit 0
                 fi
                 git commit -m "ci(${APP}): promote image to ${IMAGE_TAG} (${GIT_COMMIT_SHORT})"
                 AUTH_URL="https://${GIT_USERNAME}:${GIT_PASSWORD}@github.com/panchoraposo/demo-spring.git"
-                git push "${AUTH_URL}" "HEAD:${GIT_BRANCH}"
+                if git push "${AUTH_URL}" "HEAD:${GIT_BRANCH}"; then
+                  echo "SKIP_GIT_PUSH=0" > .ci-gitops-status
+                else
+                  echo "WARN: git push failed; image ${APP}:${IMAGE_TAG} is in the registry."
+                  echo "SKIP_GIT_PUSH=1" > .ci-gitops-status
+                fi
               '''
             }
           }
@@ -105,7 +118,12 @@ pipeline {
               export PATH="${WORKSPACE}/.tools:${PATH}"
               oc -n "${GITOPS_NS}" annotate application "${APP}" \
                 argocd.argoproj.io/refresh=hard --overwrite || true
-              echo "OpenShift GitOps will deploy ${APP}:${IMAGE_TAG} from Git."
+              if [ -f .ci-gitops-status ] && grep -q SKIP_GIT_PUSH=1 .ci-gitops-status; then
+                echo "GitOps tag bump was skipped; rolling out Deployment to pull ImageStream :latest."
+                oc -n "${APPS_NS}" rollout restart "deploy/${APP}" || true
+              else
+                echo "OpenShift GitOps will deploy ${APP}:${IMAGE_TAG} from Git."
+              fi
             '''
           }
         }
