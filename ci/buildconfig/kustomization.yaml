@@ -4,5 +4,7 @@ kind: Kustomization
 resources:
   - namespace.yaml
   - rolebinding.yaml
+  - imagestream-banking-service.yaml
+  - imagestream-api-gateway.yaml
   - buildconfig-banking-service.yaml
   - buildconfig-api-gateway.yaml
