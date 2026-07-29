@@ -18,8 +18,8 @@ spring:
     oauth2:
       resourceserver:
         jwt:
-          issuer-uri: ${OIDC_ISSUER_URI:http://localhost:8081/realms/banking}
-          jwk-set-uri: ${OIDC_JWK_SET_URI:http://localhost:8081/realms/banking/protocol/openid-connect/certs}
+          issuer-uri: ${OIDC_ISSUER_URI:http\://localhost\:8081/realms/banking}
+          jwk-set-uri: ${OIDC_JWK_SET_URI:http\://localhost\:8081/realms/banking/protocol/openid-connect/certs}
 
 management:
   endpoints:
