@@ -5,4 +5,5 @@ metadata:
 data:
   SPRING_DATASOURCE_URL: jdbc:postgresql://postgresql.banking-db.svc.cluster.local:5432/banking
   # Replace apps.cluster-4487j.4487j.sandbox2772.opentlc.com after bootstrap
-  OIDC_ISSUER_URI: https://keycloak-banking.apps.cluster-4487j.4487j.sandbox2772.opentlc.com/realms/banking
+  # Match Keycloak realm issuer (http + configured hostname).
+  OIDC_ISSUER_URI: http://keycloak-banking.apps.cluster-4487j.4487j.sandbox2772.opentlc.com/realms/banking

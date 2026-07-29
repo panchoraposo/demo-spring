@@ -4,4 +4,4 @@ metadata:
   name: api-gateway-config
 data:
   BANKING_SERVICE_URI: http://banking-service.banking-apps.svc.cluster.local:8080
-  OIDC_ISSUER_URI: https://keycloak-banking.apps.cluster-4487j.4487j.sandbox2772.opentlc.com/realms/banking
+  OIDC_ISSUER_URI: http://keycloak-banking.apps.cluster-4487j.4487j.sandbox2772.opentlc.com/realms/banking
