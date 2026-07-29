@@ -20,7 +20,6 @@ data:
       if vault status >/dev/null 2>&1 || vault status 2>&1 | grep -qiE 'Initialized|Sealed'; then
         break
       fi
-      # Uninitialized Vault still answers seal-status
       if curl -sf "${VAULT_ADDR}/v1/sys/seal-status" >/dev/null 2>&1; then
         break
       fi
@@ -56,14 +55,14 @@ data:
 
     vault secrets enable -path=secret kv-v2 2>/dev/null || true
 
-    vault policy write banking-eso-read - <<'EOF'
-path "secret/data/banking/*" {
-  capabilities = ["read"]
-}
-path "secret/metadata/banking/*" {
-  capabilities = ["read", "list"]
-}
-EOF
+    printf '%s\n' \
+      'path "secret/data/banking/*" {' \
+      '  capabilities = ["read"]' \
+      '}' \
+      'path "secret/metadata/banking/*" {' \
+      '  capabilities = ["read", "list"]' \
+      '}' \
+      | vault policy write banking-eso-read -
 
     vault auth enable kubernetes 2>/dev/null || true
 
