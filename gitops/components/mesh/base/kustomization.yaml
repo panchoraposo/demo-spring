@@ -10,3 +10,4 @@ resources:
   - eastwest-gateway.yaml
   - waypoint-banking-service.yaml
   - destinationrule-banking-service.yaml
+  - networkpolicy-allow-kubelet-probes.yaml

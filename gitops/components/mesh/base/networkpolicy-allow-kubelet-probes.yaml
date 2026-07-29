@@ -1,0 +1,21 @@
+# Allow Istio ambient SNAT-ed kubelet health probes (169.254.7.127).
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-ambient-kubelet-probes
+  namespace: banking-apps
+  labels:
+    app.kubernetes.io/part-of: banking-demo
+spec:
+  podSelector: {}
+  policyTypes:
+    - Ingress
+  ingress:
+    - from:
+        - ipBlock:
+            cidr: 169.254.7.127/32
+      ports:
+        - protocol: TCP
+          port: 8080
+    # Permit all other ingress (this NP is additive allow; pair with no default-deny).
+    - {}

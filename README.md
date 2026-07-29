@@ -81,7 +81,6 @@ See [docs/multi-cluster.md](docs/multi-cluster.md) and [docs/getting-started.md]
 - [Secrets management](docs/secrets-management.md)
 - [CI/CD](docs/ci-cd.md)
 - [API reference](docs/api-reference.md)
-- [PostgreSQL image recommendation (PoC)](docs/postgresql-image.md)
 
 ## License
 

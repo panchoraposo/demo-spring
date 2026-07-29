@@ -1,22 +1,17 @@
 apiVersion: kustomize.config.k8s.io/v1beta1
 kind: Kustomization
 
-# Hub acm — RHACM-managed GitOps app-of-apps for Conjur, Jenkins, hub ESO,
-# ODF/Quay, Trusted Artifact Signer, Trusted Profile Analyzer.
+# Hub acm — RHACM-managed GitOps app-of-apps for Conjur, Jenkins, hub ESO.
 resources:
   # wave 0
   - platform-operators.yaml
   # wave 1
   - eso-operand.yaml
   - conjur.yaml
-  - odf.yaml
   # wave 2
   - conjur-config.yaml
-  - quay.yaml
-  - trusted-artifact-signer.yaml
   # wave 3
   - external-secrets-config.yaml
-  - trusted-profile-analyzer.yaml
   # wave 4+
   - jenkins.yaml
   - ci-buildconfig.yaml

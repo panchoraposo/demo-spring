@@ -1,6 +1,0 @@
-apiVersion: kustomize.config.k8s.io/v1beta1
-kind: Kustomization
-
-# Multicloud Object Gateway (MCG) only — S3 for Quay + TPA without full Ceph.
-resources:
-  - storagecluster.yaml

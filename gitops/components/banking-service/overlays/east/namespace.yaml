@@ -5,4 +5,5 @@ metadata:
   labels:
     app.kubernetes.io/part-of: banking-demo
     cluster: east
+    istio.io/dataplane-mode: ambient
     istio-discovery: enabled

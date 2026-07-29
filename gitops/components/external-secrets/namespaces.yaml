@@ -18,4 +18,5 @@ metadata:
   name: banking-apps
   labels:
     app.kubernetes.io/part-of: banking-demo
+    istio.io/dataplane-mode: ambient
     istio-discovery: enabled

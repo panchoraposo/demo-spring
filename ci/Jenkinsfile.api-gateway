@@ -1,11 +1,11 @@
-// CI: OpenShift Build → Quay (image + sbom + attestation + signature via RHTAS) → GitOps.
+// CI for api-gateway: git → OpenShift image build/push → GitOps newTag (east+west).
 
 pipeline {
   agent any
 
   options {
     disableConcurrentBuilds()
-    timeout(time: 60, unit: 'MINUTES')
+    timeout(time: 45, unit: 'MINUTES')
     buildDiscarder(logRotator(numToKeepStr: '20'))
   }
 
@@ -19,8 +19,6 @@ pipeline {
     APPS_NS = 'banking-apps'
     GITOPS_NS = 'openshift-gitops'
     IMAGE_TAG = "${env.BUILD_NUMBER}"
-    QUAY_ORG = 'banking'
-    TOOLS_DIR = "${env.WORKSPACE}/.tools"
   }
 
   stages {
@@ -36,12 +34,12 @@ pipeline {
       steps {
         sh '''
           set -euo pipefail
-          mkdir -p "${TOOLS_DIR}"
-          if [ ! -x "${TOOLS_DIR}/oc" ]; then
+          mkdir -p "${WORKSPACE}/.tools"
+          if [ ! -x "${WORKSPACE}/.tools/oc" ]; then
             curl -fsSL "https://mirror.openshift.com/pub/openshift-v4/clients/ocp/stable/openshift-client-linux.tar.gz" \
-              | tar -xz -C "${TOOLS_DIR}" oc
+              | tar -xz -C "${WORKSPACE}/.tools" oc
           fi
-          "${TOOLS_DIR}/oc" version --client
+          "${WORKSPACE}/.tools/oc" version --client
         '''
       }
     }
@@ -53,7 +51,6 @@ pipeline {
           changeset "apps/api-gateway/**"
           changeset "ci/Jenkinsfile.app"
           changeset "ci/Jenkinsfile.api-gateway"
-          changeset "ci/scripts/sign-and-attest.sh"
         }
       }
       stages {
@@ -61,53 +58,13 @@ pipeline {
           steps {
             sh '''
               set -euo pipefail
-              export PATH="${TOOLS_DIR}:${PATH}"
+              export PATH="${WORKSPACE}/.tools:${PATH}"
               oc whoami
               oc project "${APPS_NS}"
               oc start-build "${APP}" --from-dir="apps/${APP}" --follow --wait -n "${APPS_NS}"
               oc tag "${APPS_NS}/${APP}:latest" "${APPS_NS}/${APP}:${IMAGE_TAG}" -n "${APPS_NS}"
               oc get istag "${APP}:${IMAGE_TAG}" -n "${APPS_NS}"
             '''
-          }
-        }
-
-        stage('SBOM, attest & sign') {
-          steps {
-            withCredentials([
-              string(credentialsId: 'cosign-private-key', variable: 'COSIGN_PRIVATE_KEY', optional: true),
-              usernamePassword(credentialsId: 'quay-ci', usernameVariable: 'QUAY_USER', passwordVariable: 'QUAY_PASS', optional: true)
-            ]) {
-              sh '''
-                set -euo pipefail
-                export PATH="${TOOLS_DIR}:${PATH}"
-
-                if [ -z "${QUAY_HOST:-}" ]; then
-                  QUAY_HOST="$(oc -n quay-enterprise get route -l quay-component=quay -o jsonpath='{.items[0].spec.host}' 2>/dev/null || true)"
-                fi
-                if [ -z "${QUAY_HOST:-}" ]; then
-                  QUAY_HOST="$(oc -n quay-enterprise get route banking-quay-quay -o jsonpath='{.spec.host}' 2>/dev/null || true)"
-                fi
-                if [ -z "${QUAY_HOST:-}" ]; then
-                  echo "WARN: Quay route not found; skipping sign/attest. Image remains in ImageStream ${APPS_NS}/${APP}:${IMAGE_TAG}"
-                  echo "SKIP_SIGN=1" > .ci-sign-status
-                  exit 0
-                fi
-                export QUAY_HOST
-                echo "SKIP_SIGN=0" > .ci-sign-status
-                echo "QUAY_HOST=${QUAY_HOST}" > .ci-quay.env
-
-                if [ -n "${QUAY_USER:-}" ] && [ -n "${QUAY_PASS:-}" ]; then
-                  mkdir -p "${HOME}/.docker"
-                  AUTH="$(printf '%s:%s' "${QUAY_USER}" "${QUAY_PASS}" | base64 | tr -d '\n')"
-                  printf '{"auths":{"%s":{"auth":"%s"}}}\n' "${QUAY_HOST}" "${AUTH}" > "${HOME}/.docker/config.json"
-                fi
-
-                chmod +x ci/scripts/sign-and-attest.sh
-                APP="${APP}" IMAGE_TAG="${IMAGE_TAG}" APPS_NS="${APPS_NS}" \
-                  QUAY_HOST="${QUAY_HOST}" QUAY_ORG="${QUAY_ORG}" TOOLS_DIR="${TOOLS_DIR}" \
-                  ci/scripts/sign-and-attest.sh
-              '''
-            }
           }
         }
 
@@ -125,23 +82,11 @@ pipeline {
                 test -f "${OVERLAY_EAST}"
                 test -f "${OVERLAY_WEST}"
                 sed -i.bak -E "s/newTag:.*/newTag: ${IMAGE_TAG}/" "${OVERLAY_EAST}" "${OVERLAY_WEST}"
-
-                if [ -f .ci-quay.env ]; then
-                  # shellcheck disable=SC1091
-                  . ./.ci-quay.env
-                  QUAY_REF="${QUAY_HOST}/${QUAY_ORG}/${APP}"
-                  for f in "${OVERLAY_EAST}" "${OVERLAY_WEST}"; do
-                    if grep -q 'newName:' "${f}"; then
-                      sed -i.bak -E "s|newName:.*|newName: ${QUAY_REF}|" "${f}"
-                    else
-                      sed -i.bak -E "/name: .*${APP}/a\\    newName: ${QUAY_REF}" "${f}"
-                    fi
-                  done
-                fi
                 rm -f "${OVERLAY_EAST}.bak" "${OVERLAY_WEST}.bak"
 
                 if [ "${GIT_PASSWORD}" = "replace-me" ] || [ -z "${GIT_PASSWORD}" ]; then
                   echo "WARN: github-ci token not configured; skipping git push of newTag=${IMAGE_TAG}."
+                  echo "Set Conjur banking/github-ci/token (GitHub PAT, repo scope) for GitOps promotion."
                   echo "SKIP_GIT_PUSH=1" > .ci-gitops-status
                   exit 0
                 fi
@@ -154,12 +99,12 @@ pipeline {
                   echo "SKIP_GIT_PUSH=0" > .ci-gitops-status
                   exit 0
                 fi
-                git commit -m "ci(${APP}): promote signed image ${IMAGE_TAG} on east+west (${GIT_COMMIT_SHORT})"
+                git commit -m "ci(${APP}): promote image to ${IMAGE_TAG} on east+west (${GIT_COMMIT_SHORT})"
                 AUTH_URL="https://${GIT_USERNAME}:${GIT_PASSWORD}@github.com/panchoraposo/demo-spring.git"
                 if git push "${AUTH_URL}" "HEAD:${GIT_BRANCH}"; then
                   echo "SKIP_GIT_PUSH=0" > .ci-gitops-status
                 else
-                  echo "WARN: git push failed; image ${APP}:${IMAGE_TAG} may be in Quay/ImageStream."
+                  echo "WARN: git push failed; image ${APP}:${IMAGE_TAG} is in the hub registry."
                   echo "SKIP_GIT_PUSH=1" > .ci-gitops-status
                 fi
               '''
@@ -171,7 +116,7 @@ pipeline {
           steps {
             sh '''
               set -euo pipefail
-              export PATH="${TOOLS_DIR}:${PATH}"
+              export PATH="${WORKSPACE}/.tools:${PATH}"
               for app in "${APP}" "banking-east-root" "banking-west-root"; do
                 oc -n "${GITOPS_NS}" annotate application "${app}" \
                   argocd.argoproj.io/refresh=hard --overwrite || true
@@ -179,8 +124,10 @@ pipeline {
               if [ -f .ci-gitops-status ] && grep -q SKIP_GIT_PUSH=1 .ci-gitops-status; then
                 echo "GitOps tag bump was skipped; rolling out Deployment on this cluster to pull :latest."
                 oc -n "${APPS_NS}" rollout restart "deploy/${APP}" || true
+                echo "Mirror image to spokes if needed: scripts/mirror-image-to-spokes.sh ${APP} ${IMAGE_TAG}"
               else
-                echo "OpenShift GitOps will deploy ${APP}:${IMAGE_TAG} on east+west from Git (Quay when signed)."
+                echo "OpenShift GitOps will deploy ${APP}:${IMAGE_TAG} on east+west from Git."
+                echo "Ensure spoke ImageStreams have the image (mirror from acm if registries are isolated)."
               fi
             '''
           }
@@ -191,7 +138,7 @@ pipeline {
 
   post {
     success {
-      echo "CI OK for ${env.APP}: tag=${env.IMAGE_TAG} (build → sbom/attest/sign → GitOps)."
+      echo "CI OK for ${env.APP}: image tag=${env.IMAGE_TAG}. Deployments are GitOps-owned on east+west."
     }
     unsuccessful {
       echo "CI finished with status ${currentBuild.currentResult} for ${env.APP}."
