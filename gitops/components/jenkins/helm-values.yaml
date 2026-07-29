@@ -10,7 +10,7 @@ controller:
   image:
     registry: docker.io
     repository: jenkins/jenkins
-    tag: "2.492.3-lts-jdk21"
+    tag: "lts-jdk21"
     pullPolicy: IfNotPresent
   admin:
     existingSecret: jenkins-admin
