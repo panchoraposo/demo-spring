@@ -1,0 +1,59 @@
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: conjur-bootstrap
+  namespace: banking-conjur
+  labels:
+    app.kubernetes.io/part-of: banking-demo
+rules:
+  - apiGroups: [""]
+    resources: ["pods", "pods/exec", "secrets", "services"]
+    verbs: ["get", "list", "create", "update", "patch", "delete"]
+  - apiGroups: ["apps"]
+    resources: ["deployments"]
+    verbs: ["get", "list"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: conjur-bootstrap
+  namespace: banking-conjur
+  labels:
+    app.kubernetes.io/part-of: banking-demo
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: conjur-bootstrap
+subjects:
+  - kind: ServiceAccount
+    name: conjur-bootstrap
+    namespace: banking-conjur
+---
+# Create/update ESO host credentials in the external-secrets namespace.
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: conjur-bootstrap-eso-creds
+  namespace: external-secrets
+  labels:
+    app.kubernetes.io/part-of: banking-demo
+rules:
+  - apiGroups: [""]
+    resources: ["secrets"]
+    verbs: ["get", "list", "create", "update", "patch"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: conjur-bootstrap-eso-creds
+  namespace: external-secrets
+  labels:
+    app.kubernetes.io/part-of: banking-demo
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: conjur-bootstrap-eso-creds
+subjects:
+  - kind: ServiceAccount
+    name: conjur-bootstrap
+    namespace: banking-conjur

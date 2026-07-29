@@ -1,0 +1,66 @@
+# CyberArk Conjur OSS Helm values for OpenShift cluster east (demo).
+# Chart: https://cyberark.github.io/helm-charts — conjur-oss
+#
+# Apps never talk to Conjur directly. External Secrets Operator syncs
+# Conjur variables into Kubernetes Secrets consumed by workloads.
+#
+# Uses Docker Hub images via ImageStreams + anyuid SCC (demo). Official
+# OCP path uses registry.connect.redhat.com/cyberark/{conjur,conjur-nginx}
+# with openshift.enabled=true when Connect entitlements are available.
+
+account:
+  name: banking
+  create: true
+
+authenticators: "authn"
+logLevel: info
+
+# Demo fixed data key (32-byte base64). Rotate for any non-demo use.
+dataKey: "Yl/ai1C4jVUkqqLorR52RocmN8pm4LQD+EAwLlf/StM="
+
+openshift:
+  enabled: false
+
+image:
+  repository: image-registry.openshift-image-registry.svc:5000/banking-conjur/conjur
+  tag: "1.22"
+  pullPolicy: Always
+
+nginx:
+  image:
+    repository: image-registry.openshift-image-registry.svc:5000/banking-conjur/nginx
+    tag: "1.27"
+    pullPolicy: Always
+
+postgres:
+  image:
+    repository: image-registry.openshift-image-registry.svc:5000/banking-conjur/postgres
+    tag: "15"
+    pullPolicy: Always
+  persistentVolume:
+    create: true
+    size: 8Gi
+
+replicaCount: 1
+
+service:
+  external:
+    enabled: false
+  internal:
+    type: ClusterIP
+    port: 443
+
+ssl:
+  hostname: conjur-oss.banking-conjur.svc
+  altNames:
+    - conjur.banking-conjur.svc
+  expiration: 365
+
+rbac:
+  create: true
+
+serviceAccount:
+  create: true
+
+exportAPIkey:
+  enabled: false

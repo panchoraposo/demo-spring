@@ -7,7 +7,7 @@ Current demo target. All Applications under [`../applications/east`](../applicat
 | `openshift-gitops` | OpenShift GitOps + root/child Applications |
 | `external-secrets-operator` | ESO Operator Subscription |
 | `external-secrets` | ESO operand controllers |
-| `banking-vault` | HashiCorp Vault + bootstrap Job + UI Route |
+| `banking-conjur` | CyberArk Conjur OSS + bootstrap Job + UI Route |
 | `banking-db` | PostgreSQL 16 (catalog image); secrets from ESO |
 | `banking-idp` | Red Hat build of Keycloak; secrets from ESO |
 | `banking-apps` | api-gateway + banking-service |

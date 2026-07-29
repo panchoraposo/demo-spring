@@ -2,7 +2,7 @@
 
 ## Overview
 
-This demo runs on a single OpenShift cluster (**east**) and shows a banking API stack secured with OIDC JWTs, backed by PostgreSQL, fronted by Spring Cloud Gateway, and delivered with OpenShift GitOps plus Jenkins CI. Credentials are sourced from **HashiCorp Vault** via the **External Secrets Operator for Red Hat OpenShift**.
+This demo runs on a single OpenShift cluster (**east**) and shows a banking API stack secured with OIDC JWTs, backed by PostgreSQL, fronted by Spring Cloud Gateway, and delivered with OpenShift GitOps plus Jenkins CI. Credentials are sourced from **CyberArk Conjur** via the **External Secrets Operator for Red Hat OpenShift**. Spring apps never talk to Conjur; they only mount Kubernetes Secrets that ESO materializes.
 
 ```mermaid
 flowchart TB
@@ -11,8 +11,8 @@ flowchart TB
       RootApp[Root Application]
       Argo[OpenShift GitOps]
     end
-    subgraph vaultNS [banking-vault]
-      Vault[HashiCorp Vault]
+    subgraph conjurNS [banking-conjur]
+      Conjur[CyberArk Conjur OSS]
     end
     subgraph esoNS [external-secrets]
       ESO[ESO controllers]
@@ -39,7 +39,7 @@ flowchart TB
   BS --> PG
   GW --> RHBK
   BS --> RHBK
-  ESO --> Vault
+  ESO --> Conjur
   ESO --> PG
   ESO --> RHBK
   ESO --> BS
@@ -48,7 +48,7 @@ flowchart TB
   Jenkins -->|commit image tags| GitRepo[Git repository]
   GitRepo --> Argo
   RootApp --> Argo
-  Argo --> Vault
+  Argo --> Conjur
   Argo --> ESO
   Argo --> PG
   Argo --> RHBK
@@ -64,7 +64,7 @@ flowchart TB
 | Container platform | Red Hat OpenShift |
 | GitOps | OpenShift GitOps Operator (Argo CD) |
 | Secrets sync | External Secrets Operator for Red Hat OpenShift |
-| Secrets backend | HashiCorp Vault (Helm chart, GitOps Application) |
+| Secrets backend | CyberArk Conjur OSS (Helm chart, GitOps Application) |
 | Identity (OIDC) | Red Hat build of Keycloak (`rhbk-operator`) |
 | Banking DB | [`registry.redhat.io/rhel10/postgresql-16`](https://catalog.redhat.com/en/software/containers/rhel10/postgresql-16/677d13af607921b4d74fca88) |
 | Keycloak DB | Same PostgreSQL 16 catalog image |
@@ -78,8 +78,8 @@ flowchart TB
 2. Root Application `banking-demo-root` points at `gitops/applications/east`.
 3. Child Applications sync in waves:
    - `0` platform operators (RHBK, ESO Subscription, GitOps)
-   - `1` ESO operand (`ExternalSecretsConfig`) + Vault Helm + Vault Route
-   - `2` Vault bootstrap (KV, Kubernetes auth, seed data)
+   - `1` ESO operand (`ExternalSecretsConfig`) + Conjur Helm + Conjur Route
+   - `2` Conjur bootstrap (policy, seed variables, ESO host credentials)
    - `3` `ClusterSecretStore` + `ExternalSecret`s
    - `4` PostgreSQL + Jenkins
    - `5` Keycloak (+ Jenkins Route)
@@ -95,7 +95,7 @@ Details: [secrets-management.md](secrets-management.md).
 - **api-gateway** validates the JWT (`issuer-uri`) and proxies `/api/**` to **banking-service**.
 - **banking-service** is also an OAuth2 resource server and validates the same issuer.
 - Actuator health endpoints remain unauthenticated for probes.
-- Database and admin passwords are not stored in Git; Vault is the source of truth.
+- Database and admin passwords are not stored in Git; Conjur is the source of truth, synced by ESO.
 
 ## Future multi-cluster
 
@@ -103,6 +103,6 @@ Placeholders and labels use `cluster: east` so a later phase can add:
 
 - `gitops/applications/west` for a second spoke (AWS or GCP)
 - ACM ApplicationSets / Placement for a hub cluster
-- Per-spoke `ClusterSecretStore` pointing at Vault (or cloud secret managers)
+- Per-spoke `ClusterSecretStore` pointing at Conjur (or cloud secret managers)
 
 No west/ACM resources are active in the current scope.

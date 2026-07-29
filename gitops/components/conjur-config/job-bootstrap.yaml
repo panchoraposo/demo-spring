@@ -1,0 +1,51 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: conjur-bootstrap
+  namespace: banking-conjur
+  labels:
+    app.kubernetes.io/part-of: banking-demo
+    app.kubernetes.io/component: conjur-config
+  annotations:
+    # Regular Job (not an Argo hook) so sync is not blocked while Conjur starts.
+    argocd.argoproj.io/sync-wave: "2"
+spec:
+  backoffLimit: 6
+  ttlSecondsAfterFinished: 86400
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: conjur-bootstrap
+    spec:
+      restartPolicy: OnFailure
+      serviceAccountName: conjur-bootstrap
+      containers:
+        - name: bootstrap
+          image: registry.redhat.io/openshift4/ose-cli:latest
+          command: ["/bin/bash", "/scripts/bootstrap.sh"]
+          env:
+            - name: CONJUR_URL
+              value: https://conjur-oss.banking-conjur.svc
+            - name: ACCOUNT
+              value: banking
+            - name: NAMESPACE
+              value: banking-conjur
+            - name: ESO_NAMESPACE
+              value: external-secrets
+            - name: CREDS_SECRET
+              value: conjur-creds
+            - name: RELEASE
+              value: conjur-oss
+          volumeMounts:
+            - name: scripts
+              mountPath: /scripts
+            - name: policy
+              mountPath: /policy
+      volumes:
+        - name: scripts
+          configMap:
+            name: conjur-bootstrap-script
+            defaultMode: 0755
+        - name: policy
+          configMap:
+            name: conjur-bootstrap-policy

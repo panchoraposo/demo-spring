@@ -1,7 +1,7 @@
 apiVersion: argoproj.io/v1alpha1
 kind: Application
 metadata:
-  name: vault
+  name: conjur
   namespace: openshift-gitops
   labels:
     app.kubernetes.io/part-of: banking-demo
@@ -11,19 +11,19 @@ metadata:
 spec:
   project: default
   sources:
-    - repoURL: https://helm.releases.hashicorp.com
-      chart: vault
-      targetRevision: 0.29.1
+    - repoURL: https://cyberark.github.io/helm-charts
+      chart: conjur-oss
+      targetRevision: 2.1.1
       helm:
-        releaseName: vault
+        releaseName: conjur-oss
         valueFiles:
-          - $values/gitops/components/vault/helm-values.yaml
+          - $values/gitops/components/conjur/helm-values.yaml
     - repoURL: https://github.com/panchoraposo/demo-spring.git
       targetRevision: main
       ref: values
   destination:
     server: https://kubernetes.default.svc
-    namespace: banking-vault
+    namespace: banking-conjur
   syncPolicy:
     automated:
       prune: true
@@ -34,7 +34,7 @@ spec:
 apiVersion: argoproj.io/v1alpha1
 kind: Application
 metadata:
-  name: vault-route
+  name: conjur-route
   namespace: openshift-gitops
   labels:
     app.kubernetes.io/part-of: banking-demo
@@ -46,10 +46,10 @@ spec:
   source:
     repoURL: https://github.com/panchoraposo/demo-spring.git
     targetRevision: main
-    path: gitops/components/vault
+    path: gitops/components/conjur
   destination:
     server: https://kubernetes.default.svc
-    namespace: banking-vault
+    namespace: banking-conjur
   syncPolicy:
     automated:
       prune: true

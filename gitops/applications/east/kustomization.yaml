@@ -6,9 +6,9 @@ resources:
   - platform-operators.yaml
   # wave 1
   - eso-operand.yaml
-  - vault.yaml
+  - conjur.yaml
   # wave 2
-  - vault-config.yaml
+  - conjur-config.yaml
   # wave 3
   - external-secrets-config.yaml
   # wave 4+

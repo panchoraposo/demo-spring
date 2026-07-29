@@ -1,0 +1,47 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: conjur-bootstrap-policy
+  namespace: banking-conjur
+  labels:
+    app.kubernetes.io/part-of: banking-demo
+    app.kubernetes.io/component: conjur-config
+data:
+  banking.yml: |
+    - !policy
+      id: banking
+      body:
+        - !variable postgresql/database-name
+        - !variable postgresql/database-user
+        - !variable postgresql/database-password
+        - !variable postgresql/jdbc-url
+        - !variable keycloak-db/username
+        - !variable keycloak-db/password
+        - !variable keycloak-admin/username
+        - !variable keycloak-admin/password
+        - !variable banking-service/SPRING_DATASOURCE_USERNAME
+        - !variable banking-service/SPRING_DATASOURCE_PASSWORD
+        - !variable jenkins/jenkins-admin-user
+        - !variable jenkins/jenkins-admin-password
+
+        - !host
+          id: eso
+          annotations:
+            description: External Secrets Operator (demo)
+
+        - !permit
+          role: !host eso
+          privileges: [ read ]
+          resources:
+            - !variable postgresql/database-name
+            - !variable postgresql/database-user
+            - !variable postgresql/database-password
+            - !variable postgresql/jdbc-url
+            - !variable keycloak-db/username
+            - !variable keycloak-db/password
+            - !variable keycloak-admin/username
+            - !variable keycloak-admin/password
+            - !variable banking-service/SPRING_DATASOURCE_USERNAME
+            - !variable banking-service/SPRING_DATASOURCE_PASSWORD
+            - !variable jenkins/jenkins-admin-user
+            - !variable jenkins/jenkins-admin-password

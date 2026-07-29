@@ -1,0 +1,19 @@
+# Demo-only: allow Conjur / Postgres pods to run with the chart's UIDs on OpenShift.
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: conjur-anyuid
+  namespace: banking-conjur
+  labels:
+    app.kubernetes.io/part-of: banking-demo
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: system:openshift:scc:anyuid
+subjects:
+  - kind: ServiceAccount
+    name: conjur-oss
+    namespace: banking-conjur
+  - kind: ServiceAccount
+    name: default
+    namespace: banking-conjur

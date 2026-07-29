@@ -1,5 +1,5 @@
 # Values for the Jenkins Helm chart (charts.jenkins.io).
-# Admin credentials come from ExternalSecret jenkins-admin (Vault via ESO).
+# Admin credentials come from ExternalSecret jenkins-admin (Conjur via ESO).
 #
 # Use Jenkins LTS + empty installPlugins so the chart init container does not
 # pull :latest plugins that require a newer core than the current LTS.

@@ -1,17 +1,17 @@
 apiVersion: route.openshift.io/v1
 kind: Route
 metadata:
-  name: vault
-  namespace: banking-vault
+  name: conjur
+  namespace: banking-conjur
   labels:
-    app.kubernetes.io/name: vault
+    app.kubernetes.io/name: conjur
     app.kubernetes.io/part-of: banking-demo
 spec:
   to:
     kind: Service
-    name: vault
+    name: conjur-oss
   port:
-    targetPort: 8200
+    targetPort: https
   tls:
-    termination: edge
+    termination: passthrough
     insecureEdgeTerminationPolicy: Redirect

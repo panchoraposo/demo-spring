@@ -4,7 +4,7 @@
 
 - OpenShift 4.14+ with cluster-admin (ESO GA channels typically need a recent OCP; use `stable-v1` when available)
 - `oc` logged into **east**
-- Cluster pull secret able to pull from `registry.redhat.io` and HashiCorp images (or mirror Vault)
+- Cluster pull secret able to pull from `registry.redhat.io` and Docker Hub (Conjur / nginx / postgres ImageStreams, or mirror them)
 - This repository pushed to a Git remote reachable by OpenShift GitOps and Jenkins
 
 ## 1. Set placeholders and push
@@ -34,11 +34,11 @@ oc get route -n openshift-gitops
 ## 3. Verify secrets stack, then workloads
 
 ```bash
-# Vault + External Secrets (see docs/secrets-management.md)
-oc get pods -n banking-vault
-oc get job -n banking-vault
+# Conjur + External Secrets (see docs/secrets-management.md)
+oc get pods -n banking-conjur
+oc get job -n banking-conjur
 oc get pods -n external-secrets
-oc get clustersecretstore vault-backend
+oc get clustersecretstore conjur-backend
 oc get externalsecret -A
 
 # Application namespaces
@@ -49,9 +49,14 @@ oc get pods -n banking-ci
 oc get pods -n banking-apps
 ```
 
-If Vault stays sealed or the bootstrap Job fails, run `./scripts/vault-init-unseal.sh` and refresh Application `vault-config`.
+If the Conjur bootstrap Job fails, delete it and refresh Application `conjur-config`:
 
-PostgreSQL uses the catalog image `registry.redhat.io/rhel10/postgresql-16`. Credentials come from Vault via External Secrets (not from Git).
+```bash
+oc -n banking-conjur delete job conjur-bootstrap --ignore-not-found
+oc -n openshift-gitops annotate application conjur-config argocd.argoproj.io/refresh=hard --overwrite
+```
+
+PostgreSQL uses the catalog image `registry.redhat.io/rhel10/postgresql-16`. Credentials come from Conjur via External Secrets (not from Git).
 
 ## 4. Build application images (first time)
 

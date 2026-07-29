@@ -1,7 +1,7 @@
 apiVersion: argoproj.io/v1alpha1
 kind: Application
 metadata:
-  name: vault-config
+  name: conjur-config
   namespace: openshift-gitops
   labels:
     app.kubernetes.io/part-of: banking-demo
@@ -13,10 +13,10 @@ spec:
   source:
     repoURL: https://github.com/panchoraposo/demo-spring.git
     targetRevision: main
-    path: gitops/components/vault-config
+    path: gitops/components/conjur-config
   destination:
     server: https://kubernetes.default.svc
-    namespace: banking-vault
+    namespace: banking-conjur
   syncPolicy:
     automated:
       prune: true

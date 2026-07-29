@@ -4,4 +4,5 @@ kind: Kustomization
 resources:
   - namespace.yaml
   - imagestream.yaml
+  - scc-anyuid.yaml
   - route.yaml

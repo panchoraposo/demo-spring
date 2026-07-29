@@ -1,0 +1,62 @@
+apiVersion: image.openshift.io/v1
+kind: ImageStream
+metadata:
+  name: conjur
+  namespace: banking-conjur
+  labels:
+    app.kubernetes.io/name: conjur
+    app.kubernetes.io/part-of: banking-demo
+spec:
+  lookupPolicy:
+    local: true
+  tags:
+    - name: "1.22"
+      from:
+        kind: DockerImage
+        name: docker.io/cyberark/conjur:1.22.3
+      importPolicy:
+        scheduled: true
+      referencePolicy:
+        type: Local
+---
+apiVersion: image.openshift.io/v1
+kind: ImageStream
+metadata:
+  name: nginx
+  namespace: banking-conjur
+  labels:
+    app.kubernetes.io/name: nginx
+    app.kubernetes.io/part-of: banking-demo
+spec:
+  lookupPolicy:
+    local: true
+  tags:
+    - name: "1.27"
+      from:
+        kind: DockerImage
+        name: docker.io/library/nginx:1.27
+      importPolicy:
+        scheduled: true
+      referencePolicy:
+        type: Local
+---
+apiVersion: image.openshift.io/v1
+kind: ImageStream
+metadata:
+  name: postgres
+  namespace: banking-conjur
+  labels:
+    app.kubernetes.io/name: postgres
+    app.kubernetes.io/part-of: banking-demo
+spec:
+  lookupPolicy:
+    local: true
+  tags:
+    - name: "15"
+      from:
+        kind: DockerImage
+        name: docker.io/library/postgres:15
+      importPolicy:
+        scheduled: true
+      referencePolicy:
+        type: Local

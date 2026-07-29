@@ -1,99 +1,82 @@
-# Secrets management (Vault + External Secrets)
+# Secrets management (CyberArk Conjur + External Secrets)
 
-This demo keeps credentials out of Git. **HashiCorp Vault** stores secret values; the **External Secrets Operator for Red Hat OpenShift** synchronizes them into namespace `Secret` objects consumed by workloads.
+This demo keeps credentials out of Git. **CyberArk Conjur OSS** stores secret values; the **External Secrets Operator for Red Hat OpenShift** synchronizes them into namespace `Secret` objects consumed by workloads.
 
-## Architecture
+**Applications never call Conjur (or any vault) directly.** Only ESO authenticates to Conjur and materializes Kubernetes Secrets.
 
 ```mermaid
 flowchart LR
-  Git[GitOps repo] --> Argo[OpenShift GitOps]
-  Argo --> ESOOp[ESO Operator + ExternalSecretsConfig]
-  Argo --> VaultHelm[Vault Helm]
-  Argo --> Boot[vault-bootstrap Job]
-  Argo --> ES[ExternalSecret CRs]
-  Boot -->|KV seed + K8s auth| Vault[HashiCorp Vault]
-  ES --> ESO[external-secrets controllers]
-  ESO -->|Kubernetes auth role banking-eso| Vault
-  ESO --> Secrets[K8s Secrets]
-  Secrets --> Workloads[PG Keycloak Banking Jenkins]
+  Argo[OpenShift GitOps] --> ConjurHelm[Conjur OSS Helm]
+  Argo --> Boot[conjur-bootstrap Job]
+  Argo --> ESOCfg[ClusterSecretStore + ExternalSecrets]
+  Boot -->|policy + variables + host API key| Conjur[CyberArk Conjur]
+  Boot -->|conjur-creds| ESOCreds[Secret in external-secrets]
+  ESO[ESO controllers] -->|apikey auth host/banking/eso| Conjur
+  ESO --> K8sSecrets[Namespace Secrets]
+  K8sSecrets --> Apps[PostgreSQL / Keycloak / Spring / Jenkins]
 ```
 
-| Piece | How it is delivered |
+| Piece | Location |
 | --- | --- |
-| ESO Operator Subscription | [`gitops/platform/operators/`](../gitops/platform/operators/) |
-| ESO operand (`ExternalSecretsConfig`) | [`gitops/platform/eso-operand/`](../gitops/platform/eso-operand/) |
-| Vault (Helm) | [`gitops/components/vault/helm-values.yaml`](../gitops/components/vault/helm-values.yaml) via Application `vault` |
-| Vault UI Route | [`gitops/components/vault/`](../gitops/components/vault/) |
-| Init / KV / auth / seed | [`gitops/components/vault-config/`](../gitops/components/vault-config/) Job |
-| `ClusterSecretStore` + `ExternalSecret` | [`gitops/components/external-secrets/`](../gitops/components/external-secrets/) |
+| Conjur OSS (Helm) | [`gitops/components/conjur/helm-values.yaml`](../gitops/components/conjur/helm-values.yaml) via Application `conjur` |
+| Conjur Route + ImageStreams | [`gitops/components/conjur/`](../gitops/components/conjur/) |
+| Policy / seed / ESO host | [`gitops/components/conjur-config/`](../gitops/components/conjur-config/) Job |
+| `ClusterSecretStore` + `ExternalSecret`s | [`gitops/components/external-secrets/`](../gitops/components/external-secrets/) |
 
 ## Sync waves
 
-| Wave | Application |
+| Wave | Applications |
 | --- | --- |
-| 0 | `platform-operators` (ESO + RHBK + GitOps subscriptions) |
-| 1 | `eso-operand`, `vault`, `vault-route` |
-| 2 | `vault-config` (bootstrap Job) |
-| 3 | `external-secrets-config` |
-| 4+ | PostgreSQL, Jenkins, Keycloak, apps, CI |
+| 1 | `eso-operand`, `conjur`, `conjur-route` |
+| 2 | `conjur-config` (bootstrap Job) |
+| 3 | `external-secrets-config` (`ClusterSecretStore` + `ExternalSecret`s) |
 
-## Vault paths (KV v2 mount `secret/`)
+## Conjur variables (account `banking`)
 
-| Path | Target Secret | Namespace |
-| --- | --- | --- |
-| `banking/postgresql` | `postgresql-credentials` | `banking-db` |
-| `banking/keycloak-db` | `keycloak-db-secret` | `banking-idp` |
-| `banking/keycloak-admin` | `keycloak-admin` | `banking-idp` |
-| `banking/banking-service` | `banking-service-db` | `banking-apps` |
-| `banking/jenkins` | `jenkins-admin` | `banking-ci` |
+| Variable ID | Consumed by |
+| --- | --- |
+| `banking/postgresql/*` | `ExternalSecret/postgresql-credentials` → `banking-db` |
+| `banking/keycloak-db/*` | `ExternalSecret/keycloak-db-secret` → `banking-idp` |
+| `banking/keycloak-admin/*` | `ExternalSecret/keycloak-admin` → `banking-idp` |
+| `banking/banking-service/*` | `ExternalSecret/banking-service-db` → `banking-apps` |
+| `banking/jenkins/*` | `ExternalSecret/jenkins-admin` → `banking-ci` |
 
-Properties match the keys expected by Deployments / Helm (for example `database-password`, `SPRING_DATASOURCE_PASSWORD`, `jenkins-admin-password`).
+Each Conjur variable maps 1:1 to an `ExternalSecret` `remoteRef.key` (no Vault-style `property` field).
 
-## Bootstrap and unseal
+## Bootstrap behaviour
 
-Vault runs in **standalone** mode with file storage (demo, not HA). On first sync, Job `vault-bootstrap`:
+Conjur runs as a single Helm release (`conjur-oss`) with TLS terminated by the chart’s nginx sidecar. On first sync, Job `conjur-bootstrap`:
 
-1. Initializes Vault with **1 key share / threshold 1** (demo only)
-2. Stores root token + unseal key in Secret `banking-vault/vault-root-token`
-3. Unseals Vault
-4. Enables `kv-v2` at `secret/`, policy `banking-eso-read`, Kubernetes auth role `banking-eso`
-5. Seeds the paths above
+1. Waits for the Conjur Deployment and HTTPS endpoint
+2. Retrieves the `admin` API key via `conjurctl` in the Conjur pod
+3. Loads policy `banking` (variables + host `banking/eso`)
+4. Seeds demo secret values
+5. Rotates the API key for `host/banking/eso` and stores it in Secret `external-secrets/conjur-creds`
 
-If the Job fails before init completes, run:
+To re-run bootstrap after a failure:
 
 ```bash
-./scripts/vault-init-unseal.sh
-oc -n openshift-gitops annotate application vault-config argocd.argoproj.io/refresh=hard --overwrite
+oc -n banking-conjur delete job conjur-bootstrap --ignore-not-found
+oc -n openshift-gitops annotate application conjur-config argocd.argoproj.io/refresh=hard --overwrite
 ```
 
-**Do not use single-share init or a root-token Secret outside workshops.**
+## ESO `ClusterSecretStore`
 
-## External Secrets auth
+`ClusterSecretStore/conjur-backend` uses Conjur **apikey** auth:
 
-`ClusterSecretStore/vault-backend` uses Kubernetes auth:
-
-- Vault role: `banking-eso`
-- Bound SA: `external-secrets` in namespace `external-secrets`
-- Policy: read `secret/data/banking/*`
-
-Refresh interval on `ExternalSecret` resources is `1h` (adjust as needed).
-
-## Verify
+- Account: `banking`
+- Host: `host/banking/eso` (from `conjur-creds`)
+- URL: `https://conjur-oss.banking-conjur.svc`
+- CA: chart Secret `banking-conjur/conjur-oss-conjur-ssl-ca-cert`
 
 ```bash
-oc get pods -n banking-vault
-oc get pods -n external-secrets
-oc get clustersecretstore vault-backend
+oc get pods -n banking-conjur
+oc get job -n banking-conjur
+oc get secret conjur-creds -n external-secrets
+oc get clustersecretstore conjur-backend
 oc get externalsecret -A
-oc get secret postgresql-credentials -n banking-db
 ```
 
-## Future multi-cloud (AWS + GCP)
+## Future multi-cluster
 
-Keep the same `ExternalSecret` manifests. Point each spoke’s `ClusterSecretStore` at a reachable Vault (or replicate Vault). Optionally add cloud `ClusterSecretStore`s (AWS Secrets Manager / GCP Secret Manager) later without changing application Deployments.
-
-## Hardening backlog
-
-- Vault HA Raft + AWS KMS (or GCP KMS) auto-unseal
-- Remove demo root-token Secret; use short-lived bootstrap tokens
-- Sealed Secrets / External Secrets push-secret patterns for Git-safe rotation workflows
+Keep the same `ExternalSecret` manifests. Point each spoke’s `ClusterSecretStore` at a reachable Conjur (or CyberArk Secrets Manager). Optionally add cloud `ClusterSecretStore`s later without changing application Deployments.

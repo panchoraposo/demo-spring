@@ -4,5 +4,6 @@ kind: Kustomization
 resources:
   - serviceaccount.yaml
   - rolebinding.yaml
+  - configmap-policy.yaml
   - configmap-bootstrap.yaml
   - job-bootstrap.yaml

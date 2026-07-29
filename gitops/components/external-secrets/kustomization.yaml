@@ -3,7 +3,7 @@ kind: Kustomization
 
 resources:
   - namespaces.yaml
-  - clustersecretstore-vault.yaml
+  - clustersecretstore-conjur.yaml
   - externalsecret-postgresql.yaml
   - externalsecret-keycloak.yaml
   - externalsecret-banking-service.yaml

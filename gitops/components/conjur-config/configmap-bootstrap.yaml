@@ -1,0 +1,143 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: conjur-bootstrap-script
+  namespace: banking-conjur
+  labels:
+    app.kubernetes.io/part-of: banking-demo
+    app.kubernetes.io/component: conjur-config
+data:
+  bootstrap.sh: |
+    #!/usr/bin/env bash
+    set -euo pipefail
+
+    CONJUR_URL="${CONJUR_URL:-https://conjur-oss.banking-conjur.svc}"
+    ACCOUNT="${ACCOUNT:-banking}"
+    NS="${NAMESPACE:-banking-conjur}"
+    ESO_NS="${ESO_NAMESPACE:-external-secrets}"
+    CREDS_SECRET="${CREDS_SECRET:-conjur-creds}"
+    RELEASE="${RELEASE:-conjur-oss}"
+
+    echo "Waiting for Conjur Deployment/${RELEASE}..."
+    for i in $(seq 1 90); do
+      if oc get deploy "${RELEASE}" -n "${NS}" >/dev/null 2>&1; then
+        if oc rollout status deploy/"${RELEASE}" -n "${NS}" --timeout=10s >/dev/null 2>&1; then
+          break
+        fi
+      fi
+      sleep 5
+      if [[ "${i}" -eq 90 ]]; then
+        echo "Conjur deployment did not become ready" >&2
+        exit 1
+      fi
+    done
+
+    echo "Waiting for Conjur HTTPS at ${CONJUR_URL}..."
+    for i in $(seq 1 60); do
+      if curl -skf "${CONJUR_URL}/" >/dev/null 2>&1 || curl -skf "${CONJUR_URL}/status" >/dev/null 2>&1; then
+        break
+      fi
+      # nginx /status returns 200 when ready
+      CODE="$(curl -sk -o /dev/null -w '%{http_code}' "${CONJUR_URL}/status" || true)"
+      if [[ "${CODE}" == "200" ]]; then
+        break
+      fi
+      sleep 5
+      if [[ "${i}" -eq 60 ]]; then
+        echo "Conjur HTTPS endpoint did not become ready" >&2
+        exit 1
+      fi
+    done
+
+    POD="$(oc get pod -n "${NS}" -l app.kubernetes.io/name=conjur-oss -o jsonpath='{.items[0].metadata.name}')"
+    if [[ -z "${POD}" ]]; then
+      POD="$(oc get pod -n "${NS}" -l app=conjur-oss -o jsonpath='{.items[0].metadata.name}')"
+    fi
+    echo "Using Conjur pod ${POD}"
+
+    echo "Retrieving admin API key..."
+    ADMIN_API_KEY=""
+    for i in $(seq 1 36); do
+      ADMIN_API_KEY="$(oc exec -n "${NS}" "${POD}" -c conjur-oss -- \
+        conjurctl role retrieve-key "${ACCOUNT}:user:admin" 2>/dev/null || true)"
+      ADMIN_API_KEY="$(printf '%s' "${ADMIN_API_KEY}" | tr -d '\r\n')"
+      if [[ -n "${ADMIN_API_KEY}" ]]; then
+        break
+      fi
+      sleep 5
+    done
+    if [[ -z "${ADMIN_API_KEY}" ]]; then
+      echo "Failed to retrieve admin API key" >&2
+      exit 1
+    fi
+
+    CA_FILE="/tmp/conjur-ca.crt"
+    oc get secret "${RELEASE}-conjur-ssl-ca-cert" -n "${NS}" -o jsonpath='{.data.tls\.crt}' | base64 -d > "${CA_FILE}"
+
+    auth_token() {
+      local login="$1"
+      local api_key="$2"
+      local enc_login
+      enc_login="$(python3 -c 'import urllib.parse,sys; print(urllib.parse.quote(sys.argv[1], safe=""))' "${login}")"
+      curl -sf --cacert "${CA_FILE}" -X POST \
+        --data-binary "${api_key}" \
+        "${CONJUR_URL}/authn/${ACCOUNT}/${enc_login}/authenticate" \
+        | base64 | tr -d '\n'
+    }
+
+    TOKEN_B64="$(auth_token admin "${ADMIN_API_KEY}")"
+    AUTH_HDR="Authorization: Token token=\"${TOKEN_B64}\""
+
+    echo "Loading Conjur policy..."
+    curl -sf --cacert "${CA_FILE}" -X POST \
+      -H "${AUTH_HDR}" \
+      -H "Content-Type: text/plain" \
+      --data-binary @/policy/banking.yml \
+      "${CONJUR_URL}/policies/${ACCOUNT}/policy/root" >/dev/null
+
+    set_var() {
+      local id="$1"
+      local value="$2"
+      local enc_id
+      enc_id="$(python3 -c 'import urllib.parse,sys; print(urllib.parse.quote(sys.argv[1], safe=""))' "${id}")"
+      curl -sf --cacert "${CA_FILE}" -X POST \
+        -H "${AUTH_HDR}" \
+        -H "Content-Type: text/plain" \
+        --data-binary "${value}" \
+        "${CONJUR_URL}/secrets/${ACCOUNT}/variable/${enc_id}" >/dev/null
+      echo "  set ${id}"
+    }
+
+    echo "Seeding demo secret values..."
+    set_var "banking/postgresql/database-name" "banking"
+    set_var "banking/postgresql/database-user" "banking"
+    set_var "banking/postgresql/database-password" "banking-demo-change-me"
+    set_var "banking/postgresql/jdbc-url" "jdbc:postgresql://postgresql.banking-db.svc.cluster.local:5432/banking"
+    set_var "banking/keycloak-db/username" "keycloak"
+    set_var "banking/keycloak-db/password" "keycloak-db-change-me"
+    set_var "banking/keycloak-admin/username" "admin"
+    set_var "banking/keycloak-admin/password" "admin-change-me"
+    set_var "banking/banking-service/SPRING_DATASOURCE_USERNAME" "banking"
+    set_var "banking/banking-service/SPRING_DATASOURCE_PASSWORD" "banking-demo-change-me"
+    set_var "banking/jenkins/jenkins-admin-user" "admin"
+    set_var "banking/jenkins/jenkins-admin-password" "ChangeMeOnFirstLogin!"
+
+    echo "Rotating API key for host banking/eso..."
+    # Re-auth in case token TTL is short
+    TOKEN_B64="$(auth_token admin "${ADMIN_API_KEY}")"
+    AUTH_HDR="Authorization: Token token=\"${TOKEN_B64}\""
+    ESO_API_KEY="$(curl -sf --cacert "${CA_FILE}" -X PUT \
+      -H "${AUTH_HDR}" \
+      "${CONJUR_URL}/authn/${ACCOUNT}/api_key?role=host%3Abanking%2Feso" | tr -d '\r\n')"
+    if [[ -z "${ESO_API_KEY}" ]]; then
+      echo "Failed to obtain ESO host API key" >&2
+      exit 1
+    fi
+
+    echo "Writing Secret ${ESO_NS}/${CREDS_SECRET} for External Secrets Operator..."
+    oc create secret generic "${CREDS_SECRET}" -n "${ESO_NS}" \
+      --from-literal=hostid="host/banking/eso" \
+      --from-literal=apikey="${ESO_API_KEY}" \
+      --dry-run=client -o yaml | oc apply -f -
+
+    echo "Conjur bootstrap complete. Apps still do not call Conjur; ESO syncs Secrets."
