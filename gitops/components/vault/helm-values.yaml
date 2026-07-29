@@ -14,9 +14,12 @@ csi:
 
 server:
   enabled: true
+  # Use the cluster ImageStream (imported from docker.io) so OpenShift does not
+  # rewrite short names to registry.connect.redhat.com.
   image:
-    repository: hashicorp/vault
+    repository: image-registry.openshift-image-registry.svc:5000/banking-vault/vault
     tag: "1.17.6"
+    pullPolicy: IfNotPresent
   resources:
     requests:
       memory: 256Mi

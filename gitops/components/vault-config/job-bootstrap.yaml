@@ -22,7 +22,7 @@ spec:
       serviceAccountName: vault-bootstrap
       initContainers:
         - name: copy-vault-cli
-          image: hashicorp/vault:1.17.6
+          image: image-registry.openshift-image-registry.svc:5000/banking-vault/vault:1.17.6
           command: ["/bin/sh", "-c", "cp /bin/vault /vault-bin/vault"]
           volumeMounts:
             - name: vault-bin
