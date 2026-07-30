@@ -28,28 +28,28 @@ spec:
   tracing:
     enabled: false
 
-  modules:
-    createDatabase:
-      enabled: true
-    migrateDatabase:
-      enabled: true
-    createImporters:
-      enabled: true
-    server:
-      enabled: true
-      replicas: 1
-      resources:
-        requests:
-          cpu: 100m
-          memory: 1Gi
-    importer:
-      enabled: true
-      replicas: 1
-      concurrency: 1
-      resources:
-        requests:
-          cpu: 100m
-          memory: 1Gi
-      workingDirectory:
-        size: 8Gi
+  # Modules (passed as Helm values).
+  createDatabase:
+    enabled: true
+  migrateDatabase:
+    enabled: true
+  createImporters:
+    enabled: true
+  server:
+    enabled: true
+    replicas: 1
+    resources:
+      requests:
+        cpu: 100m
+        memory: 1Gi
+  importer:
+    enabled: true
+    replicas: 1
+    concurrency: 1
+    resources:
+      requests:
+        cpu: 100m
+        memory: 1Gi
+    workingDirectory:
+      size: 8Gi
 
