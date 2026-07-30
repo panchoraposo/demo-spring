@@ -1,0 +1,28 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: trustify-realm
+  namespace: openshift-gitops
+  labels:
+    app.kubernetes.io/part-of: banking-demo
+    cluster: acm
+  annotations:
+    # Runs after the shared hub Keycloak is up.
+    argocd.argoproj.io/sync-wave: "6"
+spec:
+  project: default
+  source:
+    repoURL: https://github.com/panchoraposo/demo-spring.git
+    targetRevision: main
+    path: gitops/components/trusted-profile-analyzer/realm
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: banking-idp
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true
+      - ServerSideApply=true
+

@@ -28,6 +28,7 @@ resources:
   - trusted-profile-analyzer.yaml
   # wave 4+
   - keycloak.yaml
+  - trustify-realm.yaml
   - jenkins.yaml
   - ci-buildconfig.yaml
   - kiali-multicluster.yaml
@@ -59,6 +60,8 @@ replacements:
       - select: { kind: Application, name: promxy }
         fieldPaths: [ spec.source.repoURL ]
       - select: { kind: Application, name: keycloak }
+        fieldPaths: [ spec.source.repoURL ]
+      - select: { kind: Application, name: trustify-realm }
         fieldPaths: [ spec.source.repoURL ]
       - select: { kind: Application, name: ci-buildconfig }
         fieldPaths: [ spec.source.repoURL ]
@@ -94,6 +97,8 @@ replacements:
       - select: { kind: Application, name: promxy }
         fieldPaths: [ spec.source.targetRevision ]
       - select: { kind: Application, name: keycloak }
+        fieldPaths: [ spec.source.targetRevision ]
+      - select: { kind: Application, name: trustify-realm }
         fieldPaths: [ spec.source.targetRevision ]
       - select: { kind: Application, name: ci-buildconfig }
         fieldPaths: [ spec.source.targetRevision ]
