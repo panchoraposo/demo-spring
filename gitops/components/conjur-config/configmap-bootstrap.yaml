@@ -134,10 +134,11 @@ data:
     set_var "banking/tpa/postgresql-db-host" "tpa-postgresql"
     set_var "banking/tpa/postgresql-db-name" "rhtpadb"
     set_var "banking/tpa/postgresql-db-user" "tpa"
-    set_var "banking/tpa/postgresql-db-password" "tpa-db-change-me"
+    # NOTE: PostgreSQL initializes passwords once (PVC-backed). Keep defaults stable.
+    set_var "banking/tpa/postgresql-db-password" "replace-me-tpa-db"
     set_var "banking/tpa/postgresql-db-port" "5432"
     set_var "banking/tpa/postgresql-admin-user" "postgres"
-    set_var "banking/tpa/postgresql-admin-password" "tpa-admin-db-change-me"
+    set_var "banking/tpa/postgresql-admin-password" "replace-me-tpa-admin"
 
     echo "Rotating API key for host banking/eso..."
     # Re-auth in case token TTL is short

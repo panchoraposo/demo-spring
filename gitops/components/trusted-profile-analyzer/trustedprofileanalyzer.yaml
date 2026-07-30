@@ -20,7 +20,7 @@ spec:
     name: rhtpadb
     username: tpa
     # Keep value in sync with Conjur-seeded `banking/tpa/postgresql-db-password`.
-    password: tpa-db-change-me
+    password: replace-me-tpa-db
     # Sandbox defaults: keep connection pool small.
     minimumConnections: 1
     maximumConnections: 10
