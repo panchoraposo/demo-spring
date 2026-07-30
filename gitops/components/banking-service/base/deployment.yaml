@@ -10,9 +10,11 @@ spec:
   selector:
     matchLabels:
       app.kubernetes.io/name: banking-service
-  template:
+    template:
     metadata:
       labels:
+        app: banking-service
+        version: v1
         app.kubernetes.io/name: banking-service
         app.openshift.io/runtime: spring
     spec:

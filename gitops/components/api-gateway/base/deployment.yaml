@@ -9,9 +9,11 @@ spec:
   selector:
     matchLabels:
       app.kubernetes.io/name: api-gateway
-  template:
+    template:
     metadata:
       labels:
+        app: api-gateway
+        version: v1
         app.kubernetes.io/name: api-gateway
         app.openshift.io/runtime: spring
     spec:

@@ -17,3 +17,6 @@ spec:
     dockerStrategy:
       dockerfilePath: Dockerfile
   runPolicy: Serial
+  # Keep Kiali Workloads clean — do not retain every completed build pod.
+  successfulBuildsHistoryLimit: 1
+  failedBuildsHistoryLimit: 1
