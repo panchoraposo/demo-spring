@@ -52,7 +52,7 @@ controller:
     fsGroup: 1000
   resources:
     requests:
-      cpu: 500m
+      cpu: 100m
       memory: 1Gi
     limits:
       cpu: "2"
