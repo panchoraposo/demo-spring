@@ -1,0 +1,93 @@
+apiVersion: k8s.keycloak.org/v2alpha1
+kind: KeycloakRealmImport
+metadata:
+  name: trustify-realm
+  namespace: banking-idp
+  labels:
+    app.kubernetes.io/part-of: banking-demo
+spec:
+  keycloakCRName: banking-keycloak
+  realm:
+    realm: trustify
+    enabled: true
+    sslRequired: external
+    registrationAllowed: false
+    resetPasswordAllowed: true
+    rememberMe: true
+    clients:
+      - clientId: frontend
+        name: trustify-frontend
+        enabled: true
+        protocol: openid-connect
+        publicClient: true
+        standardFlowEnabled: true
+        implicitFlowEnabled: false
+        directAccessGrantsEnabled: true
+        serviceAccountsEnabled: false
+        fullScopeAllowed: true
+        attributes:
+          client.use.lightweight.access.token.enabled: "false"
+        redirectUris:
+          - https://server.apps.cluster-k7kqp.k7kqp.sandbox3321.opentlc.com/*
+        webOrigins:
+          - "*"
+        defaultClientScopes:
+          - read:document
+        optionalClientScopes:
+          - create:document
+          - update:document
+          - delete:document
+          - offline_access
+        protocolMappers:
+          - name: sub
+            protocol: openid-connect
+            protocolMapper: oidc-sub-mapper
+            consentRequired: false
+            config:
+              introspection.token.claim: "true"
+              access.token.claim: "true"
+      - clientId: cli
+        name: trustify-cli
+        enabled: true
+        protocol: openid-connect
+        publicClient: false
+        standardFlowEnabled: false
+        directAccessGrantsEnabled: false
+        serviceAccountsEnabled: true
+        clientAuthenticatorType: client-secret
+        secret: replace-me-oidc-client-secret
+        fullScopeAllowed: true
+        defaultClientScopes:
+          - read:document
+          - create:document
+          - update:document
+          - delete:document
+        protocolMappers:
+          - name: sub
+            protocol: openid-connect
+            protocolMapper: oidc-sub-mapper
+            consentRequired: false
+            config:
+              introspection.token.claim: "true"
+              access.token.claim: "true"
+    clientScopes:
+      - name: create:document
+        protocol: openid-connect
+      - name: read:document
+        protocol: openid-connect
+      - name: update:document
+        protocol: openid-connect
+      - name: delete:document
+        protocol: openid-connect
+    users:
+      - username: tpaadmin
+        enabled: true
+        firstName: TPA
+        lastName: Admin
+        email: tpaadmin@example.com
+        emailVerified: true
+        requiredActions: []
+        credentials:
+          - type: password
+            value: replace-me-tpaadmin
+            temporary: false

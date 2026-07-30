@@ -17,7 +17,6 @@ resources:
   - postgresql.yaml
   - redis.yaml
   - rhda-backend.yaml
-  - sso-keycloak.yaml
   - trustedprofileanalyzer.yaml
 
 replacements:

@@ -7,4 +7,5 @@ resources:
   - keycloak-db.yaml
   - keycloak.yaml
   - realm-import-job.yaml
+  - trustify-realm-import.yaml
   - route.yaml
