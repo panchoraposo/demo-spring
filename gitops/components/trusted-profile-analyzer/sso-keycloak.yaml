@@ -131,11 +131,11 @@ spec:
             periodSeconds: 20
           resources:
             requests:
-              cpu: 200m
-              memory: 768Mi
+              cpu: 50m
+              memory: 512Mi
             limits:
-              cpu: "1"
-              memory: 2Gi
+              cpu: 500m
+              memory: 1Gi
           volumeMounts:
             - name: realm
               mountPath: /opt/keycloak/data/import
