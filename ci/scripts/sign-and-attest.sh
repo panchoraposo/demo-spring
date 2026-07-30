@@ -82,8 +82,61 @@ if [ -z "${TPA_URL}" ] && oc -n trusted-profile-analyzer get route >/dev/null 2>
 fi
 
 if [ -n "${TPA_URL}" ]; then
+  # In CI we require the SBOM upload to succeed (so SBOM is left in TPA).
+  # Developers can override with TPA_UPLOAD_REQUIRED=false when running locally.
+  TPA_UPLOAD_REQUIRED="${TPA_UPLOAD_REQUIRED:-}"
+  if [ -z "${TPA_UPLOAD_REQUIRED}" ]; then
+    if [ -n "${JENKINS_URL:-}" ] || [ -n "${BUILD_NUMBER:-}" ]; then
+      TPA_UPLOAD_REQUIRED=true
+    else
+      TPA_UPLOAD_REQUIRED=false
+    fi
+  fi
+
   hdr_auth=()
+  # Prefer pre-provided token, otherwise obtain a non-interactive OIDC token for CI.
+  if [ -z "${TPA_TOKEN:-}" ]; then
+    TPA_OIDC_CLIENT_ID="${TPA_OIDC_CLIENT_ID:-cli}"
+    TPA_OIDC_CLIENT_SECRET="${TPA_OIDC_CLIENT_SECRET:-}"
+    TPA_OIDC_SCOPES="${TPA_OIDC_SCOPES:-create:document read:document}"
+
+    # Derive issuer from TPA_URL by default: https://sso.<apps-domain>/realms/trustify
+    TPA_OIDC_ISSUER_URL="${TPA_OIDC_ISSUER_URL:-}"
+    if [ -z "${TPA_OIDC_ISSUER_URL}" ]; then
+      tpa_host="${TPA_URL#http://}"; tpa_host="${tpa_host#https://}"; tpa_host="${tpa_host%%/*}"
+      if [[ "${tpa_host}" == server.* ]]; then
+        sso_host="sso.${tpa_host#server.}"
+      else
+        # best-effort fallback (same base domain)
+        sso_host="sso.${tpa_host#*.}"
+      fi
+      TPA_OIDC_ISSUER_URL="https://${sso_host}/realms/trustify"
+    fi
+
+    if [ -n "${TPA_OIDC_CLIENT_SECRET}" ]; then
+      token_url="${TPA_OIDC_TOKEN_URL:-${TPA_OIDC_ISSUER_URL}/protocol/openid-connect/token}"
+      token_http="$(curl -sk -o /tmp/tpa-oidc.json -w '%{http_code}' \
+        -X POST "${token_url}" \
+        -d 'grant_type=client_credentials' \
+        -d "client_id=${TPA_OIDC_CLIENT_ID}" \
+        -d "client_secret=${TPA_OIDC_CLIENT_SECRET}" \
+        -d "scope=${TPA_OIDC_SCOPES}" || true)"
+      TPA_TOKEN="$(sed -n 's/.*\"access_token\"[[:space:]]*:[[:space:]]*\"\\([^\"]*\\)\".*/\\1/p' /tmp/tpa-oidc.json | head -1 || true)"
+      if [ -z "${TPA_TOKEN}" ]; then
+        err="$(sed -n 's/.*\"error\"[[:space:]]*:[[:space:]]*\"\\([^\"]*\\)\".*/\\1/p' /tmp/tpa-oidc.json | head -1 || true)"
+        echo "WARN: Failed to obtain TPA token (HTTP ${token_http}) issuer=${TPA_OIDC_ISSUER_URL} err=${err}" >&2
+      fi
+    else
+      echo "WARN: Missing TPA_OIDC_CLIENT_SECRET; cannot obtain CI token for TPA upload." >&2
+    fi
+  fi
+
   [ -n "${TPA_TOKEN:-}" ] && hdr_auth+=( -H "Authorization: Bearer ${TPA_TOKEN}" )
+  if [ "${TPA_UPLOAD_REQUIRED}" = "true" ] && [ -z "${TPA_TOKEN:-}" ]; then
+    echo "ERROR: TPA upload is required but no TPA_TOKEN and no OIDC client secret available." >&2
+    exit 1
+  fi
+
   code="$(curl -sk -o /tmp/tpa-upload.json -w '%{http_code}' \
     -X POST "${TPA_URL}/api/v2/sbom?format=cyclonedx&labels.labels.app=${APP}&labels.labels.tag=${IMAGE_TAG}" \
     -H 'Content-Type: application/vnd.cyclonedx+json' \
@@ -93,6 +146,10 @@ if [ -n "${TPA_URL}" ]; then
   if [ "${code}" != "200" ] && [ "${code}" != "201" ] && [ "${code}" != "202" ]; then
     echo "WARN: SBOM upload to TPA failed (HTTP ${code})." >&2
     head -c 400 /tmp/tpa-upload.json 2>/dev/null || true
+    if [ "${TPA_UPLOAD_REQUIRED}" = "true" ]; then
+      echo "ERROR: SBOM upload to TPA is required in CI." >&2
+      exit 1
+    fi
   fi
 else
   echo "WARN: TPA_URL not found; leaving SBOM in Quay only."
