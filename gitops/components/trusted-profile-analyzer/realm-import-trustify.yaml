@@ -38,8 +38,52 @@ spec:
           - offline_access
         attributes:
           client.use.lightweight.access.token.enabled: "false"
+      # Compatibility clientId used by some operator/channel samples.
+      - clientId: trusted-profile-analyzer
+        name: trusted-profile-analyzer
+        protocol: openid-connect
+        publicClient: true
+        standardFlowEnabled: true
+        directAccessGrantsEnabled: true
+        redirectUris: ["*"]
+        webOrigins: ["*"]
+        defaultClientScopes:
+          - basic
+          - profile
+          - email
+          - roles
+          - web-origins
+          - read:document
+        optionalClientScopes:
+          - create:document
+          - update:document
+          - delete:document
+          - offline_access
+        attributes:
+          client.use.lightweight.access.token.enabled: "false"
       - clientId: cli
         name: trustify-cli
+        protocol: openid-connect
+        publicClient: false
+        standardFlowEnabled: false
+        directAccessGrantsEnabled: false
+        serviceAccountsEnabled: true
+        clientAuthenticatorType: client-secret
+        # Keep in sync with Conjur-seeded `banking/tpa/oidc-cli-client-secret`.
+        secret: tpa-oidc-cli-secret-change-me
+        defaultClientScopes:
+          - basic
+          - profile
+          - email
+          - roles
+          - web-origins
+          - read:document
+          - create:document
+          - update:document
+          - delete:document
+      # Compatibility clientId used by some operator/channel samples.
+      - clientId: trusted-profile-analyzer-cli
+        name: trusted-profile-analyzer-cli
         protocol: openid-connect
         publicClient: false
         standardFlowEnabled: false
