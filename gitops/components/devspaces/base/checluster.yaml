@@ -35,7 +35,7 @@ spec:
       pvcStrategy: per-user
     defaultEditor: che-incubator/che-code/latest
     # Repo-level defaults: ./devfile.yaml + .vscode/extensions.json (Spring + RHDA).
-    # Set REPLACE_ME_RHDA_BACKEND_URL to the acm rhda-backend Route (TPA-backed).
+    # Patched per environment via overlay env files.
     defaultComponents:
       - name: universal-developer-image
         container:
@@ -48,6 +48,8 @@ spec:
           env:
             - name: REDHAT_DEPENDENCY_ANALYTICS_EXHORT_BACKEND_URL
               value: REPLACE_ME_RHDA_BACKEND_URL
+            - name: TPA_URL
+              value: REPLACE_ME_TPA_URL
     containerBuild:
       openShiftSecurityContextConstraint: container-build
   gitServices: {}

@@ -18,7 +18,6 @@ resources:
   - user-workload-monitoring.yaml
   # wave 2
   - mesh.yaml
-  - devspaces.yaml
   # wave 3
   - external-secrets-config.yaml
   # wave 4+

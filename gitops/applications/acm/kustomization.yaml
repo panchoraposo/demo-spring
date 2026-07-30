@@ -27,6 +27,7 @@ resources:
   - promxy.yaml
   - trusted-profile-analyzer.yaml
   # wave 4+
+  - devspaces.yaml
   - keycloak.yaml
   - trustify-realm.yaml
   - jenkins.yaml
@@ -58,6 +59,8 @@ replacements:
       - select: { kind: Application, name: trusted-profile-analyzer }
         fieldPaths: [ spec.source.repoURL ]
       - select: { kind: Application, name: promxy }
+        fieldPaths: [ spec.source.repoURL ]
+      - select: { kind: Application, name: devspaces }
         fieldPaths: [ spec.source.repoURL ]
       - select: { kind: Application, name: keycloak }
         fieldPaths: [ spec.source.repoURL ]
@@ -95,6 +98,8 @@ replacements:
       - select: { kind: Application, name: trusted-profile-analyzer }
         fieldPaths: [ spec.source.targetRevision ]
       - select: { kind: Application, name: promxy }
+        fieldPaths: [ spec.source.targetRevision ]
+      - select: { kind: Application, name: devspaces }
         fieldPaths: [ spec.source.targetRevision ]
       - select: { kind: Application, name: keycloak }
         fieldPaths: [ spec.source.targetRevision ]

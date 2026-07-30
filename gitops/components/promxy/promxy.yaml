@@ -4,16 +4,18 @@ metadata:
   name: promxy
   namespace: acm-observability
   labels:
+    app: promxy
     app.kubernetes.io/name: promxy
     app.kubernetes.io/part-of: banking-demo
 spec:
   replicas: 1
   selector:
     matchLabels:
-      app.kubernetes.io/name: promxy
+      app: promxy
   template:
     metadata:
       labels:
+        app: promxy
         app.kubernetes.io/name: promxy
     spec:
       containers:
@@ -53,11 +55,12 @@ metadata:
   name: promxy
   namespace: acm-observability
   labels:
+    app: promxy
     app.kubernetes.io/name: promxy
     app.kubernetes.io/part-of: banking-demo
 spec:
   selector:
-    app.kubernetes.io/name: promxy
+    app: promxy
   ports:
     - name: http
       port: 8082
@@ -69,6 +72,7 @@ metadata:
   name: promxy
   namespace: acm-observability
   labels:
+    app: promxy
     app.kubernetes.io/name: promxy
     app.kubernetes.io/part-of: banking-demo
 spec:

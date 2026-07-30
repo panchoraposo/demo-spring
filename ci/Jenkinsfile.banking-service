@@ -178,8 +178,9 @@ pipeline {
             sh '''
               set -euo pipefail
               export PATH="${TOOLS_DIR}:${PATH}"
-              for app in "${APP}" "banking-east-root" "banking-west-root"; do
-                oc -n "${GITOPS_NS}" annotate application "${app}" \
+              # GitOps roots live on hub ArgoCD (ApplicationSet banking-spoke-roots).
+              for app in "banking-east-root" "banking-west-root"; do
+                oc -n "${GITOPS_NS}" annotate applications.argoproj.io "${app}" \
                   argocd.argoproj.io/refresh=hard --overwrite || true
               done
               if [ -f .ci-gitops-status ] && grep -q SKIP_GIT_PUSH=1 .ci-gitops-status; then

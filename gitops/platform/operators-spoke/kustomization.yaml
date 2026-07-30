@@ -7,4 +7,3 @@ resources:
   - subscription-eso.yaml
   - subscription-openshift-gitops.yaml
   - subscription-sail.yaml
-  - subscription-devspaces.yaml
