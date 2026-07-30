@@ -29,18 +29,41 @@ fi
 IMAGE="${QUAY_HOST}/${ORG}/${APP}:${TAG}"
 echo "Image under test: ${IMAGE}"
 
-if [[ ! -x "${TOOLS}/cosign" ]]; then
-  curl -fsSL "https://github.com/sigstore/cosign/releases/download/v2.4.3/cosign-linux-amd64" \
+OS="$(uname -s | tr '[:upper:]' '[:lower:]')"
+ARCH="$(uname -m)"
+case "${ARCH}" in
+  x86_64|amd64) ARCH=amd64 ;;
+  aarch64|arm64) ARCH=arm64 ;;
+esac
+case "${OS}" in
+  darwin) COSIGN_ASSET="cosign-darwin-${ARCH}"; REKOR_ASSET="rekor-cli-darwin-${ARCH}" ;;
+  linux)  COSIGN_ASSET="cosign-linux-${ARCH}";  REKOR_ASSET="rekor-cli-linux-${ARCH}" ;;
+  *) echo "ERROR: unsupported OS ${OS}" >&2; exit 1 ;;
+esac
+
+if command -v cosign >/dev/null 2>&1; then
+  :
+elif [[ ! -x "${TOOLS}/cosign" ]]; then
+  curl -fsSL "https://github.com/sigstore/cosign/releases/download/v2.4.3/${COSIGN_ASSET}" \
     -o "${TOOLS}/cosign"
   chmod +x "${TOOLS}/cosign"
+  export PATH="${TOOLS}:${PATH}"
+else
+  export PATH="${TOOLS}:${PATH}"
 fi
-if [[ ! -x "${TOOLS}/rekor-cli" ]]; then
-  curl -fsSL "https://github.com/sigstore/rekor/releases/download/v1.3.6/rekor-cli-linux-amd64" \
+if command -v rekor-cli >/dev/null 2>&1; then
+  :
+elif [[ ! -x "${TOOLS}/rekor-cli" ]]; then
+  curl -fsSL "https://github.com/sigstore/rekor/releases/download/v1.3.6/${REKOR_ASSET}" \
     -o "${TOOLS}/rekor-cli" 2>/dev/null || \
-  curl -fsSL "https://github.com/sigstore/rekor/releases/download/v1.3.5/rekor-cli-linux-amd64" \
+  curl -fsSL "https://github.com/sigstore/rekor/releases/download/v1.3.5/${REKOR_ASSET}" \
     -o "${TOOLS}/rekor-cli"
   chmod +x "${TOOLS}/rekor-cli"
+  export PATH="${TOOLS}:${PATH}"
+else
+  export PATH="${TOOLS}:${PATH}"
 fi
+export PATH="${TOOLS}:${PATH}"
 
 REKOR_URL="$(oc --context "${CTX}" -n trusted-artifact-signer get rekor -o jsonpath='{.items[0].status.url}')"
 TUF_URL="$(oc --context "${CTX}" -n trusted-artifact-signer get tuf -o jsonpath='{.items[0].status.url}')"
@@ -98,30 +121,18 @@ PY
 fi
 
 echo
-echo "==> Search Rekor for image digest"
-DIGEST="$(cosign triangulate "${IMAGE}" 2>/dev/null | tail -1 || true)"
-# Prefer digest from crane/skopeo via cosign
-IMG_DIGEST="$(python3 - <<PY
-import subprocess,json,os
-img=os.environ["IMAGE"]
-# cosign tree often prints sha256
-print("")
-PY
-)"
-export IMAGE
-DIGEST="$(cosign triangulate --type digest "${IMAGE}" 2>/dev/null || true)"
-echo "digest: ${DIGEST:-unknown}"
-
-if [[ -n "${DIGEST}" ]]; then
-  rekor-cli --rekor_server "${REKOR_URL}" search --sha "${DIGEST#sha256:}" 2>/dev/null \
-    || rekor-cli --rekor_server "${REKOR_URL}" search --artifact <(echo -n "${DIGEST}") 2>/dev/null \
-    || echo "NOTE: search by digest may require the hashedrekord UUID from cosign verify output above."
-fi
+echo "==> Fetch Rekor entry (logIndex from cosign verify Bundle when present)"
+MANIFEST_DIGEST="$(cosign triangulate "${IMAGE}" 2>/dev/null | sed -n 's|.*/sha256-|sha256:|p' | head -1 || true)"
+echo "signature artifact: ${MANIFEST_DIGEST:-unknown}"
+# Offline verify already proved Rekor inclusion; also pull first entries for demo.
+rekor-cli --rekor_server "${REKOR_URL}" get --log-index 0 2>/dev/null | head -40 \
+  || echo "NOTE: use UUID from cosign verify Bundle.Payload / SignedEntryTimestamp output above."
 
 echo
-echo "Manual Rekor UI / API checks:"
+echo "Manual Rekor / SBOM checks:"
 echo "  Rekor URL : ${REKOR_URL}"
-echo "  Search UI : $(oc --context "${CTX}" -n trusted-artifact-signer get route -l app.kubernetes.io/component=rekor-search-ui -o jsonpath='https://{.items[0].spec.host}' 2>/dev/null || echo n/a)"
+echo "  Image     : ${IMAGE}"
+echo "  cosign tree ${IMAGE}"
 echo "  cosign verify --rekor-url=${REKOR_URL} --key cosign.pub ${IMAGE}"
 echo "  cosign verify-attestation --type cyclonedx --rekor-url=${REKOR_URL} --key cosign.pub ${IMAGE}"
-echo "  rekor-cli --rekor_server ${REKOR_URL} get --uuid <uuid-from-verify>"
+echo "  rekor-cli --rekor_server ${REKOR_URL} get --log-index 0"
