@@ -148,7 +148,8 @@ else
   fi
 
   # Trustify 3.x: POST /api/v3/sbom (v2 only supports GET). Body is raw bytes.
-  upload_url="${TPA_URL}/api/v3/sbom?format=cyclonedx&labels.labels.app=${APP}&labels.labels.tag=${IMAGE_TAG}"
+  # Trustify Labels query params use the "labels." prefix (keys become app/tag).
+  upload_url="${TPA_URL}/api/v3/sbom?format=cyclonedx&labels.app=${APP}&labels.tag=${IMAGE_TAG}"
   code="$(curl -sk -o /tmp/tpa-upload.json -w '%{http_code}' \
     -X POST "${upload_url}" \
     -H 'Content-Type: application/octet-stream' \
