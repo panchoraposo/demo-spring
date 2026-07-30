@@ -6,7 +6,7 @@ This demo targets three OpenShift clusters:
 
 | Cluster | Role |
 | --- | --- |
-| **acm** | RHACM hub, Conjur, Keycloak, Jenkins, ODF, Quay, RHTAS, TPA, Dev Spaces, Kiali/promxy, credentials dashboard |
+| **acm** | RHACM hub, Conjur, Keycloak, Jenkins, ODF, Quay, RHTAS, TPA, Dev Spaces, Kiali/promxy |
 | **east** / **west** | Managed clusters with GitOps, ESO, OSSM 3.4 ambient, PostgreSQL, Spring apps |
 
 Credentials are sourced from **CyberArk Conjur** on the hub via the **External Secrets Operator** on each cluster. Spring apps never talk to Conjur; they only mount Kubernetes Secrets that ESO materializes.
@@ -23,7 +23,7 @@ Credentials are sourced from **CyberArk Conjur** on the hub via the **External S
 ```mermaid
 flowchart LR
   subgraph acm ["acm hub"]
-    HubSvc["RHACM · GitOps · Conjur · Keycloak<br/>Jenkins · ODF · Quay · RHTAS · TPA<br/>Dev Spaces · Kiali · dashboard"]
+    HubSvc["RHACM · GitOps · Conjur · Keycloak<br/>Jenkins · ODF · Quay · RHTAS · TPA<br/>Dev Spaces · Kiali"]
   end
   subgraph east ["east"]
     EastSvc["GitOps · ESO · OSSM ambient<br/>api-gateway · banking-service · PostgreSQL"]

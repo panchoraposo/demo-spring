@@ -6,7 +6,7 @@ Layout for RHACM ApplicationSets plus per-cluster regional data. Prefer the Ansi
 
 | Cluster | Role | Workloads |
 | --- | --- | --- |
-| **acm** | Hub | RHACM, GitOps, Conjur, Keycloak, Jenkins, ODF, Quay, RHTAS, TPA, Dev Spaces, hub Kiali MC + OSSMC, credentials dashboard |
+| **acm** | Hub | RHACM, GitOps, Conjur, Keycloak, Jenkins, ODF, Quay, RHTAS, TPA, Dev Spaces, hub Kiali MC + OSSMC |
 | **east** | Managed cluster | GitOps, ESO, OSSM 3.4 ambient, PostgreSQL, Spring apps |
 | **west** | Managed cluster | Same as east (independent DB) |
 

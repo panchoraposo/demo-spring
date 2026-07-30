@@ -13,7 +13,6 @@
 | OpenShift Dev Spaces | CheCluster + RHDA → TPA |
 | Jenkins + BuildConfigs | CI: Build → Quay SBOM/sign/attest → GitOps |
 | Hub Kiali + promxy | Multi-cluster view; secrets via Ansible / mesh scripts |
-| Credentials dashboard | `namespace/dashboard` (Ansible `dashboard` role) |
 
 Console banner text: **Hub Cluster** (`scripts/apply-console-banners.sh`).
 

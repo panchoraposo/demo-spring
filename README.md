@@ -13,7 +13,7 @@ Three clusters. Hub owns platform services; east/west run the banking apps with 
 ```mermaid
 flowchart LR
   subgraph acm ["acm hub"]
-    HubSvc["RHACM · GitOps · Conjur · Keycloak<br/>Jenkins · ODF · Quay · RHTAS · TPA<br/>Dev Spaces · Kiali · dashboard"]
+    HubSvc["RHACM · GitOps · Conjur · Keycloak<br/>Jenkins · ODF · Quay · RHTAS · TPA<br/>Dev Spaces · Kiali"]
   end
   subgraph east ["east"]
     EastSvc["GitOps · ESO · OSSM ambient<br/>api-gateway · banking-service · PostgreSQL"]
