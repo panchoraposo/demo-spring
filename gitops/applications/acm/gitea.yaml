@@ -17,6 +17,13 @@ spec:
   destination:
     server: https://kubernetes.default.svc
     namespace: banking-git
+  ignoreDifferences:
+    # OpenShift mutates Namespace labels/annotations; ignore drift.
+    - group: ""
+      kind: Namespace
+      jsonPointers:
+        - /metadata/labels
+        - /metadata/annotations
   syncPolicy:
     automated:
       prune: true
