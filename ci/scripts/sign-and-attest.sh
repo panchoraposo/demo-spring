@@ -73,6 +73,31 @@ echo "==> Generate CycloneDX SBOM"
 syft "registry:${QUAY_IMAGE}" -o cyclonedx-json="${ARTIFACT_DIR}/sbom.cdx.json"
 syft "registry:${QUAY_IMAGE}" -o spdx-json="${ARTIFACT_DIR}/sbom.spdx.json"
 
+echo "==> Upload SBOM to Trusted Profile Analyzer (Trustify) when available"
+TPA_URL="${TPA_URL:-}"
+if [ -z "${TPA_URL}" ] && oc -n trusted-profile-analyzer get route >/dev/null 2>&1; then
+  # Prefer a server/console route created by the rhtpa-operator instance.
+  TPA_HOST="$(oc -n trusted-profile-analyzer get route -o jsonpath='{.items[?(@.spec.to.name!="rhda-backend")][0].spec.host}' 2>/dev/null || true)"
+  [ -n "${TPA_HOST}" ] && TPA_URL="https://${TPA_HOST}"
+fi
+
+if [ -n "${TPA_URL}" ]; then
+  hdr_auth=()
+  [ -n "${TPA_TOKEN:-}" ] && hdr_auth+=( -H "Authorization: Bearer ${TPA_TOKEN}" )
+  code="$(curl -sk -o /tmp/tpa-upload.json -w '%{http_code}' \
+    -X POST "${TPA_URL}/api/v2/sbom?format=cyclonedx&labels.labels.app=${APP}&labels.labels.tag=${IMAGE_TAG}" \
+    -H 'Content-Type: application/vnd.cyclonedx+json' \
+    --data-binary "@${ARTIFACT_DIR}/sbom.cdx.json" \
+    "${hdr_auth[@]}" || true)"
+  echo "TPA upload HTTP=${code} url=${TPA_URL}"
+  if [ "${code}" != "200" ] && [ "${code}" != "201" ] && [ "${code}" != "202" ]; then
+    echo "WARN: SBOM upload to TPA failed (HTTP ${code})." >&2
+    head -c 400 /tmp/tpa-upload.json 2>/dev/null || true
+  fi
+else
+  echo "WARN: TPA_URL not found; leaving SBOM in Quay only."
+fi
+
 # RHTAS env (optional keyless). Always set Rekor/TUF when available on-cluster.
 if [ -z "${TUF_URL:-}" ] && oc get tuf -n trusted-artifact-signer >/dev/null 2>&1; then
   export TUF_URL

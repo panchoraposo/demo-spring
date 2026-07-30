@@ -12,6 +12,16 @@ spec:
   openshift:
     useServiceCa: true
 
+  # Required by the chart schema (demo defaults).
+  database:
+    host: tpa-postgresql
+    name: rhtpadb
+    username: tpa
+    password: replace-me-tpa-db
+  storage:
+    type: pvc
+    size: 20Gi
+
   # Keep footprint small for single-node hubs.
   metrics:
     enabled: false
