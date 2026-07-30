@@ -8,14 +8,13 @@ metadata:
 spec:
   namespace: ztunnel
   version: v1.30-latest
-  profile: ambient
   values:
     ztunnel:
       # Required for ambient multi-network (overlapping pod CIDRs).
       network: CLUSTER_NETWORK
       multiCluster:
         clusterName: CLUSTER_NAME
-  podMetadata:
-    annotations:
-      sidecar.istio.io/inject: "false"
-      ambient.istio.io/redirection: "disabled"
+      # Keep ztunnel out of ambient redirection / sidecar injection.
+      podAnnotations:
+        sidecar.istio.io/inject: "false"
+        ambient.istio.io/redirection: "disabled"

@@ -23,3 +23,9 @@ spec:
       selfHeal: true
     syncOptions:
       - CreateNamespace=true
+  ignoreDifferences:
+    - group: ""
+      kind: Namespace
+      jqPathExpressions:
+        - .metadata.labels
+        - .metadata.annotations

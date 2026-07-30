@@ -25,11 +25,8 @@ spec:
       - CreateNamespace=true
       - ServerSideApply=true
   ignoreDifferences:
-    # Che operator continuously reconciles defaults into .spec.
     - group: org.eclipse.che
       kind: CheCluster
-      managedFieldsManagers:
-        - manager
       jqPathExpressions:
         - .metadata.annotations
         - .status

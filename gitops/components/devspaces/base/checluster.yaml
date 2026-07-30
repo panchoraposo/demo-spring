@@ -1,4 +1,4 @@
-# OpenShift Dev Spaces on spokes. Default workspaces use the repo .devfile/devfile.yaml
+# OpenShift Dev Spaces. Default workspaces use the repo .devfile/devfile.yaml
 # (Spring Boot + Java + Red Hat Dependency Analytics → private TPA via RHDA backend).
 apiVersion: org.eclipse.che/v2
 kind: CheCluster
@@ -14,23 +14,40 @@ spec:
     cheServer:
       debug: false
       logLevel: INFO
-    dashboard: {}
+    dashboard:
+      logLevel: ERROR
+    devWorkspace: {}
     devfileRegistry: {}
     pluginRegistry: {}
     imagePuller:
       enable: false
+      spec: {}
     metrics:
       enable: true
   networking:
     auth:
       identityProviderURL: ""
+      gateway:
+        configLabels:
+          app: che
+          component: che-gateway-config
   containerRegistry: {}
   devEnvironments:
     defaultNamespace:
+      autoProvision: true
       template: <username>-devspaces
     secondsOfInactivityBeforeIdling: 1800
     secondsOfRunBeforeIdling: -1
     maxNumberOfWorkspacesPerUser: 5
+    startTimeoutSeconds: 300
+    disableContainerRunCapabilities: true
+    ignoredUnrecoverableEvents:
+      - FailedScheduling
+    persistUserHome:
+      enabled: true
+    security: {}
+    containerBuildConfiguration:
+      openShiftSecurityContextConstraint: container-build
     storage:
       pvcStrategy: per-user
     defaultEditor: che-incubator/che-code/latest
@@ -45,6 +62,7 @@ spec:
           cpuLimit: "2"
           cpuRequest: 500m
           mountSources: true
+          sourceMapping: /projects
           env:
             - name: REDHAT_DEPENDENCY_ANALYTICS_EXHORT_BACKEND_URL
               value: REPLACE_ME_RHDA_BACKEND_URL
