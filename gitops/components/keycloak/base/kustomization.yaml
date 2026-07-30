@@ -7,5 +7,5 @@ resources:
   - keycloak-db.yaml
   - keycloak.yaml
   - realm-import-job.yaml
-  - trustify-realm-import.yaml
+  # trustify realm is owned by Application trustify-realm (TPA path), not here.
   - route.yaml

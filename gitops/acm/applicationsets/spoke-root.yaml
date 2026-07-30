@@ -43,3 +43,12 @@ spec:
           selfHeal: true
         syncOptions:
           - CreateNamespace=true
+      ignoreDifferences:
+        # Child Application CRs accumulate operation/status/annotations on managed clusters.
+        - group: argoproj.io
+          kind: Application
+          jqPathExpressions:
+            - .metadata.annotations
+            - .metadata.labels
+            - .operation
+            - .status
