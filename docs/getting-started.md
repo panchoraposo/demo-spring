@@ -2,7 +2,10 @@
 
 For the **acm / east / west** layout, follow [multi-cluster.md](multi-cluster.md) first (hub Conjur + Jenkins, spoke apps, mesh peering).
 
-The steps below are the legacy **single-spoke east** path. After the multi-cluster cutover, Conjur/Jenkins are **not** on east — use acm bootstrap instead of `bootstrap-east.sh`.
+The steps below are the legacy **single-spoke east** path. For the current approach, use:
+
+- `ansible/README.md` (minimal bootstrap)
+- `docs/multi-cluster.md` (hub+spokes GitOps order)
 
 ## Prerequisites
 
@@ -11,23 +14,9 @@ The steps below are the legacy **single-spoke east** path. After the multi-clust
 - Cluster pull secret able to pull from `registry.redhat.io` and Docker Hub (Conjur / nginx / postgres ImageStreams, or mirror them)
 - This repository pushed to a Git remote reachable by OpenShift GitOps and Jenkins
 
-## 1. Set placeholders and push
+## 1. Bootstrap GitOps root app (legacy)
 
 ```bash
-export GIT_REPO_URL="https://github.com/<org>/demo-spring.git"
-export CLUSTER_DOMAIN="apps.east.example.com"   # oc get ingresses.config.openshift.io cluster -o jsonpath='{.spec.domain}'
-# Optional after acm TPA/RHDA and OIDC are known:
-# export RHDA_BACKEND_URL="https://rhda-backend-trusted-profile-analyzer.apps...."
-# export OIDC_ISSUER_URL="https://keycloak..../realms/trusted-artifact-signer"
-
-./scripts/set-placeholders.sh
-git add -A && git commit -m "chore: set east cluster placeholders" && git push
-```
-
-## 2. Bootstrap GitOps root app
-
-```bash
-export GIT_REPO_URL CLUSTER_DOMAIN
 ./scripts/bootstrap-east.sh
 ```
 
@@ -50,8 +39,7 @@ oc get externalsecret -A
 
 # Application namespaces
 oc get pods -n banking-db
-oc get pods -n banking-idp
-oc get keycloak -n banking-idp
+oc get pods -n trusted-profile-analyzer   # hub TPA + shared Keycloak (Route: sso)
 oc get pods -n banking-ci
 oc get pods -n banking-apps
 ```
@@ -81,7 +69,7 @@ oc -n banking-apps start-build api-gateway --from-dir=apps/api-gateway --follow
 ## 5. Obtain a JWT and call APIs
 
 ```bash
-KEYCLOAK_URL="https://keycloak-banking.${CLUSTER_DOMAIN}"
+KEYCLOAK_URL="https://$(oc --context acm -n trusted-profile-analyzer get route sso -o jsonpath='{.spec.host}')"
 GATEWAY_URL="https://$(oc get route api-gateway -n banking-apps -o jsonpath='{.spec.host}')"
 
 TOKEN=$(curl -s -X POST "${KEYCLOAK_URL}/realms/banking/protocol/openid-connect/token" \

@@ -5,7 +5,9 @@ metadata:
 data:
   SPRING_DATASOURCE_URL: jdbc:postgresql://postgresql.banking-db.svc.cluster.local:5432/banking
   # Bound by Spring Boot relaxed binding (resourceserver JWT)
-  SPRING_SECURITY_OAUTH2_RESOURCESERVER_JWT_ISSUER_URI: http://keycloak-banking.apps.cluster-4487j.4487j.sandbox2772.opentlc.com/realms/banking
-  SPRING_SECURITY_OAUTH2_RESOURCESERVER_JWT_JWK_SET_URI: http://banking-keycloak-service.banking-idp.svc:8080/realms/banking/protocol/openid-connect/certs
+  # Patched per environment/cluster overlay.
+  SPRING_SECURITY_OAUTH2_RESOURCESERVER_JWT_ISSUER_URI: https://sso.apps.example.com/realms/banking
+  SPRING_SECURITY_OAUTH2_RESOURCESERVER_JWT_JWK_SET_URI: https://sso.apps.example.com/realms/banking/protocol/openid-connect/certs
   # Mesh failover: accept JWTs issued by either spoke Keycloak (comma-separated).
-  OIDC_TRUSTED_ISSUERS: http://keycloak-banking.apps.cluster-4487j.4487j.sandbox2772.opentlc.com/realms/banking,http://keycloak-banking.apps.cluster-mj6n9.mj6n9.sandbox990.opentlc.com/realms/banking
+  # Patched per environment.
+  OIDC_TRUSTED_ISSUERS: https://sso.apps.example.com/realms/banking

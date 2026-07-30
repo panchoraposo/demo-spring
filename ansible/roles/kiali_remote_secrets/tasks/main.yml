@@ -1,0 +1,63 @@
+---
+- name: Ensure Kiali namespace exists on hub
+  ansible.builtin.command: oc --context "{{ acm_context }}" create namespace "{{ kiali_namespace }}" --dry-run=client -o yaml
+  register: ns_yaml
+  changed_when: false
+
+- name: Apply Kiali namespace on hub
+  ansible.builtin.command: oc --context "{{ acm_context }}" apply -f -
+  args:
+    stdin: "{{ ns_yaml.stdout }}"
+  changed_when: true
+
+- name: Create hub kubeconfig Secret for each spoke (Kiali clustering)
+  ansible.builtin.shell: |
+    set -euo pipefail
+    ctx="{{ item }}"
+    sa="kiali-remote-reader"
+    ns="{{ kiali_namespace }}"
+
+    oc --context "${ctx}" -n "${ns}" create sa "${sa}" --dry-run=client -o yaml | oc --context "${ctx}" apply -f -
+    oc --context "${ctx}" adm policy add-cluster-role-to-user cluster-admin "system:serviceaccount:${ns}:${sa}" >/dev/null
+
+    server="$(oc --context "${ctx}" config view --minify -o jsonpath='{.clusters[0].cluster.server}')"
+    token="$(oc --context "${ctx}" -n "${ns}" create token "${sa}" --duration=8760h)"
+
+    cat <<EOF | oc --context "{{ acm_context }}" -n "${ns}" apply -f -
+    apiVersion: v1
+    kind: Secret
+    metadata:
+      name: istio-remote-secret-${ctx}
+      namespace: ${ns}
+      labels:
+        kiali.io/multiCluster: "true"
+    stringData:
+      ${ctx}: |
+        apiVersion: v1
+        kind: Config
+        clusters:
+        - cluster:
+            server: ${server}
+            insecure-skip-tls-verify: true
+          name: ${ctx}
+        contexts:
+        - context:
+            cluster: ${ctx}
+            user: ${ctx}
+          name: ${ctx}
+        current-context: ${ctx}
+        users:
+        - name: ${ctx}
+          user:
+            token: ${token}
+    EOF
+  args:
+    executable: /bin/bash
+  loop: "{{ spoke_contexts }}"
+  changed_when: true
+
+- name: Restart Kiali (reload clusters)
+  ansible.builtin.command: oc --context "{{ acm_context }}" -n "{{ kiali_namespace }}" delete pod -l app.kubernetes.io/name=kiali
+  changed_when: true
+  failed_when: false
+

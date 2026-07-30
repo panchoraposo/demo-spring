@@ -1,0 +1,15 @@
+---
+- name: Ensure OpenShift GitOps is installed on hub (preflight)
+  ansible.builtin.command: oc --context "{{ acm_context }}" -n openshift-gitops get deploy openshift-gitops-server
+  changed_when: false
+
+- name: Render hub root Application manifest
+  ansible.builtin.template:
+    src: acm-root.yaml.j2
+    dest: "{{ playbook_dir }}/.rendered-acm-root.yaml"
+    mode: "0644"
+
+- name: Apply hub root Application
+  ansible.builtin.command: oc --context "{{ acm_context }}" -n openshift-gitops apply -f "{{ playbook_dir }}/.rendered-acm-root.yaml"
+  changed_when: true
+

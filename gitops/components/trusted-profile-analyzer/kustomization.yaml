@@ -5,8 +5,7 @@ kind: Kustomization
 # Apply TrustedProfileAnalyzer CR from trustedprofileanalyzer.sample.yaml after
 # aligning fields with the installed operator CSV sample (Tech Preview CRD).
 resources:
-  - objectbucketclaim.yaml
-  - secrets.yaml
+  - externalsecrets.yaml
   - postgresql.yaml
   - redis.yaml
   - rhda-backend.yaml

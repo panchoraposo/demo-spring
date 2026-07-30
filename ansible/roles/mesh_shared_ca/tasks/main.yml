@@ -1,0 +1,53 @@
+---
+- name: Generate shared mesh CA (root + per-cluster intermediates)
+  ansible.builtin.shell: |
+    set -euo pipefail
+    work="{{ playbook_dir }}/.mesh-certs"
+    mkdir -p "${work}"
+    cd "${work}"
+    if [[ ! -f root-cert.pem ]]; then
+      cat > extensions.cnf <<'EOF'
+    [ v3_ca ]
+    basicConstraints = critical,CA:TRUE
+    keyUsage = critical, digitalSignature, cRLSign, keyCertSign
+    subjectKeyIdentifier = hash
+    authorityKeyIdentifier = keyid:always,issuer
+    EOF
+      openssl req -new -newkey rsa:4096 -x509 -sha256 -days 3650 -nodes \
+        -keyout root-key.pem -out root-cert.pem \
+        -subj "/O=banking-mesh/CN=Root CA" \
+        -extensions v3_ca -config extensions.cnf
+      for ctx in "{{ east_context }}" "{{ west_context }}"; do
+        openssl req -new -newkey rsa:4096 -nodes \
+          -keyout "${ctx}-key.pem" -out "${ctx}.csr" \
+          -subj "/O=banking-mesh/CN=${ctx}"
+        openssl x509 -req -days 3650 -sha256 \
+          -CA root-cert.pem -CAkey root-key.pem -set_serial "$((RANDOM))" \
+          -in "${ctx}.csr" -out "${ctx}-cert.pem" \
+          -extfile extensions.cnf -extensions v3_ca
+        cat "${ctx}-cert.pem" root-cert.pem > "${ctx}-cert-chain.pem"
+      done
+    fi
+  args:
+    executable: /bin/bash
+  changed_when: false
+
+- name: Install cacerts secret on each spoke (istio-system)
+  ansible.builtin.shell: |
+    set -euo pipefail
+    work="{{ playbook_dir }}/.mesh-certs"
+    ctx="{{ item }}"
+    oc --context "${ctx}" create namespace istio-system --dry-run=client -o yaml | oc --context "${ctx}" apply -f -
+    oc --context "${ctx}" -n istio-system delete secret cacerts --ignore-not-found
+    oc --context "${ctx}" -n istio-system create secret generic cacerts \
+      --from-file=root-cert.pem="${work}/root-cert.pem" \
+      --from-file=ca-cert.pem="${work}/${ctx}-cert.pem" \
+      --from-file=ca-key.pem="${work}/${ctx}-key.pem" \
+      --from-file=cert-chain.pem="${work}/${ctx}-cert-chain.pem"
+    oc --context "${ctx}" -n istio-system delete pods -l app=istiod --wait=false || true
+    oc --context "${ctx}" -n ztunnel delete pods --all --wait=false || true
+  args:
+    executable: /bin/bash
+  loop: "{{ spoke_contexts }}"
+  changed_when: true
+

@@ -1,0 +1,23 @@
+---
+- name: Install banking demo (bootstrap + GitOps)
+  hosts: localhost
+  connection: local
+  gather_facts: false
+
+  vars:
+    spoke_contexts:
+      - "{{ east_context }}"
+      - "{{ west_context }}"
+
+  roles:
+    - role: preflight
+    - role: bootstrap_gitops_hub
+    - role: label_managedclusters
+    - role: apply_acm_gitops
+    - role: sync_conjur_creds_to_spokes
+    - role: mesh_shared_ca
+    - role: mesh_remote_secrets
+    - role: kiali_remote_secrets
+    - role: promxy_tokens
+    - role: postflight
+

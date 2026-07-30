@@ -1,0 +1,49 @@
+---
+- name: Read conjur-creds hostid/apikey from hub ESO namespace
+  ansible.builtin.command: >
+    oc --context "{{ acm_context }}" -n external-secrets get secret conjur-creds -o json
+  register: conjur_creds_json
+  changed_when: false
+
+- name: Read Conjur CA from hub banking-conjur
+  ansible.builtin.command: >
+    oc --context "{{ acm_context }}" -n banking-conjur get secret conjur-oss-conjur-ssl-ca-cert -o json
+  register: conjur_ca_json
+  changed_when: false
+
+- name: Create conjur-creds and conjur-ssl-ca on each spoke
+  ansible.builtin.shell: |
+    set -euo pipefail
+    hostid_b64='{{ (conjur_creds_json.stdout | from_json).data.hostid }}'
+    apikey_b64='{{ (conjur_creds_json.stdout | from_json).data.apikey }}'
+    ca_b64='{{ (conjur_ca_json.stdout | from_json).data["tls.crt"] }}'
+
+    oc --context "{{ item }}" create namespace external-secrets --dry-run=client -o yaml | oc --context "{{ item }}" apply -f -
+
+    oc --context "{{ item }}" -n external-secrets apply -f - <<EOF
+    apiVersion: v1
+    kind: Secret
+    metadata:
+      name: conjur-creds
+      namespace: external-secrets
+    type: Opaque
+    data:
+      hostid: ${hostid_b64}
+      apikey: ${apikey_b64}
+    EOF
+
+    oc --context "{{ item }}" -n external-secrets apply -f - <<EOF
+    apiVersion: v1
+    kind: Secret
+    metadata:
+      name: conjur-ssl-ca
+      namespace: external-secrets
+    type: Opaque
+    data:
+      tls.crt: ${ca_b64}
+    EOF
+  args:
+    executable: /bin/bash
+  loop: "{{ spoke_contexts }}"
+  changed_when: true
+

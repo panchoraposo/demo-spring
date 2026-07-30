@@ -1,0 +1,78 @@
+---
+- name: Create SA on spokes and generate Thanos bearer tokens
+  ansible.builtin.shell: |
+    set -euo pipefail
+    ns="istio-system"
+    sa="acm-thanos-reader"
+    ctx="{{ item }}"
+    oc --context "${ctx}" -n "${ns}" create sa "${sa}" --dry-run=client -o yaml | oc --context "${ctx}" apply -f -
+    oc --context "${ctx}" adm policy add-cluster-role-to-user cluster-monitoring-view "system:serviceaccount:${ns}:${sa}" >/dev/null
+    oc --context "${ctx}" -n "${ns}" create token "${sa}" --duration=8760h
+  args:
+    executable: /bin/bash
+  loop: "{{ spoke_contexts }}"
+  register: spoke_tokens
+  changed_when: true
+
+- name: Map tokens to variables
+  ansible.builtin.set_fact:
+    promxy_east_token: "{{ (spoke_tokens.results | selectattr('item','equalto', east_context) | first).stdout | trim }}"
+    promxy_west_token: "{{ (spoke_tokens.results | selectattr('item','equalto', west_context) | first).stdout | trim }}"
+
+- name: Retrieve Conjur admin API key via conjurctl (hub)
+  ansible.builtin.shell: |
+    set -euo pipefail
+    ns="banking-conjur"
+    pod="$(oc --context "{{ acm_context }}" get pod -n "${ns}" -l app=conjur-oss --field-selector=status.phase=Running -o jsonpath='{.items[0].metadata.name}' 2>/dev/null || true)"
+    if [[ -z "${pod}" ]]; then
+      pod="$(oc --context "{{ acm_context }}" get pod -n "${ns}" -l app.kubernetes.io/name=conjur-oss --field-selector=status.phase=Running -o jsonpath='{.items[0].metadata.name}' 2>/dev/null || true)"
+    fi
+    [[ -n "${pod}" ]] || { echo \"No running conjur-oss pod\" >&2; exit 1; }
+    oc --context "{{ acm_context }}" exec -n "${ns}" "${pod}" -c conjur-oss -- conjurctl role retrieve-key banking:user:admin | tr -d '\r\n'
+  args:
+    executable: /bin/bash
+  register: conjur_admin_key
+  changed_when: false
+
+- name: Write Conjur CA bundle to temp file
+  ansible.builtin.shell: |
+    set -euo pipefail
+    oc --context "{{ acm_context }}" -n banking-conjur get secret conjur-oss-conjur-ssl-ca-cert -o jsonpath='{.data.tls\\.crt}' | base64 -d > "{{ playbook_dir }}/.conjur-ca.crt"
+  args:
+    executable: /bin/bash
+  changed_when: false
+
+- name: Store promxy tokens in Conjur variables
+  ansible.builtin.shell: |
+    set -euo pipefail
+    CONJUR_URL="https://conjur-oss.banking-conjur.svc"
+    ACCOUNT="banking"
+    CA="{{ playbook_dir }}/.conjur-ca.crt"
+    ADMIN_KEY='{{ conjur_admin_key.stdout | trim }}'
+
+    auth_token() {
+      local login="$1" api_key="$2"
+      local enc_login
+      enc_login="$(python3 -c 'import urllib.parse,sys; print(urllib.parse.quote(sys.argv[1], safe=\"\"))' "${login}")"
+      curl -sf --cacert "${CA}" -X POST --data-binary "${api_key}" \
+        "${CONJUR_URL}/authn/${ACCOUNT}/${enc_login}/authenticate" | base64 | tr -d '\\n'
+    }
+    set_var() {
+      local id="$1" value="$2"
+      local enc_id
+      enc_id="$(python3 -c 'import urllib.parse,sys; print(urllib.parse.quote(sys.argv[1], safe=\"\"))' "${id}")"
+      curl -sf --cacert "${CA}" -X POST \
+        -H "Authorization: Token token=\"${TOKEN_B64}\"" \
+        -H "Content-Type: text/plain" \
+        --data-binary "${value}" \
+        "${CONJUR_URL}/secrets/${ACCOUNT}/variable/${enc_id}" >/dev/null
+    }
+
+    TOKEN_B64="$(auth_token admin \"${ADMIN_KEY}\")"
+    set_var \"banking/promxy/east-token\" '{{ promxy_east_token }}'
+    set_var \"banking/promxy/west-token\" '{{ promxy_west_token }}'
+    echo OK
+  args:
+    executable: /bin/bash
+  changed_when: true
+

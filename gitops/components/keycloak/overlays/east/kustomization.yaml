@@ -1,8 +1,39 @@
 apiVersion: kustomize.config.k8s.io/v1beta1
 kind: Kustomization
 
+namespace: banking-idp
+
 resources:
   - ../../base
 
 commonLabels:
   cluster: east
+
+generatorOptions:
+  disableNameSuffixHash: true
+
+configMapGenerator:
+  - name: env-config-keycloak
+    envs:
+      - env/keycloak.env
+
+replacements:
+  - source:
+      kind: ConfigMap
+      name: env-config-keycloak
+      fieldPath: data.KEYCLOAK_HOST
+    targets:
+      - select:
+          group: k8s.keycloak.org
+          version: v2alpha1
+          kind: Keycloak
+          name: banking-keycloak
+        fieldPaths:
+          - spec.hostname.hostname
+      - select:
+          group: route.openshift.io
+          version: v1
+          kind: Route
+          name: banking-keycloak
+        fieldPaths:
+          - spec.host

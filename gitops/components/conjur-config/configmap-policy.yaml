@@ -25,6 +25,18 @@ data:
         - !variable jenkins/jenkins-admin-password
         - !variable github-ci/username
         - !variable github-ci/token
+        - !variable promxy/east-token
+        - !variable promxy/west-token
+        - !variable tpa/keycloak-admin-username
+        - !variable tpa/keycloak-admin-password
+        - !variable tpa/oidc-cli-client-secret
+        - !variable tpa/postgresql-db-host
+        - !variable tpa/postgresql-db-name
+        - !variable tpa/postgresql-db-user
+        - !variable tpa/postgresql-db-password
+        - !variable tpa/postgresql-db-port
+        - !variable tpa/postgresql-admin-user
+        - !variable tpa/postgresql-admin-password
 
         - !host
           id: eso
@@ -50,3 +62,15 @@ data:
             - !variable jenkins/jenkins-admin-password
             - !variable github-ci/username
             - !variable github-ci/token
+            - !variable promxy/east-token
+            - !variable promxy/west-token
+            - !variable tpa/keycloak-admin-username
+            - !variable tpa/keycloak-admin-password
+            - !variable tpa/oidc-cli-client-secret
+            - !variable tpa/postgresql-db-host
+            - !variable tpa/postgresql-db-name
+            - !variable tpa/postgresql-db-user
+            - !variable tpa/postgresql-db-password
+            - !variable tpa/postgresql-db-port
+            - !variable tpa/postgresql-admin-user
+            - !variable tpa/postgresql-admin-password

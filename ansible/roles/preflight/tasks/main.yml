@@ -1,0 +1,23 @@
+---
+- name: Check required CLIs exist
+  ansible.builtin.command: "{{ item }} --version"
+  changed_when: false
+  loop:
+    - oc
+    - jq
+    - curl
+    - openssl
+
+- name: Validate oc contexts are present
+  ansible.builtin.command: oc config get-contexts -o name
+  register: oc_contexts
+  changed_when: false
+
+- name: Fail if required contexts missing
+  ansible.builtin.assert:
+    that:
+      - acm_context in oc_contexts.stdout_lines
+      - east_context in oc_contexts.stdout_lines
+      - west_context in oc_contexts.stdout_lines
+    fail_msg: "Missing one or more oc contexts (expected: {{ acm_context }}, {{ east_context }}, {{ west_context }})"
+

@@ -18,12 +18,10 @@ Operators: [`gitops/platform/operators-hub`](../gitops/platform/operators-hub).
 1. Platform operators (wave 0) including `odf-operator`, `quay-operator`, `rhtas-operator`, `rhtpa-operator`.
 2. ODF `StorageCluster` MCG-only — wait until `openshift-storage.noobaa.io` StorageClass exists.
 3. QuayRegistry + Securesign.
-4. TPA ObjectBucketClaim, PostgreSQL, `rhda-backend`; then apply
-   `trustedprofileanalyzer.sample.yaml` (align with operator CSV — Tech Preview).
-5. Replace placeholders:
-   - `REPLACE_ME_OIDC_ISSUER_URL` (Fulcio + TPA)
-   - `REPLACE_ME_S3_*` / OBC credentials for TPA
-   - `REPLACE_ME_RHDA_BACKEND_URL` in `devfile.yaml`, `.vscode/settings.json`, CheCluster
+4. TPA PostgreSQL + `rhda-backend` + Keycloak SSO (GitOps managed; secrets via Conjur/ESO).
+5. Optional values:
+   - Fulcio OIDC issuer for RHTAS (`gitops/components/trusted-artifact-signer/env/rhtas.env`)
+   - RHDA/TPA URLs for Dev Spaces (`devfile.yaml` / CheCluster overlays)
 
 ### Quay post-install
 
@@ -54,6 +52,11 @@ Opening this Git repo in Dev Spaces loads:
 oc -n trusted-profile-analyzer get route rhda-backend \
   -o jsonpath='https://{.spec.host}{"\n"}'
 # Paste into REPLACE_ME_RHDA_BACKEND_URL (repo + CheCluster env).
+
+# Optional: TPA server route (UI/API). Use as TPA_URL.
+oc -n trusted-profile-analyzer get route -l app.kubernetes.io/component=server \
+  -o jsonpath='https://{.items[0].spec.host}{"\n"}'
+# Paste into REPLACE_ME_TPA_URL.
 ```
 
 ## Console banner

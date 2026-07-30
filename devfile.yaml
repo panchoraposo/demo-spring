@@ -37,6 +37,9 @@ components:
         # Wired to acm RHDA backend → Trusted Profile Analyzer
         - name: REDHAT_DEPENDENCY_ANALYTICS_EXHORT_BACKEND_URL
           value: REPLACE_ME_RHDA_BACKEND_URL
+        # Trusted Profile Analyzer (Trustify) base URL for SBOM ingestion/UI integration
+        - name: TPA_URL
+          value: REPLACE_ME_TPA_URL
 commands:
   - id: build-banking-service
     exec:

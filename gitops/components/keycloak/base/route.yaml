@@ -7,7 +7,8 @@ metadata:
     app.kubernetes.io/name: keycloak
 spec:
   # Must match Keycloak CR hostname (and OIDC issuer used by Spring apps).
-  host: keycloak-banking.apps.cluster-4487j.4487j.sandbox2772.opentlc.com
+  # Patched per environment/cluster overlay.
+  host: keycloak-banking.apps.example.com
   to:
     kind: Service
     name: banking-keycloak-service

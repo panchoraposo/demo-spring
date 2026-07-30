@@ -3,6 +3,14 @@ kind: Kustomization
 
 namespace: banking-apps
 
+generatorOptions:
+  disableNameSuffixHash: true
+
+configMapGenerator:
+  - name: env-config-api-gateway
+    envs:
+      - env/api-gateway.env
+
 resources:
   - ../../base
   - imagestream.yaml
@@ -13,3 +21,15 @@ images:
 
 commonLabels:
   cluster: east
+
+replacements:
+  - source:
+      kind: ConfigMap
+      name: env-config-api-gateway
+      fieldPath: data.KEYCLOAK_ISSUER
+    targets:
+      - select:
+          kind: ConfigMap
+          name: api-gateway-config
+        fieldPaths:
+          - data.SPRING_SECURITY_OAUTH2_RESOURCESERVER_JWT_ISSUER_URI

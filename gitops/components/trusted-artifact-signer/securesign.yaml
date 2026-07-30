@@ -1,6 +1,5 @@
 # Red Hat Trusted Artifact Signer (Securesign) on acm.
-# Replace REPLACE_ME_OIDC_ISSUER_URL with a Fulcio-trusted OIDC issuer
-# (e.g. RHBK realm URL, or https://accounts.google.com / GitHub OIDC).
+# OIDC issuer is configured via gitops environment (`RHTAS_OIDC_ISSUER_URL`).
 # For automated Jenkins signing the demo also supports a cosign key pair
 # (secret banking-ci/cosign-signing-key) with Rekor transparency from this instance.
 apiVersion: rhtas.redhat.com/v1alpha1
@@ -30,8 +29,8 @@ spec:
     config:
       OIDCIssuers:
         - ClientID: trusted-artifact-signer
-          Issuer: REPLACE_ME_OIDC_ISSUER_URL
-          IssuerURL: REPLACE_ME_OIDC_ISSUER_URL
+          Issuer: ""
+          IssuerURL: ""
           Type: email
     certificate:
       organizationName: Banking Demo

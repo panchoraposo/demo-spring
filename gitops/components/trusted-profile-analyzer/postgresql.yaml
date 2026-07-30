@@ -1,34 +1,5 @@
 # Lightweight PostgreSQL for RHTPA advisory/analytics data (demo scale).
-apiVersion: v1
-kind: Secret
-metadata:
-  name: postgresql-credentials
-  namespace: trusted-profile-analyzer
-  labels:
-    app.kubernetes.io/part-of: banking-demo
-type: Opaque
-stringData:
-  db.host: tpa-postgresql
-  db.name: rhtpadb
-  db.user: tpa
-  db.password: replace-me-tpa-db
-  db.port: "5432"
----
-apiVersion: v1
-kind: Secret
-metadata:
-  name: postgresql-admin-credentials
-  namespace: trusted-profile-analyzer
-  labels:
-    app.kubernetes.io/part-of: banking-demo
-type: Opaque
-stringData:
-  db.host: tpa-postgresql
-  db.name: rhtpadb
-  db.user: postgres
-  db.password: replace-me-tpa-admin
-  db.port: "5432"
----
+# Credentials are materialized by ESO from Conjur (see externalsecrets.yaml).
 apiVersion: v1
 kind: PersistentVolumeClaim
 metadata:

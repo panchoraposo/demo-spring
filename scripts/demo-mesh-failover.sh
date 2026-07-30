@@ -67,7 +67,8 @@ gateway_url() {
 
 keycloak_url() {
   local ctx="$1"
-  echo "https://$(oc --context "${ctx}" -n banking-idp get route -o jsonpath='{.items[0].spec.host}')"
+  # Single IdP on the hub (acm): trusted-profile-analyzer/sso
+  echo "https://$(oc --context "${HUB_CONTEXT}" -n trusted-profile-analyzer get route sso -o jsonpath='{.spec.host}')"
 }
 
 get_token() {

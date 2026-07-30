@@ -1,0 +1,7 @@
+---
+- name: Apply Placement + ApplicationSets on hub
+  ansible.builtin.command: oc --context "{{ acm_context }}" apply -k gitops/acm
+  args:
+    chdir: "{{ playbook_dir }}/../.."
+  changed_when: true
+

@@ -3,6 +3,14 @@ kind: Kustomization
 
 namespace: banking-apps
 
+generatorOptions:
+  disableNameSuffixHash: true
+
+configMapGenerator:
+  - name: env-config-banking-service
+    envs:
+      - env/banking-service.env
+
 resources:
   - ../../base
   - namespace.yaml
@@ -11,20 +19,32 @@ resources:
 images:
   - name: image-registry.openshift-image-registry.svc:5000/banking-apps/banking-service
     newName: banking-quay-quay-quay-enterprise.apps.cluster-k7kqp.k7kqp.sandbox3321.opentlc.com/banking/banking-service
-    newTag: 11
+    newTag: "11"
 
-patches:
-  - target:
+labels:
+  - pairs:
+      cluster: west
+    includeSelectors: false
+    includeTemplates: true
+
+replacements:
+  - source:
       kind: ConfigMap
-      name: banking-service-config
-    newName: banking-quay-quay-quay-enterprise.apps.cluster-k7kqp.k7kqp.sandbox3321.opentlc.com/banking/banking-service
-    patch: |-
-      - op: replace
-        path: /data/SPRING_SECURITY_OAUTH2_RESOURCESERVER_JWT_ISSUER_URI
-        value: http://keycloak-banking.apps.cluster-mj6n9.mj6n9.sandbox990.opentlc.com/realms/banking
-      - op: replace
-        path: /data/OIDC_TRUSTED_ISSUERS
-        value: http://keycloak-banking.apps.cluster-4487j.4487j.sandbox2772.opentlc.com/realms/banking,http://keycloak-banking.apps.cluster-mj6n9.mj6n9.sandbox990.opentlc.com/realms/banking
-
-commonLabels:
-  cluster: west
+      name: env-config-banking-service
+      fieldPath: data.KEYCLOAK_ISSUER
+    targets:
+      - select:
+          kind: ConfigMap
+          name: banking-service-config
+        fieldPaths:
+          - data.SPRING_SECURITY_OAUTH2_RESOURCESERVER_JWT_ISSUER_URI
+  - source:
+      kind: ConfigMap
+      name: env-config-banking-service
+      fieldPath: data.OIDC_TRUSTED_ISSUERS
+    targets:
+      - select:
+          kind: ConfigMap
+          name: banking-service-config
+        fieldPaths:
+          - data.OIDC_TRUSTED_ISSUERS

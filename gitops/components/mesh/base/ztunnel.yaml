@@ -11,6 +11,8 @@ spec:
   profile: ambient
   values:
     ztunnel:
+      # Required for ambient multi-network (overlapping pod CIDRs).
+      network: CLUSTER_NETWORK
       multiCluster:
         clusterName: CLUSTER_NAME
   podMetadata:

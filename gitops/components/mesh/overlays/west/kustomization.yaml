@@ -26,6 +26,9 @@ patches:
       - op: replace
         path: /spec/values/ztunnel/multiCluster/clusterName
         value: west
+      - op: replace
+        path: /spec/values/ztunnel/network
+        value: network2
   - target:
       kind: Namespace
       name: istio-system

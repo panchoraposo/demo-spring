@@ -1,0 +1,23 @@
+all:
+  hosts:
+    localhost:
+      ansible_connection: local
+  vars:
+    acm_context: acm
+    east_context: east
+    west_context: west
+
+    # Git repo used by ArgoCD Applications
+    git_repo_url: https://github.com/panchoraposo/demo-spring.git
+    git_target_revision: main
+
+    # Required for spoke ESO ClusterSecretStore (hub Conjur Route)
+    conjur_url_spoke: https://conjur-banking-conjur.apps.cluster-k7kqp.k7kqp.sandbox3321.opentlc.com
+
+    # promxy upstream targets (Thanos Querier routes on spokes)
+    east_thanos_host: thanos-querier-openshift-monitoring.apps.cluster-4487j.4487j.sandbox2772.opentlc.com
+    west_thanos_host: thanos-querier-openshift-monitoring.apps.cluster-mj6n9.mj6n9.sandbox990.opentlc.com
+
+    # Kiali hub namespace
+    kiali_namespace: istio-system
+

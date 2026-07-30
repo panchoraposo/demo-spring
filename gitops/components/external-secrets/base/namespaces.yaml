@@ -8,15 +8,10 @@ metadata:
 apiVersion: v1
 kind: Namespace
 metadata:
-  name: banking-idp
-  labels:
-    app.kubernetes.io/part-of: banking-demo
----
-apiVersion: v1
-kind: Namespace
-metadata:
   name: banking-apps
   labels:
     app.kubernetes.io/part-of: banking-demo
     istio.io/dataplane-mode: ambient
     istio-discovery: enabled
+    openshift.io/user-monitoring: "true"
+

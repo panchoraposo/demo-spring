@@ -5,17 +5,21 @@ import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.context.annotation.Profile;
 import org.springframework.http.HttpMethod;
+import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.AuthenticationManagerResolver;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
 import org.springframework.security.config.http.SessionCreationPolicy;
+import org.springframework.security.oauth2.jwt.JwtValidators;
+import org.springframework.security.oauth2.jwt.NimbusJwtDecoder;
+import org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationProvider;
 import org.springframework.security.oauth2.server.resource.authentication.JwtIssuerAuthenticationManagerResolver;
 import org.springframework.security.web.SecurityFilterChain;
 
 import jakarta.servlet.http.HttpServletRequest;
 import java.util.Arrays;
-import java.util.LinkedHashSet;
-import java.util.Set;
+import java.util.LinkedHashMap;
+import java.util.Map;
 
 @Configuration
 @EnableWebSecurity
@@ -23,24 +27,31 @@ import java.util.Set;
 public class SecurityConfig {
 
     /**
-     * Accept JWTs from this spoke's Keycloak and peer spokes (mesh failover).
-     * Comma-separated issuer URIs via OIDC_TRUSTED_ISSUERS; falls back to OIDC_ISSUER_URI.
+     * Trust JWTs from this spoke and peer Keycloaks (mesh failover).
+     * Issuers: OIDC_TRUSTED_ISSUERS (comma-separated).
+     * JWKS is fetched over HTTPS even when iss is http:// (OpenShift Routes).
      */
     @Bean
     AuthenticationManagerResolver<HttpServletRequest> authenticationManagerResolver(
             @Value("${OIDC_TRUSTED_ISSUERS:${spring.security.oauth2.resourceserver.jwt.issuer-uri:}}")
             String trustedIssuers) {
-        Set<String> issuers = new LinkedHashSet<>();
-        if (trustedIssuers != null && !trustedIssuers.isBlank()) {
-            Arrays.stream(trustedIssuers.split(","))
-                    .map(String::trim)
-                    .filter(s -> !s.isEmpty())
-                    .forEach(issuers::add);
-        }
-        if (issuers.isEmpty()) {
+        Map<String, AuthenticationManager> managers = new LinkedHashMap<>();
+        Arrays.stream(trustedIssuers.split(","))
+                .map(String::trim)
+                .filter(s -> !s.isEmpty())
+                .forEach(issuer -> managers.put(issuer, authenticationManagerForIssuer(issuer)));
+        if (managers.isEmpty()) {
             throw new IllegalStateException("Configure OIDC_TRUSTED_ISSUERS or issuer-uri");
         }
-        return JwtIssuerAuthenticationManagerResolver.fromTrustedIssuers(issuers);
+        return new JwtIssuerAuthenticationManagerResolver(managers::get);
+    }
+
+    private static AuthenticationManager authenticationManagerForIssuer(String issuer) {
+        String jwkSetUri = issuer.replace("http://", "https://") + "/protocol/openid-connect/certs";
+        NimbusJwtDecoder decoder = NimbusJwtDecoder.withJwkSetUri(jwkSetUri).build();
+        decoder.setJwtValidator(JwtValidators.createDefaultWithIssuer(issuer));
+        JwtAuthenticationProvider provider = new JwtAuthenticationProvider(decoder);
+        return provider::authenticate;
     }
 
     @Bean

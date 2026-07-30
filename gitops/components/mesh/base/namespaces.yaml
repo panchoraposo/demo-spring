@@ -5,6 +5,7 @@ metadata:
   labels:
     app.kubernetes.io/part-of: banking-demo
     openshift.io/cluster-monitoring: "true"
+    openshift.io/user-monitoring: "true"
     # Patched per overlay to network1 / network2
     topology.istio.io/network: CLUSTER_NETWORK
 ---
@@ -26,3 +27,4 @@ metadata:
     pod-security.kubernetes.io/enforce: privileged
     istio-discovery: enabled
     istio.io/dataplane-mode: ambient
+    openshift.io/user-monitoring: "true"

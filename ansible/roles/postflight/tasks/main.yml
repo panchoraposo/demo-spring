@@ -1,0 +1,63 @@
+---
+- name: Get Kiali route host (hub)
+  ansible.builtin.command: oc --context "{{ acm_context }}" -n "{{ kiali_namespace }}" get route kiali -o jsonpath='{.spec.host}'
+  register: kiali_host
+  changed_when: false
+
+- name: Verify Kiali sees Prometheus
+  ansible.builtin.shell: |
+    set -euo pipefail
+    host="{{ kiali_host.stdout | trim }}"
+    curl -sk "https://${host}/api/status" | jq -e '.externalServices[].name | select(. == "Prometheus")' >/dev/null
+  args:
+    executable: /bin/bash
+  changed_when: false
+
+- name: Generate a small burst of traffic (east gateway)
+  ansible.builtin.shell: |
+    set -euo pipefail
+    gw="https://$(oc --context "{{ east_context }}" -n banking-apps get route api-gateway -o jsonpath='{.spec.host}')"
+    kc="https://$(oc --context "{{ acm_context }}" -n trusted-profile-analyzer get route sso -o jsonpath='{.spec.host}')"
+    token="$(curl -sk -X POST "${kc}/realms/banking/protocol/openid-connect/token" \
+      -d client_id=banking-cli -d username=teller -d password=teller-change-me -d grant_type=password \
+      | jq -r '.access_token')"
+    for _ in $(seq 1 10); do
+      curl -sk -o /dev/null -H "Authorization: Bearer ${token}" "${gw}/api/v1/customers"
+    done
+  args:
+    executable: /bin/bash
+  changed_when: true
+
+- name: Verify Kiali graph has edges for banking-apps
+  ansible.builtin.shell: |
+    set -euo pipefail
+    host="{{ kiali_host.stdout | trim }}"
+    edges="$(curl -sk "https://${host}/api/namespaces/graph?namespaces=banking-apps&graphType=versionedApp&duration=10m" \
+      | jq -r '.elements.edges | length')"
+    test "${edges}" -gt 0
+  args:
+    executable: /bin/bash
+  changed_when: false
+
+- name: Optional failover test (scale east banking-service to 0 and call API)
+  when: run_failover_test | default(false) | bool
+  ansible.builtin.shell: |
+    set -euo pipefail
+    gw="https://$(oc --context "{{ east_context }}" -n banking-apps get route api-gateway -o jsonpath='{.spec.host}')"
+    kc="https://$(oc --context "{{ acm_context }}" -n trusted-profile-analyzer get route sso -o jsonpath='{.spec.host}')"
+    token="$(curl -sk -X POST "${kc}/realms/banking/protocol/openid-connect/token" \
+      -d client_id=banking-cli -d username=teller -d password=teller-change-me -d grant_type=password \
+      | jq -r '.access_token')"
+
+    oc --context "{{ east_context }}" -n banking-apps scale deploy/banking-service --replicas=0
+    sleep 10
+
+    code="$(curl -sk -o /dev/null -w '%{http_code}' -H "Authorization: Bearer ${token}" "${gw}/api/v1/customers")"
+    oc --context "{{ east_context }}" -n banking-apps scale deploy/banking-service --replicas=1
+    oc --context "{{ east_context }}" -n banking-apps rollout status deploy/banking-service --timeout=180s
+
+    test "${code}" = "200"
+  args:
+    executable: /bin/bash
+  changed_when: true
+

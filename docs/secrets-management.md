@@ -29,7 +29,7 @@ flowchart LR
 | Cluster | Conjur URL in ClusterSecretStore | ExternalSecrets |
 | --- | --- | --- |
 | acm | `https://conjur-oss.banking-conjur.svc` | jenkins-admin, github-ci |
-| east / west | `https://conjur-oss-banking-conjur.REPLACE_ME_ACM_APPS_DOMAIN` | postgresql, keycloak, banking-service |
+| east / west | Hub Conjur Route (set in `gitops/components/external-secrets/overlays/{east,west}/env/conjur.env`) | postgresql, keycloak, banking-service |
 
 After Conjur bootstrap on acm, copy credentials:
 

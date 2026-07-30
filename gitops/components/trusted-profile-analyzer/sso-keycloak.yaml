@@ -1,17 +1,4 @@
 apiVersion: v1
-kind: Secret
-metadata:
-  name: keycloak-admin
-  namespace: trusted-profile-analyzer
-  labels:
-    app.kubernetes.io/name: tpa-sso
-    app.kubernetes.io/part-of: banking-demo
-type: Opaque
-stringData:
-  username: admin
-  password: replace-me-keycloak-admin
----
-apiVersion: v1
 kind: ConfigMap
 metadata:
   name: keycloak-realm-trustify
@@ -81,7 +68,7 @@ data:
             "delete:document"
           ],
           "clientAuthenticatorType": "client-secret",
-          "secret": "replace-me-oidc-client-secret"
+          "secret": "tpa-oidc-cli-secret-change-me"
         }
       ],
       "clientScopes": [
@@ -131,7 +118,53 @@ data:
           "emailVerified": true,
           "requiredActions": [],
           "credentials": [
-            { "type": "password", "value": "replace-me-tpaadmin", "temporary": false }
+            { "type": "password", "value": "tpaadmin-change-me", "temporary": false }
+          ]
+        }
+      ]
+    }
+  banking-realm.json: |
+    {
+      "realm": "banking",
+      "enabled": true,
+      "registrationAllowed": false,
+      "resetPasswordAllowed": true,
+      "clients": [
+        {
+          "clientId": "banking-cli",
+          "name": "banking-cli",
+          "protocol": "openid-connect",
+          "publicClient": true,
+          "standardFlowEnabled": true,
+          "directAccessGrantsEnabled": true,
+          "redirectUris": ["*"],
+          "webOrigins": ["*"]
+        },
+        {
+          "clientId": "banking-gateway",
+          "name": "banking-gateway",
+          "protocol": "openid-connect",
+          "publicClient": false,
+          "standardFlowEnabled": true,
+          "directAccessGrantsEnabled": true,
+          "serviceAccountsEnabled": true,
+          "clientAuthenticatorType": "client-secret",
+          "secret": "banking-gateway-secret-change-me",
+          "redirectUris": ["*"],
+          "webOrigins": ["*"]
+        }
+      ],
+      "users": [
+        {
+          "username": "teller",
+          "enabled": true,
+          "firstName": "Demo",
+          "lastName": "Teller",
+          "email": "teller@bank.demo",
+          "emailVerified": true,
+          "requiredActions": [],
+          "credentials": [
+            { "type": "password", "value": "teller-change-me", "temporary": false }
           ]
         }
       ]

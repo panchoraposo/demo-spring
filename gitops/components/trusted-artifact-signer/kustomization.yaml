@@ -1,6 +1,31 @@
 apiVersion: kustomize.config.k8s.io/v1beta1
 kind: Kustomization
 
+namespace: trusted-artifact-signer
+
+generatorOptions:
+  disableNameSuffixHash: true
+
+configMapGenerator:
+  - name: env-config-rhtas
+    envs:
+      - env/rhtas.env
+
 resources:
   - namespace.yaml
   - securesign.yaml
+
+replacements:
+  - source:
+      kind: ConfigMap
+      name: env-config-rhtas
+      fieldPath: data.RHTAS_OIDC_ISSUER_URL
+    targets:
+      - select:
+          group: rhtas.redhat.com
+          version: v1alpha1
+          kind: Securesign
+          name: banking-securesign
+        fieldPaths:
+          - spec.fulcio.config.OIDCIssuers.0.Issuer
+          - spec.fulcio.config.OIDCIssuers.0.IssuerURL

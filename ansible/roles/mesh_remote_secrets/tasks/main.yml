@@ -1,0 +1,21 @@
+---
+- name: Exchange Istio remote secrets east <-> west (requires istioctl)
+  ansible.builtin.shell: |
+    set -euo pipefail
+    if ! command -v istioctl >/dev/null 2>&1; then
+      echo "istioctl is required for remote secret exchange" >&2
+      exit 1
+    fi
+    istioctl create-remote-secret --context "{{ east_context }}" --name "{{ east_context }}" \
+      | oc --context "{{ west_context }}" apply -f -
+    istioctl create-remote-secret --context "{{ west_context }}" --name "{{ west_context }}" \
+      | oc --context "{{ east_context }}" apply -f -
+
+    oc --context "{{ east_context }}" -n istio-system label secret "istio-remote-secret-{{ west_context }}" \
+      istio/multiCluster=true kiali.io/multiCluster=true --overwrite || true
+    oc --context "{{ west_context }}" -n istio-system label secret "istio-remote-secret-{{ east_context }}" \
+      istio/multiCluster=true kiali.io/multiCluster=true --overwrite || true
+  args:
+    executable: /bin/bash
+  changed_when: true
+

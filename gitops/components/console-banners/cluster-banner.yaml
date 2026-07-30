@@ -1,0 +1,14 @@
+# Hub OpenShift console top banner (acm). Spokes remain script-applied
+# (east/west) via scripts/apply-console-banners.sh.
+apiVersion: console.openshift.io/v1
+kind: ConsoleNotification
+metadata:
+  name: cluster-banner
+  labels:
+    app.kubernetes.io/part-of: banking-demo
+    cluster: acm
+spec:
+  text: Hub Cluster
+  location: BannerTop
+  color: '#fff'
+  backgroundColor: '#6A00FF'

@@ -2,11 +2,20 @@ apiVersion: kustomize.config.k8s.io/v1beta1
 kind: Kustomization
 
 # Spoke west — mirror of east; independent PostgreSQL + Keycloak.
+generatorOptions:
+  disableNameSuffixHash: true
+
+configMapGenerator:
+  - name: banking-demo-env
+    envs:
+      - env/common.env
+
 resources:
   # wave 0
   - platform-operators.yaml
   # wave 1
   - eso-operand.yaml
+  - user-workload-monitoring.yaml
   # wave 2
   - mesh.yaml
   - devspaces.yaml
@@ -14,6 +23,25 @@ resources:
   - external-secrets-config.yaml
   # wave 4+
   - postgresql.yaml
-  - keycloak.yaml
   - banking-service.yaml
   - api-gateway.yaml
+
+replacements:
+  - source:
+      kind: ConfigMap
+      name: banking-demo-env
+      fieldPath: data.GIT_REPO_URL
+    targets:
+      - select:
+          kind: Application
+        fieldPaths:
+          - spec.source.repoURL
+  - source:
+      kind: ConfigMap
+      name: banking-demo-env
+      fieldPath: data.GIT_TARGET_REVISION
+    targets:
+      - select:
+          kind: Application
+        fieldPaths:
+          - spec.source.targetRevision

@@ -1,5 +1,4 @@
 # Red Hat build of Keycloak CR (requires rhbk-operator).
-# Replace apps.cluster-4487j.4487j.sandbox2772.opentlc.com with your OpenShift apps domain, e.g. apps.east.example.com
 apiVersion: k8s.keycloak.org/v2alpha1
 kind: Keycloak
 metadata:
@@ -24,7 +23,8 @@ spec:
   http:
     httpEnabled: true
   hostname:
-    hostname: keycloak-banking.apps.cluster-4487j.4487j.sandbox2772.opentlc.com
+    # Patched per environment/cluster overlay.
+    hostname: keycloak-banking.apps.example.com
     strict: false
   ingress:
     enabled: false
