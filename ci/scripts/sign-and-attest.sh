@@ -51,15 +51,22 @@ INTERNAL_PULL="$(oc registry info --internal)/${APPS_NS}/${APP}@${DIGEST}"
 echo "Internal: ${INTERNAL_PULL}"
 echo "Quay:     ${QUAY_IMAGE}"
 
+echo "==> Auth to internal OpenShift registry (source) + Quay (dest)"
+# Merge SA token for image-registry into docker config without wiping Quay robot auth.
+REG_INTERNAL="$(oc registry info --internal)"
+oc registry login --registry="${REG_INTERNAL}" --to="${HOME}/.docker/config.json" --insecure=true \
+  || oc registry login --to="${HOME}/.docker/config.json" --insecure=true
+
 echo "==> Mirror image to Quay"
 # Prefer skopeo from PATH; fall back to oc image mirror
 if command -v skopeo >/dev/null 2>&1; then
   skopeo copy --all \
+    --src-tls-verify=false \
     --dest-tls-verify=false \
     "docker://${INTERNAL_PULL}" \
     "docker://${QUAY_IMAGE}"
 else
-  oc image mirror --insecure=true "${INTERNAL_PULL}" "${QUAY_IMAGE}"
+  oc image mirror --insecure=true --filter-by-os='.*' "${INTERNAL_PULL}" "${QUAY_IMAGE}"
 fi
 
 echo "==> Generate CycloneDX SBOM"
