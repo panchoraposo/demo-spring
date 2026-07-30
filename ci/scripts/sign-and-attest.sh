@@ -88,6 +88,8 @@ if [ -z "${FULCIO_URL:-}" ] && oc get fulcio -n trusted-artifact-signer >/dev/nu
 fi
 
 export COSIGN_YES=true
+# CI keys are generated with an empty password (bootstrap-quay-ci.sh).
+export COSIGN_PASSWORD="${COSIGN_PASSWORD-}"
 if [ -n "${TUF_URL:-}" ]; then
   export COSIGN_MIRROR="${TUF_URL}"
   export COSIGN_ROOT="${TUF_URL}/root.json"
