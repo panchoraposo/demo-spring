@@ -1,0 +1,25 @@
+apiVersion: operators.coreos.com/v1
+kind: OperatorGroup
+metadata:
+  name: rhbk-operator-group
+  namespace: rhbk-operator
+spec:
+  # Single shared Keycloak for the demo lives on the hub.
+  # Today it's deployed as part of the TPA stack in `trusted-profile-analyzer`.
+  targetNamespaces:
+    - trusted-profile-analyzer
+---
+apiVersion: operators.coreos.com/v1alpha1
+kind: Subscription
+metadata:
+  name: rhbk-operator
+  namespace: rhbk-operator
+  labels:
+    app.kubernetes.io/part-of: banking-demo
+spec:
+  channel: stable-v26.6
+  name: rhbk-operator
+  source: redhat-operators
+  sourceNamespace: openshift-marketplace
+  installPlanApproval: Automatic
+
