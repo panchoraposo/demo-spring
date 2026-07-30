@@ -19,7 +19,7 @@ spec:
     username: tpa
     password: replace-me-tpa-db
   storage:
-    type: pvc
+    type: filesystem
     size: 20Gi
 
   # Keep footprint small for single-node hubs.
