@@ -22,4 +22,14 @@ spec:
   source: redhat-operators
   sourceNamespace: openshift-marketplace
   installPlanApproval: Automatic
+  # Sandbox/hub clusters may be single-node with tight allocatable CPU.
+  # Subscription config is immutable: to change resources, delete and let Argo recreate.
+  config:
+    resources:
+      requests:
+        cpu: 50m
+        memory: 256Mi
+      limits:
+        cpu: 500m
+        memory: 512Mi
 
