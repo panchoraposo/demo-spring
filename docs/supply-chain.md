@@ -1,6 +1,6 @@
 # Supply chain (ODF, Quay, RHTAS, TPA, Dev Spaces)
 
-Prep manifests for hub supply-chain services and spoke developer workspaces. **Do not apply** until acm/east/west are ready.
+Prep manifests for hub supply-chain services and developer workspaces. **Do not apply** until acm/east/west are ready.
 
 ## Hub (acm)
 
@@ -32,11 +32,11 @@ See [`gitops/components/quay/README.md`](../gitops/components/quay/README.md): c
 - Interactive / keyless: configure Fulcio OIDC issuer, then `cosign sign` with OIDC.
 - CI (Jenkins): cosign key in `cosign-signing-key` + Rekor URL from the Securesign instance (`ci/scripts/sign-and-attest.sh`).
 
-## Spokes (east / west)
+## Regional clusters (east / west)
 
 | Component | Path |
 | --- | --- |
-| Dev Spaces operator | `gitops/platform/operators-spoke/subscription-devspaces.yaml` |
+| Dev Spaces operator | `gitops/platform/operators-hub/subscription-devspaces.yaml` (runs on hub) |
 | CheCluster | `gitops/components/devspaces` |
 
 ### Default Spring workspace

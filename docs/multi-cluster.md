@@ -1,14 +1,14 @@
 # Multi-cluster (acm / east / west)
 
-Prep layout for RHACM ApplicationSets plus per-spoke data/IdP. **Do not apply** until clusters are ready.
+Prep layout for RHACM ApplicationSets plus per-cluster regional data/IdP. **Do not apply** until clusters are ready.
 
 ## Topology
 
 | Cluster | Role | Workloads |
 | --- | --- | --- |
 | **acm** | Hub | RHACM, GitOps, Gitea, Conjur, Jenkins, ODF, Quay, RHTAS, TPA, hub Kiali MC + OSSMC |
-| **east** | Spoke | GitOps, ESO, OSSM 3.4 ambient, Dev Spaces, PostgreSQL, Spring apps |
-| **west** | Spoke | Same as east (independent DB) |
+| **east** | Managed cluster | GitOps, ESO, OSSM 3.4 ambient, PostgreSQL, Spring apps |
+| **west** | Managed cluster | Same as east (independent DB) |
 
 **Failover is mesh traffic only.** Scaling east `banking-service` to 0 lets ambient locality send traffic to west endpoints. PostgreSQL is **not** shared.
 
@@ -21,39 +21,49 @@ Prep layout for RHACM ApplicationSets plus per-spoke data/IdP. **Do not apply** 
 
 1. Install RHACM on **acm**; join **east** and **west** as ManagedClusters.
 2. Install OpenShift GitOps on acm; run [`scripts/bootstrap-acm.sh`](../scripts/bootstrap-acm.sh) (installs Gitea, seeds `banking/demo-spring`, stores CI PAT in Conjur, applies acm-root).
-3. Label spokes and apply Placement + ApplicationSets:
+3. Ensure hub capacity (required for Dev Spaces + Jenkins on small hubs):
+
+```bash
+# Some environments provision the hub with 0 workers by default.
+# Dev Spaces and Jenkins may remain Pending until a worker is added.
+oc --context acm -n openshift-machine-api get machineset.machine.openshift.io -o wide
+oc --context acm -n openshift-machine-api scale machineset.machine.openshift.io/<worker-machineset> --replicas=1
+oc --context acm get nodes -o wide
+```
+
+4. Label managed clusters and apply Placement + ApplicationSets:
 
 ```bash
 oc --context acm label managedcluster east \
-  cluster.open-cluster-management.io/clusterset=banking-spokes \
-  banking-demo/role=spoke banking-demo/region=east --overwrite
+  cluster.open-cluster-management.io/clusterset=banking-managed \
+  banking-demo/role=managed banking-demo/region=east --overwrite
 oc --context acm label managedcluster west \
-  cluster.open-cluster-management.io/clusterset=banking-spokes \
-  banking-demo/role=spoke banking-demo/region=west --overwrite
+  cluster.open-cluster-management.io/clusterset=banking-managed \
+  banking-demo/role=managed banking-demo/region=west --overwrite
 
 # Placement + ManagedClusterSetBinding live in openshift-gitops (with ApplicationSets).
 oc --context acm apply -k gitops/acm
 ```
 
-4. Ensure hub Argo can reach spoke APIs (ACM GitOps Cluster addon or cluster secrets).
-5. Set environment values (no repo-wide placeholder script):
+5. Ensure hub Argo can reach managed cluster APIs (ACM GitOps Cluster addon or cluster secrets).
+6. Set environment values (no repo-wide placeholder script):
    - Git repo URL + revision: `gitops/applications/{acm,east,west}/env/common.env`
    - Hub Keycloak + TPA domain values:
      - `gitops/components/keycloak/overlays/acm/env/keycloak.env` (Route host `sso.<appsDomain>`)
      - `gitops/components/trusted-profile-analyzer/env/tpa.env` (TPA `appDomain`)
-   - Spoke OIDC issuer values (pointing to hub):
+   - Cluster OIDC issuer values (pointing to hub):
      - `gitops/components/{api-gateway,banking-service}/overlays/{east,west}/env/*.env`
-   - Spoke Conjur URL (ESO ClusterSecretStore): `gitops/components/external-secrets/overlays/{east,west}/env/conjur.env`
-6. After Conjur bootstrap on acm: [`scripts/sync-conjur-creds-to-spokes.sh`](../scripts/sync-conjur-creds-to-spokes.sh)
-7. After both meshes are Ready:
+   - Cluster Conjur URL (ESO ClusterSecretStore): `gitops/components/external-secrets/overlays/{east,west}/env/conjur.env`
+7. After Conjur bootstrap on acm: [`scripts/sync-conjur-creds-to-clusters.sh`](../scripts/sync-conjur-creds-to-clusters.sh)
+8. After both meshes are Ready:
    - Shared CA: [`scripts/mesh/sync-shared-cacerts.sh`](../scripts/mesh/sync-shared-cacerts.sh)
    - Peering: [`scripts/mesh/exchange-remote-secrets.sh`](../scripts/mesh/exchange-remote-secrets.sh)
-8. Hub Kiali multi-cluster secrets: [`scripts/mesh/sync-kiali-multicluster-secrets.sh`](../scripts/mesh/sync-kiali-multicluster-secrets.sh) (feeds OSSMC / Service Mesh console on acm).
-9. Spoke metrics for Kiali graphs: [`scripts/mesh/enable-user-workload-monitoring.sh`](../scripts/mesh/enable-user-workload-monitoring.sh) + mesh `PodMonitor`s, then hub promxy [`scripts/mesh/sync-promxy.sh`](../scripts/mesh/sync-promxy.sh).
-10. Live failover demo: [`scripts/demo-mesh-failover.sh`](../scripts/demo-mesh-failover.sh)
-10. After Jenkins / Quay / RHTAS Routes exist: [`scripts/apply-console-banners.sh`](../scripts/apply-console-banners.sh) (spoke banners + ApplicationMenu ConsoleLinks).
+9. Hub Kiali multi-cluster secrets: [`scripts/mesh/sync-kiali-multicluster-secrets.sh`](../scripts/mesh/sync-kiali-multicluster-secrets.sh) (feeds OSSMC / Service Mesh console on acm).
+10. Cluster metrics for Kiali graphs: [`scripts/mesh/enable-user-workload-monitoring.sh`](../scripts/mesh/enable-user-workload-monitoring.sh) + mesh `PodMonitor`s, then hub promxy [`scripts/mesh/sync-promxy.sh`](../scripts/mesh/sync-promxy.sh).
+11. Live failover demo: [`scripts/demo-mesh-failover.sh`](../scripts/demo-mesh-failover.sh)
+12. After Jenkins / Quay / RHTAS Routes exist: [`scripts/apply-console-banners.sh`](../scripts/apply-console-banners.sh) (cluster banners + ApplicationMenu ConsoleLinks).
 
-Spoke GitOps prerequisite: Subscription in [`gitops/platform/operators-spoke`](../gitops/platform/operators-spoke) (synced once Applications start).
+Managed cluster GitOps prerequisite: Subscription in `gitops/platform/operators-managed` (synced once Applications start).
 
 ## Mesh peering checklist
 
@@ -62,7 +72,7 @@ Spoke GitOps prerequisite: Subscription in [`gitops/platform/operators-spoke`](.
 - [ ] `banking-apps` labeled `istio.io/dataplane-mode=ambient`
 - [ ] `banking-service` Service has `istio.io/global=true` and waypoint label
 - [ ] East-west Gateway `istio-eastwestgateway` present
-- [ ] Passthrough Route `istio-eastwestgateway` (HTTPS→HBONE) present on both spokes
+- [ ] Passthrough Route `istio-eastwestgateway` (HTTPS→HBONE) present on both clusters
 - [ ] Remote secrets exchanged both directions
 - [ ] DestinationRule `banking-service-failover` present
 - [ ] Shared `cacerts` installed (`scripts/mesh/sync-shared-cacerts.sh`)
@@ -89,7 +99,7 @@ oc --context east -n banking-apps scale deploy/banking-service --replicas=0
 
 # api-gateway on east keeps calling banking-service.banking-apps.svc.cluster.local;
 # ambient multi-network + DestinationRule should shift to west endpoints (EW HBONE).
-# West PG data may differ; JWT issuers are trusted on both spokes (OIDC_TRUSTED_ISSUERS).
+# West PG data may differ; JWT issuers are trusted on both clusters (OIDC_TRUSTED_ISSUERS).
 
 oc --context east -n banking-apps scale deploy/banking-service --replicas=1
 ```
@@ -101,8 +111,8 @@ Jenkins on **acm** builds via OpenShift BuildConfigs, mirrors to **Quay**, gener
 Legacy ImageStream mirror (if Quay is not yet Ready):
 
 ```bash
-scripts/mirror-image-to-spokes.sh banking-service <tag>
-scripts/mirror-image-to-spokes.sh api-gateway <tag>
+scripts/mirror-image-to-clusters.sh banking-service <tag>
+scripts/mirror-image-to-clusters.sh api-gateway <tag>
 ```
 
 Console UX on acm:

@@ -7,11 +7,11 @@ This demo targets three OpenShift clusters:
 | Cluster | Role |
 | --- | --- |
 | **acm** | RHACM hub, Conjur, Jenkins, ODF, Quay, RHTAS, TPA, hub Kiali |
-| **east** / **west** | Spokes with GitOps, ESO, OSSM 3.4 ambient, Dev Spaces, PostgreSQL, Spring apps |
+| **east** / **west** | Managed clusters with GitOps, ESO, OSSM 3.4 ambient, PostgreSQL, Spring apps |
 
 Credentials are sourced from **CyberArk Conjur** on the hub via the **External Secrets Operator** on each cluster. Spring apps never talk to Conjur; they only mount Kubernetes Secrets that ESO materializes.
 
-**Traffic failover ≠ data failover.** Mesh locality can send `banking-service` traffic to the peer spoke; each spoke keeps its own PostgreSQL.
+**Traffic failover ≠ data failover.** Mesh locality can send `banking-service` traffic to the peer cluster; each cluster keeps its own PostgreSQL.
 
 **OIDC is centralized on the hub.** A single Keycloak instance on **acm** provides:
 
@@ -27,7 +27,7 @@ flowchart TB
     KialiHub[Kiali multi-cluster]
   end
 
-  subgraph eastSpoke [Cluster east]
+  subgraph eastCluster [Cluster east]
     ArgoE[OpenShift GitOps]
     MeshE[OSSM 3.4 ambient]
     PGE[(PostgreSQL)]
@@ -36,7 +36,7 @@ flowchart TB
     BSE[banking-service]
   end
 
-  subgraph westSpoke [Cluster west]
+  subgraph westCluster [Cluster west]
     ArgoW[OpenShift GitOps]
     MeshW[OSSM 3.4 ambient]
     PGW[(PostgreSQL)]
@@ -74,7 +74,7 @@ flowchart TB
 | Secrets sync | External Secrets Operator for Red Hat OpenShift |
 | Secrets backend | CyberArk Conjur OSS (Helm chart, GitOps Application on acm) |
 | Identity (OIDC) | Red Hat build of Keycloak (`rhbk-operator`) — **hub (acm)** |
-| Banking DB | [`registry.redhat.io/rhel10/postgresql-16`](https://catalog.redhat.com/en/software/containers/rhel10/postgresql-16/677d13af607921b4d74fca88) — **per spoke** |
+| Banking DB | [`registry.redhat.io/rhel10/postgresql-16`](https://catalog.redhat.com/en/software/containers/rhel10/postgresql-16/677d13af607921b4d74fca88) — **per cluster** |
 | App runtime images | UBI 9 OpenJDK 21 |
 | Object storage | OpenShift Data Foundation (Multicloud Object Gateway) on acm |
 | Container registry | Red Hat Quay on acm (SBOM, signature, attestation) |
@@ -86,8 +86,8 @@ flowchart TB
 ## GitOps ownership
 
 1. **acm:** [`gitops/bootstrap/acm-root.yaml`](../gitops/bootstrap/acm-root.yaml) → [`gitops/applications/acm`](../gitops/applications/acm) (Conjur, Jenkins, hub ESO, Kiali).
-2. **RHACM:** [`gitops/acm`](../gitops/acm) Placement + ApplicationSet `banking-spoke-roots` generates Applications that sync `gitops/applications/{{east|west}}` to each ManagedCluster.
-3. **Spoke waves (east/west):**
+2. **RHACM:** [`gitops/acm`](../gitops/acm) Placement + ApplicationSet generates Applications that sync `gitops/applications/{{east|west}}` to each ManagedCluster.
+3. **Regional cluster waves (east/west):**
   - `0` platform operators (ESO, Sail, GitOps)
    - `1` ESO operand
    - `2` mesh (Istio / CNI / ZTunnel / east-west GW / DestinationRule)

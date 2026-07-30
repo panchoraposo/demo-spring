@@ -1,18 +1,18 @@
 apiVersion: cluster.open-cluster-management.io/v1beta1
 kind: Placement
 metadata:
-  name: banking-spokes
+  name: banking-managed
   namespace: openshift-gitops
   labels:
     app.kubernetes.io/part-of: banking-demo
 spec:
   clusterSets:
-    - banking-spokes
+    - banking-managed
   predicates:
     - requiredClusterSelector:
         labelSelector:
           matchLabels:
-            banking-demo/role: spoke
+            banking-demo/role: managed
   tolerations:
     - key: cluster.open-cluster-management.io/unreachable
       operator: Exists

@@ -1,0 +1,45 @@
+---
+- name: Check if hub MachineSets exist
+  ansible.builtin.command: oc --context "{{ acm_context }}" -n openshift-machine-api get machineset.machine.openshift.io -o name
+  register: hub_machinesets
+  changed_when: false
+  failed_when: false
+
+- name: Scale hub worker MachineSet when present (avoid single-node hub starvation)
+  when: hub_machinesets.rc == 0 and (hub_machinesets.stdout_lines | length) > 0
+  ansible.builtin.shell: |
+    set -euo pipefail
+    # Prefer a worker machineset (name contains "worker")
+    ms="$(oc --context "{{ acm_context }}" -n openshift-machine-api get machineset.machine.openshift.io -o name | rg 'worker' | head -n 1 | sed 's|^machineset\\.machine\\.openshift\\.io/||')"
+    if [ -z "${ms}" ]; then
+      echo "No worker machineset found; skipping scale"
+      exit 0
+    fi
+
+    current="$(oc --context "{{ acm_context }}" -n openshift-machine-api get machineset.machine.openshift.io "${ms}" -o jsonpath='{.spec.replicas}')"
+    desired="${HUB_WORKER_REPLICAS:-{{ hub_worker_replicas | default(1) }}}"
+
+    # Only scale up (never scale down)
+    if [ "${current}" -lt "${desired}" ]; then
+      oc --context "{{ acm_context }}" -n openshift-machine-api scale machineset.machine.openshift.io/"${ms}" --replicas="${desired}"
+    fi
+  args:
+    executable: /bin/bash
+  changed_when: true
+
+- name: Wait for hub worker node count (best effort)
+  when: hub_machinesets.rc == 0 and (hub_machinesets.stdout_lines | length) > 0
+  ansible.builtin.shell: |
+    set -euo pipefail
+    # Wait until at least 2 nodes are Ready (control-plane + 1 worker)
+    for i in $(seq 1 90); do
+      ready="$(oc --context "{{ acm_context }}" get nodes --no-headers 2>/dev/null | awk '$2==\"Ready\" {c++} END{print c+0}')"
+      if [ "${ready}" -ge 2 ]; then
+        exit 0
+      fi
+      sleep 10
+    done
+    echo "WARN: hub did not reach 2 Ready nodes within timeout"
+  args:
+    executable: /bin/bash
+  changed_when: false

@@ -3,6 +3,10 @@
   ansible.builtin.command: oc --context "{{ acm_context }}" -n openshift-gitops get deploy openshift-gitops-server
   changed_when: false
 
+- name: Ensure hub has capacity for Dev Spaces (optional)
+  ansible.builtin.import_role:
+    name: hub_capacity
+
 - name: Render hub root Application manifest
   ansible.builtin.template:
     src: acm-root.yaml.j2

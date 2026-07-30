@@ -2,7 +2,7 @@
 
 ## Design
 
-Jenkins and BuildConfigs run on hub cluster **acm**. After an OpenShift image build, pipelines push to **Red Hat Quay**, generate an **SBOM**, create a **cosign attestation**, and **sign** with **Red Hat Trusted Artifact Signer** (Rekor/Fulcio). GitOps then bumps image tags on **both** spoke overlays.
+Jenkins and BuildConfigs run on hub cluster **acm**. After an OpenShift image build, pipelines push to **Red Hat Quay**, generate an **SBOM**, create a **cosign attestation**, and **sign** with **Red Hat Trusted Artifact Signer** (Rekor/Fulcio). GitOps then bumps image tags on **both** regional cluster overlays.
 
 | Stage | Tool | Responsibility |
 | --- | --- | --- |
@@ -11,7 +11,7 @@ Jenkins and BuildConfigs run on hub cluster **acm**. After an OpenShift image bu
 | Image build | OpenShift BuildConfig on acm | Binary Docker build into acm `banking-apps` ImageStream |
 | Mirror + supply chain | `ci/scripts/sign-and-attest.sh` | Push to Quay; Syft SBOM; cosign attach/attest/sign (RHTAS) |
 | GitOps update | Jenkins | Commit `newTag` (+ Quay `newName`) in east **and** west overlays |
-| Deploy | OpenShift GitOps on spokes | Sync Applications → Deployments |
+| Deploy | OpenShift GitOps on managed clusters | Sync Applications → Deployments |
 
 Jenkins does **not** `oc apply` app manifests. GitOps owns cluster state.
 

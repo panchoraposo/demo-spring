@@ -1,0 +1,23 @@
+apiVersion: operators.coreos.com/v1alpha1
+kind: Subscription
+metadata:
+  name: devworkspace-operator
+  namespace: openshift-operators
+  labels:
+    app.kubernetes.io/part-of: banking-demo
+spec:
+  channel: fast
+  name: devworkspace-operator
+  source: redhat-operators
+  sourceNamespace: openshift-marketplace
+  installPlanApproval: Automatic
+  # Keep footprint small for single-node hubs.
+  # Subscription config is immutable: if you need to change these, delete and let Argo recreate.
+  config:
+    resources:
+      requests:
+        cpu: 50m
+        memory: 128Mi
+      limits:
+        cpu: 200m
+        memory: 256Mi

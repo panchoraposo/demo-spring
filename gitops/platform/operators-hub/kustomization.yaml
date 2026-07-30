@@ -6,6 +6,7 @@ resources:
   - namespace-eso.yaml
   - subscription-eso.yaml
   - subscription-openshift-gitops.yaml
+  - subscription-devworkspace.yaml
   - subscription-devspaces.yaml
   - namespace-rhbk.yaml
   - subscription-rhbk.yaml

@@ -2,8 +2,8 @@
 - name: Label ManagedClusters for banking ApplicationSets
   ansible.builtin.command: >
     oc --context "{{ acm_context }}" label managedcluster {{ item.name }}
-    cluster.open-cluster-management.io/clusterset=banking-spokes
-    banking-demo/role=spoke
+    cluster.open-cluster-management.io/clusterset=banking-managed
+    banking-demo/role=managed
     banking-demo/region={{ item.region }}
     --overwrite
   changed_when: true

@@ -9,7 +9,7 @@
 apiVersion: argoproj.io/v1alpha1
 kind: ApplicationSet
 metadata:
-  name: banking-spoke-roots
+  name: banking-managed-roots
   namespace: openshift-gitops
   labels:
     app.kubernetes.io/part-of: banking-demo
@@ -18,7 +18,7 @@ spec:
     - clusters:
         selector:
           matchLabels:
-            banking-demo/role: spoke
+            banking-demo/role: managed
   template:
     metadata:
       name: 'banking-{{name}}-root'

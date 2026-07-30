@@ -1,16 +1,16 @@
 # Getting started
 
-For the **acm / east / west** layout, follow [multi-cluster.md](multi-cluster.md) first (hub Conjur + Jenkins, spoke apps, mesh peering).
+For the **acm / east / west** layout, follow [multi-cluster.md](multi-cluster.md) first (hub Conjur + Jenkins, regional apps, mesh peering).
 
-The steps below are the legacy **single-spoke east** path. For the current approach, use:
+The steps below are the legacy **single-cluster east** path. For the current approach, use:
 
 - `ansible/README.md` (minimal bootstrap)
-- `docs/multi-cluster.md` (hub+spokes GitOps order)
+- `docs/multi-cluster.md` (hub + regional clusters GitOps order)
 
 ## Prerequisites
 
 - OpenShift 4.14+ with cluster-admin (ESO GA channels typically need a recent OCP; use `stable-v1` when available)
-- `oc` logged into the target cluster (**acm** for hub, **east**/**west** for spokes)
+- `oc` logged into the target cluster (**acm** for hub, **east**/**west** for regional clusters)
 - Cluster pull secret able to pull from `registry.redhat.io` and Docker Hub (Conjur / nginx / postgres ImageStreams, or mirror them)
 - This repository pushed to a Git remote reachable by OpenShift GitOps and Jenkins
 

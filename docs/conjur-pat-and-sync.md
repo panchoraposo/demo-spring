@@ -42,7 +42,7 @@ scripts/demo-conjur-secret-sync.sh
 
 Default path: `banking/jenkins/jenkins-admin-password` → `banking-ci/jenkins-admin`.
 
-Spoke banking-service password (after `scripts/sync-conjur-creds-to-spokes.sh` and apps synced):
+Regional cluster banking-service password (after `scripts/sync-conjur-creds-to-clusters.sh` and apps synced):
 
 ```bash
 VARIABLE=banking/banking-service/SPRING_DATASOURCE_PASSWORD \

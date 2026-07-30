@@ -1,6 +1,6 @@
 # Secrets management (CyberArk Conjur + External Secrets)
 
-This demo keeps credentials out of Git. **CyberArk Conjur OSS** on cluster **acm** stores secret values; the **External Secrets Operator** on acm and on each spoke synchronizes them into namespace `Secret` objects.
+This demo keeps credentials out of Git. **CyberArk Conjur OSS** on cluster **acm** stores secret values; the **External Secrets Operator** on acm and on each managed cluster synchronizes them into namespace `Secret` objects.
 
 **Applications never call Conjur (or any vault) directly.** Only ESO authenticates to Conjur and materializes Kubernetes Secrets.
 
@@ -10,7 +10,7 @@ flowchart LR
   ArgoHub --> Boot[conjur-bootstrap Job]
   Boot -->|policy + host API key| Conjur[CyberArk Conjur]
   Boot -->|conjur-creds| HubESO[ESO on acm]
-  Sync[sync-conjur-creds-to-spokes.sh] -->|creds + CA| SpokeESO[ESO on east/west]
+  Sync[sync-conjur-creds-to-clusters.sh] -->|creds + CA| ClusterESO[ESO on east/west]
   HubESO -->|ClusterSecretStore local SVC| Conjur
   SpokeESO -->|ClusterSecretStore Conjur Route| Conjur
   SpokeESO --> AppSecrets[PG / Keycloak / Spring Secrets]
@@ -22,9 +22,9 @@ flowchart LR
 | Conjur OSS | [`gitops/components/conjur/`](../gitops/components/conjur/) on **acm** |
 | Policy / seed / ESO host | [`gitops/components/conjur-config/`](../gitops/components/conjur-config/) on **acm** |
 | Hub `ClusterSecretStore` + Jenkins ES | [`gitops/components/external-secrets-hub/`](../gitops/components/external-secrets-hub/) |
-| Spoke `ClusterSecretStore` + app ES | [`gitops/components/external-secrets/`](../gitops/components/external-secrets/) |
+| Managed-cluster `ClusterSecretStore` + app ES | [`gitops/components/external-secrets/`](../gitops/components/external-secrets/) |
 
-## Hub vs spoke
+## Hub vs managed clusters
 
 | Cluster | Conjur URL in ClusterSecretStore | ExternalSecrets |
 | --- | --- | --- |
@@ -34,10 +34,10 @@ flowchart LR
 After Conjur bootstrap on acm, copy credentials:
 
 ```bash
-scripts/sync-conjur-creds-to-spokes.sh
+scripts/sync-conjur-creds-to-clusters.sh
 ```
 
-That creates `external-secrets/conjur-creds` and `external-secrets/conjur-ssl-ca` on each spoke. Spokes must reach the acm Conjur Route over HTTPS.
+That creates `external-secrets/conjur-creds` and `external-secrets/conjur-ssl-ca` on each managed cluster. Clusters must reach the acm Conjur Route over HTTPS.
 
 ## Sync waves (acm)
 
@@ -52,10 +52,10 @@ That creates `external-secrets/conjur-creds` and `external-secrets/conjur-ssl-ca
 
 | Variable ID | Consumed by |
 | --- | --- |
-| `banking/postgresql/*` | Spoke `ExternalSecret/postgresql-credentials` |
-| `banking/keycloak-db/*` | Spoke `ExternalSecret/keycloak-db-secret` |
-| `banking/keycloak-admin/*` | Spoke `ExternalSecret/keycloak-admin` |
-| `banking/banking-service/*` | Spoke `ExternalSecret/banking-service-db` |
+| `banking/postgresql/*` | Managed-cluster `ExternalSecret/postgresql-credentials` |
+| `banking/keycloak-db/*` | Managed-cluster `ExternalSecret/keycloak-db-secret` |
+| `banking/keycloak-admin/*` | Managed-cluster `ExternalSecret/keycloak-admin` |
+| `banking/banking-service/*` | Managed-cluster `ExternalSecret/banking-service-db` |
 | `banking/jenkins/*` | Hub `ExternalSecret/jenkins-admin` |
 | `banking/github-ci/*` | Hub `ExternalSecret/github-ci` |
 

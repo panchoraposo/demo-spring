@@ -1,7 +1,7 @@
 apiVersion: cluster.open-cluster-management.io/v1beta2
 kind: ManagedClusterSet
 metadata:
-  name: banking-spokes
+  name: banking-managed
   labels:
     app.kubernetes.io/part-of: banking-demo
 ---
@@ -9,9 +9,9 @@ metadata:
 apiVersion: cluster.open-cluster-management.io/v1beta2
 kind: ManagedClusterSetBinding
 metadata:
-  name: banking-spokes
+  name: banking-managed
   namespace: openshift-gitops
   labels:
     app.kubernetes.io/part-of: banking-demo
 spec:
-  clusterSet: banking-spokes
+  clusterSet: banking-managed
