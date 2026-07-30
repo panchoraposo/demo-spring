@@ -1,6 +1,7 @@
 # Hub Kiali multi-cluster — observes east + west (ignore_home_cluster).
 # Remote kubeconfig Secrets (label kiali.io/multiCluster=true) are created by
-# scripts/mesh/sync-kiali-multicluster-secrets.sh (cluster-admin reader SA).
+# scripts/mesh/sync-kiali-multicluster-secrets.sh
+# Prometheus: promxy in acm-observability (scripts/mesh/sync-promxy.sh).
 apiVersion: kiali.io/v1alpha1
 kind: Kiali
 metadata:
@@ -13,7 +14,6 @@ metadata:
     argocd.argoproj.io/sync-wave: "1"
     argocd.argoproj.io/sync-options: SkipDryRunOnMissingResource=true
 spec:
-  # Anonymous keeps live demos friction-free; switch to openshift for workshops with SSO.
   auth:
     strategy: anonymous
   deployment:
@@ -30,11 +30,18 @@ spec:
   kubernetes_config:
     cluster_name: acm
   external_services:
-    # Traffic rates need a federated Prometheus (e.g. promxy). Topology / config
-    # graphs work without it; enable when hub metrics fan-out is available.
     prometheus:
-      enabled: false
-      is_core: false
+      enabled: true
+      url: http://promxy.acm-observability.svc.cluster.local:8082
+      is_core: true
+      auth:
+        type: none
+      health_check_url: http://promxy.acm-observability.svc.cluster.local:8082/-/healthy
+      # promxy fans out to OpenShift Thanos Querier; enable thanos query tweaks
+      thanos_proxy:
+        enabled: true
+        retention_period: 7d
+        scrape_interval: 30s
     grafana:
       enabled: false
     tracing:

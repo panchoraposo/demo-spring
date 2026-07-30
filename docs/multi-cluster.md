@@ -39,7 +39,8 @@ oc --context acm apply -k gitops/acm
    - Shared CA: [`scripts/mesh/sync-shared-cacerts.sh`](../scripts/mesh/sync-shared-cacerts.sh)
    - Peering: [`scripts/mesh/exchange-remote-secrets.sh`](../scripts/mesh/exchange-remote-secrets.sh)
 8. Hub Kiali multi-cluster secrets: [`scripts/mesh/sync-kiali-multicluster-secrets.sh`](../scripts/mesh/sync-kiali-multicluster-secrets.sh) (feeds OSSMC / Service Mesh console on acm).
-9. Live failover demo: [`scripts/demo-mesh-failover.sh`](../scripts/demo-mesh-failover.sh)
+9. Spoke metrics for Kiali graphs: [`scripts/mesh/enable-user-workload-monitoring.sh`](../scripts/mesh/enable-user-workload-monitoring.sh) + mesh `PodMonitor`s, then hub promxy [`scripts/mesh/sync-promxy.sh`](../scripts/mesh/sync-promxy.sh).
+10. Live failover demo: [`scripts/demo-mesh-failover.sh`](../scripts/demo-mesh-failover.sh)
 10. After Jenkins / Quay / RHTAS Routes exist: [`scripts/apply-console-banners.sh`](../scripts/apply-console-banners.sh) (spoke banners + ApplicationMenu ConsoleLinks).
 
 Spoke GitOps prerequisite: Subscription in [`gitops/platform/operators-spoke`](../gitops/platform/operators-spoke) (synced once Applications start).
@@ -96,7 +97,7 @@ scripts/mirror-image-to-spokes.sh api-gateway <tag>
 
 Console UX on acm:
 - Banner **Hub Cluster** — GitOps [`gitops/components/console-banners`](../gitops/components/console-banners) (+ script for east/west).
-- ApplicationMenu links (Gitea, Jenkins, Quay, Rekor) — [`scripts/apply-console-links.sh`](../scripts/apply-console-links.sh) (Gitea also created by `bootstrap-gitea.sh`).
+- ApplicationMenu links (Gitea, Jenkins, Quay, Rekor Search UI, Kiali) — [`scripts/apply-console-links.sh`](../scripts/apply-console-links.sh) (Gitea also created by `bootstrap-gitea.sh`).
 - Service Mesh console (OSSMC) — [`gitops/components/kiali-multicluster/ossmconsole.yaml`](../gitops/components/kiali-multicluster/ossmconsole.yaml); refresh the OpenShift console after the plugin is Ready.
 
 ## Repo paths
