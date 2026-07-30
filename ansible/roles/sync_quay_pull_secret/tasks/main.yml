@@ -1,0 +1,7 @@
+---
+- name: Sync Quay robot pull secret to managed clusters
+  ansible.builtin.command: "{{ playbook_dir }}/../../scripts/sync-quay-pull-secret-to-clusters.sh"
+  environment:
+    ACM_CONTEXT: "{{ acm_context }}"
+    MANAGED_CONTEXTS: "{{ east_context }} {{ west_context }}"
+  changed_when: true

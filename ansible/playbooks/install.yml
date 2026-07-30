@@ -15,6 +15,7 @@
     - role: label_managedclusters
     - role: apply_acm_gitops
     - role: sync_conjur_creds_to_spokes
+    - role: sync_quay_pull_secret
     - role: mesh_shared_ca
     - role: mesh_remote_secrets
     - role: kiali_remote_secrets

@@ -16,6 +16,8 @@ spec:
         app.kubernetes.io/name: banking-service
         app.openshift.io/runtime: spring
     spec:
+      imagePullSecrets:
+        - name: quay-pull
       containers:
         - name: banking-service
           image: image-registry.openshift-image-registry.svc:5000/banking-apps/banking-service:latest
