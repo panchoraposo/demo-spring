@@ -5,9 +5,9 @@ metadata:
   namespace: rhbk-operator
 spec:
   # Single shared Keycloak for the demo lives on the hub.
-  # Today it's deployed as part of the TPA stack in `trusted-profile-analyzer`.
+  # It runs in `banking-idp` and serves both app and TPA realms.
   targetNamespaces:
-    - trusted-profile-analyzer
+    - banking-idp
 ---
 apiVersion: operators.coreos.com/v1alpha1
 kind: Subscription
