@@ -28,8 +28,6 @@ spec:
           - basic
           - profile
           - email
-          - roles
-          - web-origins
           - read:document
         optionalClientScopes:
           - create:document
@@ -51,8 +49,6 @@ spec:
           - basic
           - profile
           - email
-          - roles
-          - web-origins
           - read:document
         optionalClientScopes:
           - create:document
@@ -75,8 +71,6 @@ spec:
           - basic
           - profile
           - email
-          - roles
-          - web-origins
           - read:document
           - create:document
           - update:document
@@ -96,8 +90,6 @@ spec:
           - basic
           - profile
           - email
-          - roles
-          - web-origins
           - read:document
           - create:document
           - update:document
@@ -124,7 +116,51 @@ spec:
             consentRequired: false
             config:
               introspection.token.claim: "true"
+              userinfo.token.claim: "true"
+              id.token.claim: "true"
               access.token.claim: "true"
+      - name: profile
+        protocol: openid-connect
+        protocolMappers:
+          - name: username
+            protocol: openid-connect
+            protocolMapper: oidc-usermodel-attribute-mapper
+            consentRequired: false
+            config:
+              introspection.token.claim: "true"
+              userinfo.token.claim: "true"
+              user.attribute: username
+              id.token.claim: "true"
+              access.token.claim: "true"
+              claim.name: preferred_username
+              jsonType.label: String
+      - name: email
+        protocol: openid-connect
+        protocolMappers:
+          - name: email
+            protocol: openid-connect
+            protocolMapper: oidc-usermodel-attribute-mapper
+            consentRequired: false
+            config:
+              introspection.token.claim: "true"
+              userinfo.token.claim: "true"
+              user.attribute: email
+              id.token.claim: "true"
+              access.token.claim: "true"
+              claim.name: email
+              jsonType.label: String
+          - name: email verified
+            protocol: openid-connect
+            protocolMapper: oidc-usermodel-property-mapper
+            consentRequired: false
+            config:
+              introspection.token.claim: "true"
+              userinfo.token.claim: "true"
+              user.attribute: emailVerified
+              id.token.claim: "true"
+              access.token.claim: "true"
+              claim.name: email_verified
+              jsonType.label: boolean
       - { name: create:document, protocol: openid-connect }
       - { name: read:document, protocol: openid-connect }
       - { name: update:document, protocol: openid-connect }
