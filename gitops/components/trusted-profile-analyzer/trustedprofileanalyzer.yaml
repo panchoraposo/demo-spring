@@ -1,0 +1,45 @@
+apiVersion: rhtpa.io/v1
+kind: TrustedProfileAnalyzer
+metadata:
+  name: banking-tpa
+  namespace: trusted-profile-analyzer
+  labels:
+    app.kubernetes.io/part-of: banking-demo
+spec:
+  # OpenShift apps domain (suffix only). Routes are created under this domain.
+  appDomain: apps.cluster-k7kqp.k7kqp.sandbox3321.opentlc.com
+  partOf: trustify
+  openshift:
+    useServiceCa: true
+
+  # Keep footprint small for single-node hubs.
+  metrics:
+    enabled: false
+  tracing:
+    enabled: false
+
+  modules:
+    createDatabase:
+      enabled: true
+    migrateDatabase:
+      enabled: true
+    createImporters:
+      enabled: true
+    server:
+      enabled: true
+      replicas: 1
+      resources:
+        requests:
+          cpu: 100m
+          memory: 1Gi
+    importer:
+      enabled: true
+      replicas: 1
+      concurrency: 1
+      resources:
+        requests:
+          cpu: 100m
+          memory: 1Gi
+      workingDirectory:
+        size: 8Gi
+

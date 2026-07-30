@@ -10,3 +10,4 @@ resources:
   - postgresql.yaml
   - redis.yaml
   - rhda-backend.yaml
+  - trustedprofileanalyzer.yaml
