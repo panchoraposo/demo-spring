@@ -22,7 +22,7 @@ metadata:
   labels:
     app.kubernetes.io/part-of: banking-demo
 spec:
-  channel: stable
+  channel: stable-v3
   name: rhtpa-operator
   source: redhat-operators
   sourceNamespace: openshift-marketplace
