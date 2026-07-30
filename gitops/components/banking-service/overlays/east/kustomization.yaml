@@ -10,7 +10,7 @@ resources:
 
 images:
   - name: image-registry.openshift-image-registry.svc:5000/banking-apps/banking-service
-    newTag: latest
+    newTag: 7
 
 commonLabels:
   cluster: east
