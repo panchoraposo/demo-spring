@@ -66,7 +66,11 @@ data:
         {
           "username": "tpaadmin",
           "enabled": true,
+          "firstName": "TPA",
+          "lastName": "Admin",
+          "email": "tpaadmin@example.com",
           "emailVerified": true,
+          "requiredActions": [],
           "credentials": [
             { "type": "password", "value": "replace-me-tpaadmin", "temporary": false }
           ]
