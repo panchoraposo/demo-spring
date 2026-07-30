@@ -18,76 +18,62 @@ Credentials are sourced from **CyberArk Conjur** on the hub via the **External S
 - Realm `banking` for Spring apps
 - Realm `trustify` for TPA
 
+### Where things run
+
 ```mermaid
-flowchart TB
-  subgraph hub ["Cluster acm hub"]
-    RHACM[RHACM ApplicationSets]
-    GitOpsH[OpenShift GitOps]
-    Conjur[CyberArk Conjur]
-    ESOH[ESO hub]
-    Keycloak["RHBK Keycloak banking + trustify"]
-    Jenkins[Jenkins + BuildConfigs]
-    ODF[ODF MCG]
-    Quay[Red Hat Quay]
-    TAS[Trusted Artifact Signer]
-    TPA[Trusted Profile Analyzer]
-    RHDA[RHDA backend]
-    DevSpaces[Dev Spaces]
-    Kiali[Kiali MC + promxy]
-    Dash[Credentials dashboard]
+flowchart LR
+  subgraph acm ["acm hub"]
+    HubSvc["RHACM · GitOps · Conjur · Keycloak<br/>Jenkins · ODF · Quay · RHTAS · TPA<br/>Dev Spaces · Kiali · dashboard"]
   end
-
-  subgraph east ["Cluster east"]
-    GitOpsE[OpenShift GitOps]
-    ESOE[ESO]
-    MeshE[OSSM ambient]
-    GWE[api-gateway]
-    BSE[banking-service]
-    PGE[PostgreSQL 16]
+  subgraph east ["east"]
+    EastSvc["GitOps · ESO · OSSM ambient<br/>api-gateway · banking-service · PostgreSQL"]
   end
-
-  subgraph west ["Cluster west"]
-    GitOpsW[OpenShift GitOps]
-    ESOW[ESO]
-    MeshW[OSSM ambient]
-    GWW[api-gateway]
-    BSW[banking-service]
-    PGW[PostgreSQL 16]
+  subgraph west ["west"]
+    WestSvc["GitOps · ESO · OSSM ambient<br/>api-gateway · banking-service · PostgreSQL"]
   end
+  HubSvc -->|ApplicationSets| EastSvc
+  HubSvc -->|ApplicationSets| WestSvc
+  EastSvc <-.->|mesh failover| WestSvc
+```
 
-  Client -->|JWT| Keycloak
-  Client --> GWE
-  Client --> GWW
-  GWE --> BSE
-  GWW --> BSW
-  BSE --> PGE
-  BSW --> PGW
-  BSE <-. mesh failover .-> BSW
+### Runtime request path
 
-  RHACM --> GitOpsE
-  RHACM --> GitOpsW
-  Conjur --> ESOH
-  Conjur --> ESOE
-  Conjur --> ESOW
-  Keycloak --> GWE
-  Keycloak --> GWW
+```mermaid
+flowchart LR
+  Client --> KC[Keycloak on acm]
+  Client --> GW[api-gateway]
+  KC -->|JWT| GW
+  GW --> BS[banking-service]
+  BS --> PG[PostgreSQL local]
+  BS -. failover .-> BS2[banking-service peer]
+```
 
-  Dev[Developer] --> DevSpaces
-  DevSpaces --> RHDA
-  RHDA --> TPA
-  TPA --> Keycloak
+PostgreSQL stays local to each managed cluster. Mesh can shift `banking-service` traffic east ↔ west; data does not follow.
+
+### Secrets
+
+```mermaid
+flowchart LR
+  Conjur[Conjur on acm] --> ESOH[ESO acm]
+  Conjur --> ESOM[ESO east and west]
+  ESOH --> HubSec[Jenkins Keycloak CI secrets]
+  ESOM --> AppSec[PostgreSQL and app secrets]
+```
+
+### Supply chain
+
+```mermaid
+flowchart LR
+  Dev[Developer] --> DS[Dev Spaces]
+  DS --> RHDA[RHDA]
+  RHDA --> TPA[TPA on acm]
   Dev --> Jenkins
-  Jenkins --> Quay
-  Quay --> ODF
-  Jenkins --> TAS
+  Jenkins --> BC[BuildConfig]
+  BC --> Quay
+  Jenkins --> TAS[RHTAS]
   Jenkins --> Git[Git repo]
-  Git --> GitOpsH
-  Git --> GitOpsE
-  Git --> GitOpsW
-  Quay --> BSE
-  Quay --> BSW
-  Kiali --> MeshE
-  Kiali --> MeshW
+  Git --> Argo[GitOps on acm east west]
+  Quay --> Apps[banking-service images]
 ```
 
 ## Red Hat / catalog components

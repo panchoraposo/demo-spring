@@ -8,77 +8,32 @@ Multi-cluster layout: **acm** (RHACM hub — Conjur, Jenkins, ODF, Quay, Trusted
 
 ## Architecture
 
+Three clusters. Hub owns platform services; east/west run the banking apps with local data and mesh failover.
+
 ```mermaid
-flowchart TB
-  subgraph hub ["Cluster acm hub"]
-    RHACM[RHACM ApplicationSets]
-    GitOpsH[OpenShift GitOps]
-    Conjur[CyberArk Conjur]
-    ESOH[ESO hub]
-    Keycloak["RHBK Keycloak banking + trustify"]
-    Jenkins[Jenkins + BuildConfigs]
-    ODF[ODF MCG]
-    Quay[Red Hat Quay]
-    TAS[Trusted Artifact Signer]
-    TPA[Trusted Profile Analyzer]
-    RHDA[RHDA backend]
-    DevSpaces[Dev Spaces]
-    Kiali[Kiali MC + promxy]
-    Dash[Credentials dashboard]
+flowchart LR
+  subgraph acm ["acm hub"]
+    HubSvc["RHACM · GitOps · Conjur · Keycloak<br/>Jenkins · ODF · Quay · RHTAS · TPA<br/>Dev Spaces · Kiali · dashboard"]
   end
-
-  subgraph east ["Cluster east"]
-    GitOpsE[OpenShift GitOps]
-    ESOE[ESO]
-    MeshE[OSSM ambient]
-    GWE[api-gateway]
-    BSE[banking-service]
-    PGE[PostgreSQL 16]
+  subgraph east ["east"]
+    EastSvc["GitOps · ESO · OSSM ambient<br/>api-gateway · banking-service · PostgreSQL"]
   end
-
-  subgraph west ["Cluster west"]
-    GitOpsW[OpenShift GitOps]
-    ESOW[ESO]
-    MeshW[OSSM ambient]
-    GWW[api-gateway]
-    BSW[banking-service]
-    PGW[PostgreSQL 16]
+  subgraph west ["west"]
+    WestSvc["GitOps · ESO · OSSM ambient<br/>api-gateway · banking-service · PostgreSQL"]
   end
-
-  Client -->|JWT| Keycloak
-  Client --> GWE
-  Client --> GWW
-  GWE --> BSE
-  GWW --> BSW
-  BSE --> PGE
-  BSW --> PGW
-  BSE <-. mesh failover .-> BSW
-
-  RHACM --> GitOpsE
-  RHACM --> GitOpsW
-  Conjur --> ESOH
-  Conjur --> ESOE
-  Conjur --> ESOW
-  Keycloak --> GWE
-  Keycloak --> GWW
-
-  Dev[Developer] --> DevSpaces
-  DevSpaces --> RHDA
-  RHDA --> TPA
-  TPA --> Keycloak
-  Dev --> Jenkins
-  Jenkins --> Quay
-  Quay --> ODF
-  Jenkins --> TAS
-  Jenkins --> Git[Git repo]
-  Git --> GitOpsH
-  Git --> GitOpsE
-  Git --> GitOpsW
-  Quay --> BSE
-  Quay --> BSW
-  Kiali --> MeshE
-  Kiali --> MeshW
+  HubSvc -->|ApplicationSets| EastSvc
+  HubSvc -->|ApplicationSets| WestSvc
+  EastSvc <-.->|mesh failover| WestSvc
 ```
+
+| Flow | Path |
+| --- | --- |
+| API call | Client → hub Keycloak JWT → east/west `api-gateway` → `banking-service` → local PostgreSQL |
+| Secrets | Conjur on acm → ESO on acm/east/west → Kubernetes Secrets |
+| Supply chain | Dev Spaces / Jenkins on acm → BuildConfig → Quay + RHTAS → Git tag bump → GitOps sync |
+| Observability | Hub Kiali + promxy → east/west mesh metrics |
+
+Detail and component table: [docs/architecture.md](docs/architecture.md).
 
 | Layer | Red Hat / catalog component |
 | --- | --- |
