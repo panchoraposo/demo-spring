@@ -28,28 +28,31 @@ spec:
   tracing:
     enabled: false
 
-  # Modules (passed as Helm values).
+  # Init/migrations are expected at the top-level by the chart templates.
   createDatabase:
     enabled: true
   migrateDatabase:
     enabled: true
-  createImporters:
-    enabled: true
-  server:
-    enabled: true
-    replicas: 1
-    resources:
-      requests:
-        cpu: 100m
-        memory: 1Gi
-  importer:
-    enabled: true
-    replicas: 1
-    concurrency: 1
-    resources:
-      requests:
-        cpu: 100m
-        memory: 1Gi
-    workingDirectory:
-      size: 8Gi
+
+  # Runtime modules.
+  modules:
+    createImporters:
+      enabled: true
+    server:
+      enabled: true
+      replicas: 1
+      resources:
+        requests:
+          cpu: 100m
+          memory: 1Gi
+    importer:
+      enabled: true
+      replicas: 1
+      concurrency: 1
+      resources:
+        requests:
+          cpu: 100m
+          memory: 1Gi
+      workingDirectory:
+        size: 8Gi
 
