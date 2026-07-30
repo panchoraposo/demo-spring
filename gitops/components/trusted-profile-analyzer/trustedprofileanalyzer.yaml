@@ -30,6 +30,12 @@ spec:
   tracing:
     enabled: false
 
+  # For sandbox/demo: allow running without an external OIDC provider.
+  # When clients is empty, the server starts without validating an issuer URL.
+  oidc:
+    clients: {}
+    loadUser: false
+
   # Init/migrations are expected at the top-level by the chart templates.
   createDatabase:
     enabled: true
