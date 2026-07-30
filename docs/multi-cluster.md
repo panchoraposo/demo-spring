@@ -38,8 +38,10 @@ oc --context acm apply -k gitops/acm
 4. Ensure hub Argo can reach spoke APIs (ACM GitOps Cluster addon or cluster secrets).
 5. Set environment values (no repo-wide placeholder script):
    - Git repo URL + revision: `gitops/applications/{acm,east,west}/env/common.env`
-   - Spoke Keycloak + issuer values:
-     - `gitops/components/keycloak/overlays/{east,west}/env/keycloak.env`
+   - Hub Keycloak + TPA domain values:
+     - `gitops/components/keycloak/overlays/acm/env/keycloak.env` (Route host `sso.<appsDomain>`)
+     - `gitops/components/trusted-profile-analyzer/env/tpa.env` (TPA `appDomain`)
+   - Spoke OIDC issuer values (pointing to hub):
      - `gitops/components/{api-gateway,banking-service}/overlays/{east,west}/env/*.env`
    - Spoke Conjur URL (ESO ClusterSecretStore): `gitops/components/external-secrets/overlays/{east,west}/env/conjur.env`
 6. After Conjur bootstrap on acm: [`scripts/sync-conjur-creds-to-spokes.sh`](../scripts/sync-conjur-creds-to-spokes.sh)
