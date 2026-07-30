@@ -1,0 +1,28 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: keycloak
+  namespace: openshift-gitops
+  labels:
+    app.kubernetes.io/part-of: banking-demo
+    cluster: acm
+  annotations:
+    # Requires RHBK operator (platform-operators), and ESO/Conjur (external-secrets-config).
+    argocd.argoproj.io/sync-wave: "4"
+spec:
+  project: default
+  source:
+    repoURL: https://github.com/panchoraposo/demo-spring.git
+    targetRevision: main
+    path: gitops/components/keycloak/overlays/acm
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: banking-idp
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true
+      - ServerSideApply=true
+

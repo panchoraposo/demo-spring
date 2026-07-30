@@ -27,8 +27,6 @@ data:
         - !variable github-ci/token
         - !variable promxy/east-token
         - !variable promxy/west-token
-        - !variable tpa/keycloak-admin-username
-        - !variable tpa/keycloak-admin-password
         - !variable tpa/oidc-cli-client-secret
         - !variable tpa/postgresql-db-host
         - !variable tpa/postgresql-db-name
@@ -64,8 +62,6 @@ data:
             - !variable github-ci/token
             - !variable promxy/east-token
             - !variable promxy/west-token
-            - !variable tpa/keycloak-admin-username
-            - !variable tpa/keycloak-admin-password
             - !variable tpa/oidc-cli-client-secret
             - !variable tpa/postgresql-db-host
             - !variable tpa/postgresql-db-name

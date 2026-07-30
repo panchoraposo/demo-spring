@@ -34,6 +34,6 @@ replacements:
           group: route.openshift.io
           version: v1
           kind: Route
-          name: banking-keycloak
+          name: sso
         fieldPaths:
           - spec.host

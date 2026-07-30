@@ -3,6 +3,7 @@ kind: Kustomization
 
 resources:
   - namespace.yaml
+  - externalsecrets.yaml
   - keycloak-db.yaml
   - keycloak.yaml
   - realm-import-job.yaml

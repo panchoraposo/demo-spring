@@ -24,7 +24,7 @@ spec:
     httpEnabled: true
   hostname:
     # Patched per environment/cluster overlay.
-    hostname: keycloak-banking.apps.example.com
+    hostname: sso.apps.example.com
     strict: false
   ingress:
     enabled: false

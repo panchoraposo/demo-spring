@@ -1,0 +1,100 @@
+apiVersion: k8s.keycloak.org/v2alpha1
+kind: KeycloakRealmImport
+metadata:
+  name: trustify-realm
+  namespace: banking-idp
+  labels:
+    app.kubernetes.io/part-of: banking-demo
+spec:
+  # Shared hub Keycloak instance (operator-managed).
+  keycloakCRName: banking-keycloak
+  realm:
+    realm: trustify
+    enabled: true
+    sslRequired: external
+    registrationAllowed: false
+    resetPasswordAllowed: true
+    rememberMe: true
+    clients:
+      - clientId: frontend
+        name: trustify-frontend
+        protocol: openid-connect
+        publicClient: true
+        standardFlowEnabled: true
+        directAccessGrantsEnabled: true
+        redirectUris: ["*"]
+        webOrigins: ["*"]
+        defaultClientScopes:
+          - basic
+          - profile
+          - email
+          - roles
+          - web-origins
+          - read:document
+        optionalClientScopes:
+          - create:document
+          - update:document
+          - delete:document
+          - offline_access
+        attributes:
+          client.use.lightweight.access.token.enabled: "false"
+      - clientId: cli
+        name: trustify-cli
+        protocol: openid-connect
+        publicClient: false
+        standardFlowEnabled: false
+        directAccessGrantsEnabled: false
+        serviceAccountsEnabled: true
+        clientAuthenticatorType: client-secret
+        # Keep in sync with Conjur-seeded `banking/tpa/oidc-cli-client-secret`.
+        secret: tpa-oidc-cli-secret-change-me
+        defaultClientScopes:
+          - basic
+          - profile
+          - email
+          - roles
+          - web-origins
+          - read:document
+          - create:document
+          - update:document
+          - delete:document
+    clientScopes:
+      - name: basic
+        protocol: openid-connect
+        protocolMappers:
+          - name: auth_time
+            protocol: openid-connect
+            protocolMapper: oidc-usersessionmodel-note-mapper
+            consentRequired: false
+            config:
+              user.session.note: AUTH_TIME
+              introspection.token.claim: "true"
+              userinfo.token.claim: "true"
+              id.token.claim: "true"
+              access.token.claim: "true"
+              claim.name: auth_time
+              jsonType.label: long
+          - name: sub
+            protocol: openid-connect
+            protocolMapper: oidc-sub-mapper
+            consentRequired: false
+            config:
+              introspection.token.claim: "true"
+              access.token.claim: "true"
+      - { name: create:document, protocol: openid-connect }
+      - { name: read:document, protocol: openid-connect }
+      - { name: update:document, protocol: openid-connect }
+      - { name: delete:document, protocol: openid-connect }
+    users:
+      - username: tpaadmin
+        enabled: true
+        firstName: TPA
+        lastName: Admin
+        email: tpaadmin@example.com
+        emailVerified: true
+        requiredActions: []
+        credentials:
+          - type: password
+            value: tpaadmin-change-me
+            temporary: false
+

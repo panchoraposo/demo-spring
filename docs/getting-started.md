@@ -69,7 +69,7 @@ oc -n banking-apps start-build api-gateway --from-dir=apps/api-gateway --follow
 ## 5. Obtain a JWT and call APIs
 
 ```bash
-KEYCLOAK_URL="https://$(oc --context acm -n trusted-profile-analyzer get route sso -o jsonpath='{.spec.host}')"
+KEYCLOAK_URL="https://$(oc --context acm -n banking-idp get route sso -o jsonpath='{.spec.host}')"
 GATEWAY_URL="https://$(oc get route api-gateway -n banking-apps -o jsonpath='{.spec.host}')"
 
 TOKEN=$(curl -s -X POST "${KEYCLOAK_URL}/realms/banking/protocol/openid-connect/token" \

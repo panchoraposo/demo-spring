@@ -17,7 +17,7 @@
   ansible.builtin.shell: |
     set -euo pipefail
     gw="https://$(oc --context "{{ east_context }}" -n banking-apps get route api-gateway -o jsonpath='{.spec.host}')"
-    kc="https://$(oc --context "{{ acm_context }}" -n trusted-profile-analyzer get route sso -o jsonpath='{.spec.host}')"
+    kc="https://$(oc --context "{{ acm_context }}" -n banking-idp get route sso -o jsonpath='{.spec.host}')"
     token="$(curl -sk -X POST "${kc}/realms/banking/protocol/openid-connect/token" \
       -d client_id=banking-cli -d username=teller -d password=teller-change-me -d grant_type=password \
       | jq -r '.access_token')"
@@ -44,7 +44,7 @@
   ansible.builtin.shell: |
     set -euo pipefail
     gw="https://$(oc --context "{{ east_context }}" -n banking-apps get route api-gateway -o jsonpath='{.spec.host}')"
-    kc="https://$(oc --context "{{ acm_context }}" -n trusted-profile-analyzer get route sso -o jsonpath='{.spec.host}')"
+    kc="https://$(oc --context "{{ acm_context }}" -n banking-idp get route sso -o jsonpath='{.spec.host}')"
     token="$(curl -sk -X POST "${kc}/realms/banking/protocol/openid-connect/token" \
       -d client_id=banking-cli -d username=teller -d password=teller-change-me -d grant_type=password \
       | jq -r '.access_token')"

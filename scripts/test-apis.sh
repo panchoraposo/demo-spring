@@ -65,8 +65,8 @@ test_cluster() {
   local gateway_host gateway_url keycloak_url token
   gateway_host="$(oc --context "${ctx}" -n banking-apps get route api-gateway -o jsonpath='{.spec.host}')"
   gateway_url="https://${gateway_host}"
-  # Single IdP for the demo lives on the hub (acm): Route trusted-profile-analyzer/sso
-  keycloak_url="https://$(oc --context "${HUB_CONTEXT:-acm}" -n trusted-profile-analyzer get route sso -o jsonpath='{.spec.host}')"
+  # Single IdP for the demo lives on the hub (acm): Route banking-idp/sso
+  keycloak_url="https://$(oc --context "${HUB_CONTEXT:-acm}" -n banking-idp get route sso -o jsonpath='{.spec.host}')"
   echo "  gateway:  ${gateway_url}"
   echo "  keycloak: ${keycloak_url}"
 

@@ -4,4 +4,3 @@ metadata:
   name: banking-idp
   labels:
     app.kubernetes.io/part-of: banking-demo
-    cluster: east

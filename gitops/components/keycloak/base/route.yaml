@@ -1,14 +1,14 @@
 apiVersion: route.openshift.io/v1
 kind: Route
 metadata:
-  name: banking-keycloak
+  name: sso
   namespace: banking-idp
   labels:
     app.kubernetes.io/name: keycloak
 spec:
   # Must match Keycloak CR hostname (and OIDC issuer used by Spring apps).
   # Patched per environment/cluster overlay.
-  host: keycloak-banking.apps.example.com
+  host: sso.apps.example.com
   to:
     kind: Service
     name: banking-keycloak-service

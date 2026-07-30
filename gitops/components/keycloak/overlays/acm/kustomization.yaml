@@ -3,12 +3,6 @@ kind: Kustomization
 
 namespace: banking-idp
 
-resources:
-  - ../../base
-
-commonLabels:
-  cluster: west
-
 generatorOptions:
   disableNameSuffixHash: true
 
@@ -17,6 +11,10 @@ configMapGenerator:
     envs:
       - env/keycloak.env
 
+resources:
+  - ../../base
+
+# Patch Keycloak hostname + Route host for the shared hub IdP.
 replacements:
   - source:
       kind: ConfigMap
@@ -31,9 +29,8 @@ replacements:
         fieldPaths:
           - spec.hostname.hostname
       - select:
-          group: route.openshift.io
-          version: v1
           kind: Route
           name: sso
         fieldPaths:
           - spec.host
+
