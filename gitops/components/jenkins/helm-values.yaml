@@ -89,6 +89,14 @@ controller:
           name: cosign-signing-key
           key: cosign.key
           optional: true
+    - name: TPA_OIDC_CLIENT_ID
+      value: cli
+    - name: TPA_OIDC_CLIENT_SECRET
+      valueFrom:
+        secretKeyRef:
+          name: tpa-oidc-cli
+          key: client-secret
+          optional: true
   sidecars:
     configAutoReload:
       enabled: false

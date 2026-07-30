@@ -6,3 +6,4 @@ resources:
   - clustersecretstore-conjur.yaml
   - externalsecret-jenkins.yaml
   - externalsecret-github-ci.yaml
+  - externalsecret-tpa-oidc-cli.yaml

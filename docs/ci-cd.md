@@ -70,6 +70,7 @@ SCM poll interval: every ~3 minutes (`H/3 * * * *`). Manual **Build with Paramet
 | `github-ci` | GitOps push PAT |
 | `quay-ci` | Quay robot (`username` / `password`) |
 | `cosign-signing-key` | PEM in key `cosign.key` for non-interactive signing |
+| `tpa-oidc-cli` | OIDC client secret for uploading SBOMs to TPA |
 
 Without Quay/cosign, the OpenShift build still succeeds; the sign stage is skipped with a warning.
 
