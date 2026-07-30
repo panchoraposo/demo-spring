@@ -9,7 +9,7 @@ spec:
   # OpenShift apps domain (suffix only). Routes are created under this domain.
   # NOTE: rhtpa chart concatenates subdomains directly (e.g. "server" + appDomain),
   # so this value must start with a dot.
-  appDomain: .apps.cluster-k7kqp.k7kqp.sandbox3321.opentlc.com
+  appDomain: .apps.example.com
   partOf: trustify
   openshift:
     useServiceCa: true

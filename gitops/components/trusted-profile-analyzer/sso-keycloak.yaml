@@ -41,9 +41,7 @@ data:
             "delete:document",
             "offline_access"
           ],
-          "redirectUris": [
-            "https://server.apps.cluster-k7kqp.k7kqp.sandbox3321.opentlc.com/*"
-          ],
+          "redirectUris": ["*"],
           "webOrigins": [
             "*"
           ]
@@ -209,7 +207,7 @@ spec:
                   name: keycloak-admin
                   key: password
             - name: KC_HOSTNAME_URL
-              value: https://sso.apps.cluster-k7kqp.k7kqp.sandbox3321.opentlc.com
+              value: https://sso.apps.example.com
           ports:
             - name: http
               containerPort: 8080
@@ -267,7 +265,7 @@ metadata:
   labels:
     app.kubernetes.io/name: tpa-sso
 spec:
-  host: sso.apps.cluster-k7kqp.k7kqp.sandbox3321.opentlc.com
+  host: sso.apps.example.com
   to:
     kind: Service
     name: tpa-sso

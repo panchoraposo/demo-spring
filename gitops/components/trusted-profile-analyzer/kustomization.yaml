@@ -4,6 +4,14 @@ kind: Kustomization
 # RHTPA supporting resources + RHDA backend for Dev Spaces Dependency Analytics.
 # Apply TrustedProfileAnalyzer CR from trustedprofileanalyzer.sample.yaml after
 # aligning fields with the installed operator CSV sample (Tech Preview CRD).
+generatorOptions:
+  disableNameSuffixHash: true
+
+configMapGenerator:
+  - name: env-config-tpa
+    envs:
+      - env/tpa.env
+
 resources:
   - externalsecrets.yaml
   - postgresql.yaml
@@ -11,3 +19,30 @@ resources:
   - rhda-backend.yaml
   - sso-keycloak.yaml
   - trustedprofileanalyzer.yaml
+
+replacements:
+  - source:
+      kind: ConfigMap
+      name: env-config-tpa
+      fieldPath: data.TPA_SSO_HOST
+    targets:
+      - select:
+          kind: Deployment
+          name: tpa-sso
+        fieldPaths:
+          - spec.template.spec.containers.[name=keycloak].env.[name=KC_HOSTNAME_URL].value
+      - select:
+          kind: Route
+          name: sso
+        fieldPaths:
+          - spec.host
+  - source:
+      kind: ConfigMap
+      name: env-config-tpa
+      fieldPath: data.TPA_APP_DOMAIN
+    targets:
+      - select:
+          kind: TrustedProfileAnalyzer
+          name: banking-tpa
+        fieldPaths:
+          - spec.appDomain
