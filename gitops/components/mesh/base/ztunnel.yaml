@@ -14,7 +14,8 @@ spec:
       network: CLUSTER_NETWORK
       multiCluster:
         clusterName: CLUSTER_NAME
-      # Keep ztunnel out of ambient redirection / sidecar injection.
+      # Do NOT set sidecar.istio.io/inject here — the ztunnel Helm chart already
+      # defines it; duplicating the key makes Sail post-render fail (ReconcileError)
+      # and Kiali reports data-plane warnings (Istio state ZTunnelNotHealthy).
       podAnnotations:
-        sidecar.istio.io/inject: "false"
         ambient.istio.io/redirection: "disabled"
