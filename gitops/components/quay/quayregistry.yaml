@@ -1,5 +1,6 @@
 # Red Hat Quay on acm. objectstorage:managed uses ODF ObjectBucketClaim (MCG).
 # After Ready, create org `banking` and robot account for CI push/pull.
+# Clair/mirror/HPA disabled: single-node sandbox cannot schedule Clair (2 CPU / 2Gi request).
 apiVersion: quay.redhat.com/v1
 kind: QuayRegistry
 metadata:
@@ -10,9 +11,10 @@ metadata:
   annotations:
     argocd.argoproj.io/sync-options: SkipDryRunOnMissingResource=true
 spec:
+  configBundleSecret: banking-quay-demo-config
   components:
     - kind: clair
-      managed: true
+      managed: false
     - kind: postgres
       managed: true
     - kind: objectstorage
@@ -20,16 +22,19 @@ spec:
     - kind: redis
       managed: true
     - kind: horizontalpodautoscaler
-      managed: true
+      managed: false
     - kind: route
       managed: true
     - kind: mirror
-      managed: true
+      managed: false
+    # monitoring requires Quay Operator AllNamespaces install mode
     - kind: monitoring
-      managed: true
+      managed: false
     - kind: tls
       managed: true
     - kind: quay
       managed: true
+      overrides:
+        replicas: 1
     - kind: clairpostgres
-      managed: true
+      managed: false

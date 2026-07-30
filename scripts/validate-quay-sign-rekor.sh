@@ -10,8 +10,12 @@ TOOLS="${TOOLS_DIR:-$(mktemp -d)}"
 mkdir -p "${TOOLS}"
 export PATH="${TOOLS}:${PATH}"
 
-QUAY_HOST="$(oc --context "${CTX}" -n quay-enterprise get route -l quay-component=quay \
+QUAY_HOST="$(oc --context "${CTX}" -n quay-enterprise get route -l quay-component=quay-app-route \
   -o jsonpath='{.items[0].spec.host}')"
+if [[ -z "${QUAY_HOST}" ]]; then
+  QUAY_HOST="$(oc --context "${CTX}" -n quay-enterprise get route banking-quay-quay \
+    -o jsonpath='{.spec.host}')"
+fi
 [[ -n "${QUAY_HOST}" ]] || { echo "ERROR: Quay route not found" >&2; exit 1; }
 
 if [[ -z "${TAG}" ]]; then

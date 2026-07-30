@@ -2,19 +2,31 @@
 
 Depends on ODF Multicloud Object Gateway (`ObjectBucketClaim` API).
 
-## After Quay is Ready
+This demo disables Clair / mirror / HPA / monitoring so Quay fits a single-node hub.
+`Available` may stay `False` even when the registry HTTP endpoint is healthy — that is expected.
 
-1. Open the Quay route: `oc -n quay-enterprise get route -l quay-component=quay`
-2. Create the first user (superuser) via the Quay UI.
-3. Create organization `banking` and repositories `banking-service`, `api-gateway`.
-4. Create a robot account with write on those repos; store credentials for Jenkins:
+## Bootstrap CI credentials
 
 ```bash
-# Secret consumed by CI (create once; not GitOps'd — contains robot token)
-oc -n banking-ci create secret docker-registry quay-ci \
-  --docker-server="$(oc -n quay-enterprise get route banking-quay-quay -o jsonpath='{.spec.host}')" \
-  --docker-username='banking+ci' \
-  --docker-password='<robot-token>'
+scripts/bootstrap-quay-ci.sh
 ```
 
-Pipelines push signed images, SBOMs, and attestations to `quay.<host>/banking/<app>:<tag>`.
+Creates org `banking`, repos, robot `banking+ci`, and Secrets:
+
+- `banking-ci/quay-ci` (robot username/password)
+- `banking-ci/cosign-signing-key` (CI signing keypair)
+
+## Manual UI path
+
+1. Open the Quay route: `oc -n quay-enterprise get route -l quay-component=quay-app-route`
+2. First user is created via `/api/v1/user/initialize` (see bootstrap script) when `FEATURE_USER_INITIALIZE` is set in `config-bundle.yaml`.
+3. Organization `banking`, repositories `banking-service` / `api-gateway`, robot with write.
+
+Pipelines push signed images, SBOMs, and attestations to `<quay-host>/banking/<app>:<tag>`.
+
+## Validate sign + SBOM + Rekor
+
+```bash
+scripts/validate-quay-sign-rekor.sh banking-service <BUILD_NUMBER>
+scripts/validate-quay-sign-rekor.sh api-gateway <BUILD_NUMBER>
+```

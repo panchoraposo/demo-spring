@@ -85,7 +85,10 @@ pipeline {
 
                 # Discover Quay route on acm when not provided
                 if [ -z "${QUAY_HOST:-}" ]; then
-                  QUAY_HOST="$(oc -n quay-enterprise get route -l quay-component=quay -o jsonpath='{.items[0].spec.host}' 2>/dev/null || true)"
+                  QUAY_HOST="$(oc -n quay-enterprise get route -l quay-component=quay-app-route -o jsonpath='{.items[0].spec.host}' 2>/dev/null || true)"
+                  if [[ -z "${QUAY_HOST}" ]]; then
+                    QUAY_HOST="$(oc -n quay-enterprise get route banking-quay-quay -o jsonpath='{.spec.host}' 2>/dev/null || true)"
+                  fi
                 fi
                 if [ -z "${QUAY_HOST:-}" ]; then
                   QUAY_HOST="$(oc -n quay-enterprise get route banking-quay-quay -o jsonpath='{.spec.host}' 2>/dev/null || true)"

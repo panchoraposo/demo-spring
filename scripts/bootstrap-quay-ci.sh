@@ -12,22 +12,31 @@ SUPERUSER="${QUAY_SUPERUSER:-quayadmin}"
 SUPERPASS="${QUAY_SUPERPASS:-QuayAdminChangeMe1!}"
 EMAIL="${QUAY_EMAIL:-quayadmin@banking-demo.local}"
 
-echo "==> Waiting for QuayRegistry ${QUAY_NS}/${QUAY_NAME} to become Available"
+echo "==> Waiting for QuayRegistry ${QUAY_NS}/${QUAY_NAME} (Available or HTTP-ready)"
 for i in $(seq 1 90); do
   blocked="$(oc --context "${CTX}" -n "${QUAY_NS}" get quayregistry "${QUAY_NAME}" \
     -o jsonpath='{.status.conditions[?(@.type=="RolloutBlocked")].status}' 2>/dev/null || true)"
   avail="$(oc --context "${CTX}" -n "${QUAY_NS}" get quayregistry "${QUAY_NAME}" \
     -o jsonpath='{.status.conditions[?(@.type=="Available")].status}' 2>/dev/null || true)"
-  host="$(oc --context "${CTX}" -n "${QUAY_NS}" get route -l quay-component=quay \
+  host="$(oc --context "${CTX}" -n "${QUAY_NS}" get route -l quay-component=quay-app-route \
     -o jsonpath='{.items[0].spec.host}' 2>/dev/null || true)"
-  echo "[$i] RolloutBlocked=${blocked:-?} Available=${avail:-?} host=${host:-none}"
-  if [[ "${avail}" == "True" && -n "${host}" ]]; then
+  if [[ -z "${host}" ]]; then
+    host="$(oc --context "${CTX}" -n "${QUAY_NS}" get route "${QUAY_NAME}-quay" \
+      -o jsonpath='{.spec.host}' 2>/dev/null || true)"
+  fi
+  code="000"
+  if [[ -n "${host}" ]]; then
+    code="$(curl -sk -o /dev/null -w '%{http_code}' --connect-timeout 5 "https://${host}/" || true)"
+  fi
+  echo "[$i] RolloutBlocked=${blocked:-?} Available=${avail:-?} host=${host:-none} HTTP=${code}"
+  # Available may stay False when Clair/mirror are unmanaged on small hubs; HTTP is enough for CI.
+  if [[ -n "${host}" ]] && { [[ "${avail}" == "True" ]] || [[ "${code}" =~ ^(200|301|302)$ ]]; }; then
     QUAY_HOST="${host}"
     break
   fi
   sleep 20
   if [[ "${i}" -eq 90 ]]; then
-    echo "ERROR: Quay not Ready. Check ODF/MCG ObjectBucketClaim support." >&2
+    echo "ERROR: Quay not Ready. Check ODF/MCG ObjectBucketClaim support / node CPU." >&2
     oc --context "${CTX}" -n "${QUAY_NS}" get quayregistry "${QUAY_NAME}" -o yaml | tail -40 >&2 || true
     exit 1
   fi
@@ -52,28 +61,38 @@ except Exception:
 PY
 )"
 
+if [[ -z "${TOKEN}" && -n "${QUAY_TOKEN:-}" ]]; then
+  TOKEN="${QUAY_TOKEN}"
+  echo "Using QUAY_TOKEN from environment"
+fi
+
 if [[ -z "${TOKEN}" ]]; then
-  echo "Initialize may have already run; obtaining token via auth login"
-  # Fallback: create OAuth app is heavy — use basic auth against API where supported
-  # Quay supports username/password for some endpoints via Bearer from /api/v1/signin in older versions.
-  # Prefer existing config.secret password if present.
-  TOKEN="$(curl -sk -u "${SUPERUSER}:${SUPERPASS}" "${QUAY_URL}/api/v1/user" \
-    -H 'Accept: application/json' >/dev/null && echo "USE_BASIC")"
+  echo "Initialize already done or failed; trying basic auth (needs BROWSER_API_CALLS_XHR_ONLY: false)"
+  if curl -sk -u "${SUPERUSER}:${SUPERPASS}" "${QUAY_URL}/api/v1/user/" \
+    -H 'Accept: application/json' | python3 -c 'import json,sys; json.load(sys.stdin)' >/dev/null 2>&1; then
+    TOKEN="USE_BASIC"
+  fi
+fi
+
+if [[ -z "${TOKEN}" ]]; then
+  echo "ERROR: no Quay API token. Re-init with FEATURE_USER_INITIALIZE or export QUAY_TOKEN." >&2
+  exit 1
 fi
 
 auth_hdr() {
-  if [[ "${TOKEN}" == "USE_BASIC" || -z "${TOKEN}" ]]; then
+  if [[ "${TOKEN}" == "USE_BASIC" ]]; then
     echo -n "-u ${SUPERUSER}:${SUPERPASS}"
   else
     echo -n "-H Authorization: Bearer ${TOKEN}"
   fi
 }
 
+ORG_EMAIL="${QUAY_ORG_EMAIL:-${ORG}@banking-demo.local}"
 echo "==> Create organization ${ORG}"
 # shellcheck disable=SC2046
 curl -sk $(auth_hdr) -X POST "${QUAY_URL}/api/v1/organization/" \
   -H 'Content-Type: application/json' \
-  -d "{\"name\":\"${ORG}\",\"email\":\"${EMAIL}\"}" >/dev/null || true
+  -d "{\"name\":\"${ORG}\",\"email\":\"${ORG_EMAIL}\"}" >/dev/null || true
 
 for repo in banking-service api-gateway; do
   echo "==> Create repository ${ORG}/${repo}"
@@ -137,14 +156,27 @@ oc --context "${CTX}" -n "${CI_NS}" create secret generic quay-ci \
 if ! oc --context "${CTX}" -n "${CI_NS}" get secret cosign-signing-key >/dev/null 2>&1; then
   echo "==> Generate cosign key pair for CI signing"
   TOOLS="$(mktemp -d)"
-  if [[ ! -x "${TOOLS}/cosign" ]]; then
-    curl -fsSL "https://github.com/sigstore/cosign/releases/download/v2.4.3/cosign-linux-amd64" \
+  if command -v cosign >/dev/null 2>&1; then
+    COSIGN_BIN="$(command -v cosign)"
+  else
+    OS="$(uname -s | tr '[:upper:]' '[:lower:]')"
+    ARCH="$(uname -m)"
+    case "${ARCH}" in
+      x86_64|amd64) ARCH=amd64 ;;
+      aarch64|arm64) ARCH=arm64 ;;
+    esac
+    case "${OS}" in
+      darwin) ASSET="cosign-darwin-${ARCH}" ;;
+      linux) ASSET="cosign-linux-${ARCH}" ;;
+      *) echo "ERROR: unsupported OS ${OS}; install cosign or run on linux/darwin" >&2; exit 1 ;;
+    esac
+    curl -fsSL "https://github.com/sigstore/cosign/releases/download/v2.4.3/${ASSET}" \
       -o "${TOOLS}/cosign"
     chmod +x "${TOOLS}/cosign"
+    COSIGN_BIN="${TOOLS}/cosign"
   fi
-  COSIGN_PASSWORD="" "${TOOLS}/cosign" generate-key-pair -d "${TOOLS}" >/dev/null
   # cosign writes cosign.key / cosign.pub in cwd
-  (cd "${TOOLS}" && COSIGN_PASSWORD="" "${TOOLS}/cosign" generate-key-pair)
+  (cd "${TOOLS}" && COSIGN_PASSWORD="" "${COSIGN_BIN}" generate-key-pair)
   oc --context "${CTX}" -n "${CI_NS}" create secret generic cosign-signing-key \
     --from-file=cosign.key="${TOOLS}/cosign.key" \
     --from-file=cosign.pub="${TOOLS}/cosign.pub" \

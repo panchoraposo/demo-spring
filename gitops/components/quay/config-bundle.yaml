@@ -1,0 +1,17 @@
+# Minimal Quay config for demos: first-user init + API without CSRF browser gating.
+apiVersion: v1
+kind: Secret
+metadata:
+  name: banking-quay-demo-config
+  namespace: quay-enterprise
+  labels:
+    app.kubernetes.io/part-of: banking-demo
+type: Opaque
+stringData:
+  config.yaml: |
+    FEATURE_USER_INITIALIZE: true
+    FEATURE_USER_CREATION: true
+    FEATURE_DIRECT_LOGIN: true
+    BROWSER_API_CALLS_XHR_ONLY: false
+    SUPER_USERS:
+      - quayadmin

@@ -1,35 +1,36 @@
 # Conjur PAT automation + secret sync demo
 
-## Gitea CI PAT in Conjur (automatic)
+## GitHub CI PAT in Conjur
 
-`scripts/bootstrap-acm.sh` installs Gitea on **acm**, seeds `banking/demo-spring` (Spring apps + GitOps), creates a CI user PAT, and writes it to Conjur:
+Jenkins pushes GitOps commits with credential id `github-ci`, synced from Conjur:
 
 | Conjur variable | Value |
 | --- | --- |
-| `banking/github-ci/username` | `git` (Gitea CI user) |
-| `banking/github-ci/token` | Gitea PAT (`write:repository`) |
+| `banking/github-ci/username` | GitHub login (e.g. `panchoraposo`) |
+| `banking/github-ci/token` | GitHub PAT / fine-grained token with **contents: write** on `panchoraposo/demo-spring` |
 
 ESO syncs Secret `banking-ci/github-ci` → Jenkins credential id `github-ci`.
 
-Re-run seed only:
+### Load / rotate PAT (automated)
 
 ```bash
-scripts/bootstrap-gitea.sh seed
-```
-
-## Rotate / override PAT manually
-
-```bash
-export GITEA_TOKEN=<pat>
-export GITEA_USERNAME=git
+# From env:
+export GITHUB_TOKEN=<pat>
+export GITHUB_USERNAME=panchoraposo
 scripts/set-conjur-github-pat.sh
+
+# Or reuse macOS/git credential helper for github.com:
+GITHUB_USERNAME=panchoraposo scripts/set-conjur-github-pat.sh
 ```
 
 What it does:
 
-1. Writes `banking/github-ci/{username,token}` in Conjur on **acm**
-2. Forces `ExternalSecret/github-ci` reconcile → Secret `banking-ci/github-ci`
-3. Restarts Jenkins so JCasC reloads credential id `github-ci`
+1. Validates the PAT against `https://api.github.com/repos/panchoraposo/demo-spring` (read + push)
+2. Writes `banking/github-ci/{username,token}` in Conjur on **acm**
+3. Forces `ExternalSecret/github-ci` reconcile → Secret `banking-ci/github-ci`
+4. Restarts Jenkins so JCasC reloads credential id `github-ci`
+
+Optional Gitea mode: `GIT_PROVIDER=gitea GITEA_TOKEN=... scripts/set-conjur-github-pat.sh`.
 
 ## Demo: change Conjur → ESO syncs K8s Secret
 
@@ -67,7 +68,7 @@ scripts/validate-quay-sign-rekor.sh api-gateway <BUILD_NUMBER>
 
 ```bash
 export REKOR_URL=$(oc --context acm -n trusted-artifact-signer get rekor -o jsonpath='{.items[0].status.url}')
-export QUAY_HOST=$(oc --context acm -n quay-enterprise get route -l quay-component=quay -o jsonpath='{.items[0].spec.host}')
+export QUAY_HOST=$(oc --context acm -n quay-enterprise get route -l quay-component=quay-app-route -o jsonpath='{.items[0].spec.host}')
 export IMAGE="${QUAY_HOST}/banking/banking-service:<tag>"
 
 # Pull cosign.pub from CI secret
