@@ -6,7 +6,7 @@ This demo targets three OpenShift clusters:
 
 | Cluster | Role |
 | --- | --- |
-| **acm** | RHACM hub, Conjur, Jenkins, ODF, Quay, RHTAS, TPA, hub Kiali |
+| **acm** | RHACM hub, Conjur, Keycloak, Jenkins, ODF, Quay, RHTAS, TPA, Dev Spaces, Kiali/promxy, credentials dashboard |
 | **east** / **west** | Managed clusters with GitOps, ESO, OSSM 3.4 ambient, PostgreSQL, Spring apps |
 
 Credentials are sourced from **CyberArk Conjur** on the hub via the **External Secrets Operator** on each cluster. Spring apps never talk to Conjur; they only mount Kubernetes Secrets that ESO materializes.
@@ -19,29 +19,75 @@ Credentials are sourced from **CyberArk Conjur** on the hub via the **External S
 - Realm `trustify` for TPA
 
 ```mermaid
-flowchart LR
-  ACM[RHACM on acm] --> E[east cluster]
-  ACM --> W[west cluster]
+flowchart TB
+  subgraph hub ["Cluster acm hub"]
+    RHACM[RHACM ApplicationSets]
+    GitOpsH[OpenShift GitOps]
+    Conjur[CyberArk Conjur]
+    ESOH[ESO hub]
+    Keycloak["RHBK Keycloak banking + trustify"]
+    Jenkins[Jenkins + BuildConfigs]
+    ODF[ODF MCG]
+    Quay[Red Hat Quay]
+    TAS[Trusted Artifact Signer]
+    TPA[Trusted Profile Analyzer]
+    RHDA[RHDA backend]
+    DevSpaces[Dev Spaces]
+    Kiali[Kiali MC + promxy]
+    Dash[Credentials dashboard]
+  end
 
-  Conjur[Conjur on acm] --> ESOE[ESO east]
-  Conjur --> ESOW[ESO west]
+  subgraph east ["Cluster east"]
+    GitOpsE[OpenShift GitOps]
+    ESOE[ESO]
+    MeshE[OSSM ambient]
+    GWE[api-gateway]
+    BSE[banking-service]
+    PGE[PostgreSQL 16]
+  end
 
-  Keycloak[Keycloak on acm] --> E
-  Keycloak --> W
+  subgraph west ["Cluster west"]
+    GitOpsW[OpenShift GitOps]
+    ESOW[ESO]
+    MeshW[OSSM ambient]
+    GWW[api-gateway]
+    BSW[banking-service]
+    PGW[PostgreSQL 16]
+  end
 
-  E --> GW_E[api-gateway]
-  GW_E --> BS_E[banking-service]
-  BS_E --> PG_E[PostgreSQL]
+  Client -->|JWT| Keycloak
+  Client --> GWE
+  Client --> GWW
+  GWE --> BSE
+  GWW --> BSW
+  BSE --> PGE
+  BSW --> PGW
+  BSE <-. mesh failover .-> BSW
 
-  W --> GW_W[api-gateway]
-  GW_W --> BS_W[banking-service]
-  BS_W --> PG_W[PostgreSQL]
+  RHACM --> GitOpsE
+  RHACM --> GitOpsW
+  Conjur --> ESOH
+  Conjur --> ESOE
+  Conjur --> ESOW
+  Keycloak --> GWE
+  Keycloak --> GWW
 
-  BS_E <---> BS_W
-
-  Jenkins[Jenkins on acm] --> Git[Git repository]
-  Git --> E
-  Git --> W
+  Dev[Developer] --> DevSpaces
+  DevSpaces --> RHDA
+  RHDA --> TPA
+  TPA --> Keycloak
+  Dev --> Jenkins
+  Jenkins --> Quay
+  Quay --> ODF
+  Jenkins --> TAS
+  Jenkins --> Git[Git repo]
+  Git --> GitOpsH
+  Git --> GitOpsE
+  Git --> GitOpsW
+  Quay --> BSE
+  Quay --> BSW
+  Kiali --> MeshE
+  Kiali --> MeshW
 ```
 
 ## Red Hat / catalog components

@@ -9,21 +9,75 @@ Multi-cluster layout: **acm** (RHACM hub — Conjur, Jenkins, ODF, Quay, Trusted
 ## Architecture
 
 ```mermaid
-flowchart LR
-  ACM[RHACM on acm] --> East[east cluster]
-  ACM --> West[west cluster]
-  Client --> Gateway[Spring Cloud Gateway]
-  Gateway --> Banking[Banking Service]
-  Banking --> PG[PostgreSQL 16]
-  Gateway --> Keycloak["RHBK OIDC hub"]
-  Dev[Developer] --> Jenkins[Jenkins on acm]
-  Jenkins --> Build[OpenShift Builds]
-  Build --> Quay["Quay SBOM sign attest"]
-  Quay --> TAS[Trusted Artifact Signer]
+flowchart TB
+  subgraph hub ["Cluster acm hub"]
+    RHACM[RHACM ApplicationSets]
+    GitOpsH[OpenShift GitOps]
+    Conjur[CyberArk Conjur]
+    ESOH[ESO hub]
+    Keycloak["RHBK Keycloak banking + trustify"]
+    Jenkins[Jenkins + BuildConfigs]
+    ODF[ODF MCG]
+    Quay[Red Hat Quay]
+    TAS[Trusted Artifact Signer]
+    TPA[Trusted Profile Analyzer]
+    RHDA[RHDA backend]
+    DevSpaces[Dev Spaces]
+    Kiali[Kiali MC + promxy]
+    Dash[Credentials dashboard]
+  end
+
+  subgraph east ["Cluster east"]
+    GitOpsE[OpenShift GitOps]
+    ESOE[ESO]
+    MeshE[OSSM ambient]
+    GWE[api-gateway]
+    BSE[banking-service]
+    PGE[PostgreSQL 16]
+  end
+
+  subgraph west ["Cluster west"]
+    GitOpsW[OpenShift GitOps]
+    ESOW[ESO]
+    MeshW[OSSM ambient]
+    GWW[api-gateway]
+    BSW[banking-service]
+    PGW[PostgreSQL 16]
+  end
+
+  Client -->|JWT| Keycloak
+  Client --> GWE
+  Client --> GWW
+  GWE --> BSE
+  GWW --> BSW
+  BSE --> PGE
+  BSW --> PGW
+  BSE <-. mesh failover .-> BSW
+
+  RHACM --> GitOpsE
+  RHACM --> GitOpsW
+  Conjur --> ESOH
+  Conjur --> ESOE
+  Conjur --> ESOW
+  Keycloak --> GWE
+  Keycloak --> GWW
+
+  Dev[Developer] --> DevSpaces
+  DevSpaces --> RHDA
+  RHDA --> TPA
+  TPA --> Keycloak
+  Dev --> Jenkins
+  Jenkins --> Quay
+  Quay --> ODF
+  Jenkins --> TAS
   Jenkins --> Git[Git repo]
-  Git --> East
-  Git --> West
-  DS[Dev Spaces on acm] --> RHDA["RHDA to TPA on acm"]
+  Git --> GitOpsH
+  Git --> GitOpsE
+  Git --> GitOpsW
+  Quay --> BSE
+  Quay --> BSW
+  Kiali --> MeshE
+  Kiali --> MeshW
 ```
 
 | Layer | Red Hat / catalog component |
