@@ -1,0 +1,8 @@
+---
+- name: Publish banking demo credentials dashboard
+  hosts: localhost
+  connection: local
+  gather_facts: false
+
+  roles:
+    - role: dashboard

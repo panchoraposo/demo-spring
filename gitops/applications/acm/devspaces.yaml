@@ -24,3 +24,10 @@ spec:
     syncOptions:
       - CreateNamespace=true
       - ServerSideApply=true
+  ignoreDifferences:
+    # Operator mutates annotations / defaults after apply.
+    - group: org.eclipse.che
+      kind: CheCluster
+      jqPathExpressions:
+        - .metadata.annotations
+        - .status

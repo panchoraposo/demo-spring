@@ -20,4 +20,5 @@
     - role: kiali_remote_secrets
     - role: promxy_tokens
     - role: postflight
+    - role: dashboard
 

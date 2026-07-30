@@ -1,11 +1,11 @@
 # ApplicationSet on hub OpenShift GitOps.
 # Prerequisites:
-# 1. ManagedClusters east/west labeled banking-demo/role=spoke and banking-demo/region=<name>
-# 2. Placement banking-spokes decides those clusters
-# 3. Hub Argo has cluster secrets for east/west (ACM GitOps Cluster addon or manual)
-# 4. OpenShift GitOps installed on each spoke (operators-spoke Subscription)
+# 1. ManagedClusters east/west labeled banking-demo/role=managed and banking-demo/region=<name>
+# 2. Hub Argo cluster secrets for east/west with the same banking-demo/role=managed label
+# 3. Placement banking-managed selects those clusters
+# 4. OpenShift GitOps installed on each managed cluster (operators-spoke / operators-managed)
 #
-# Each decision creates an Application that syncs gitops/applications/<cluster> to that cluster.
+# Generates Application banking-<name>-root syncing gitops/applications/<name> to that cluster.
 apiVersion: argoproj.io/v1alpha1
 kind: ApplicationSet
 metadata:

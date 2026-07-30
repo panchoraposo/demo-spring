@@ -28,6 +28,10 @@ Thumbs.db
 local.properties
 .mesh-certs/
 
+# Ansible rendered artifacts (may contain live passwords)
+ansible/playbooks/.generated/
+ansible/**/.rendered-*.yaml
+
 # Maven
 .mvn/wrapper/maven-wrapper.jar
 

@@ -1,0 +1,737 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Banking Demo · Access Dashboard</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet" />
+  <style>
+    :root {
+      --bg0: #0b1f2a;
+      --bg1: #123043;
+      --bg2: #1a3d52;
+      --surface: rgba(255, 255, 255, 0.06);
+      --surface-strong: rgba(255, 255, 255, 0.1);
+      --border: rgba(255, 255, 255, 0.12);
+      --text: #eef6f8;
+      --muted: #9db4c0;
+      --accent: #2ec4b6;
+      --accent-2: #3d8bfd;
+      --warn: #f4a261;
+      --ok: #7dcfb6;
+      --danger: #ef6f6c;
+      --radius: 18px;
+      --shadow: 0 18px 50px rgba(0, 0, 0, 0.28);
+      --font: "Outfit", system-ui, sans-serif;
+      --mono: "IBM Plex Mono", ui-monospace, monospace;
+    }
+
+    * { box-sizing: border-box; }
+    html { scroll-behavior: smooth; }
+    body {
+      margin: 0;
+      min-height: 100vh;
+      font-family: var(--font);
+      color: var(--text);
+      background:
+        radial-gradient(1000px 500px at 10% -10%, rgba(46, 196, 182, 0.28), transparent 55%),
+        radial-gradient(800px 420px at 90% 0%, rgba(61, 139, 253, 0.22), transparent 50%),
+        radial-gradient(700px 500px at 50% 110%, rgba(244, 162, 97, 0.12), transparent 45%),
+        linear-gradient(160deg, var(--bg0), var(--bg1) 45%, var(--bg2));
+      background-attachment: fixed;
+    }
+
+    .wrap {
+      width: min(1180px, calc(100% - 2rem));
+      margin: 0 auto;
+      padding: 2.5rem 0 4rem;
+    }
+
+    header.hero {
+      display: grid;
+      gap: 0.75rem;
+      margin-bottom: 2rem;
+      animation: rise 0.6s ease both;
+    }
+    .eyebrow {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.5rem;
+      width: fit-content;
+      padding: 0.35rem 0.75rem;
+      border-radius: 999px;
+      border: 1px solid var(--border);
+      background: var(--surface);
+      color: var(--accent);
+      font-size: 0.8rem;
+      font-weight: 600;
+      letter-spacing: 0.04em;
+      text-transform: uppercase;
+    }
+    .eyebrow::before {
+      content: "";
+      width: 0.45rem;
+      height: 0.45rem;
+      border-radius: 50%;
+      background: var(--accent);
+      box-shadow: 0 0 0 4px rgba(46, 196, 182, 0.2);
+    }
+    h1 {
+      margin: 0;
+      font-size: clamp(2rem, 4vw, 3rem);
+      font-weight: 700;
+      letter-spacing: -0.03em;
+      line-height: 1.1;
+    }
+    .lede {
+      margin: 0;
+      max-width: 52ch;
+      color: var(--muted);
+      font-size: 1.05rem;
+      line-height: 1.55;
+    }
+    .meta {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.75rem;
+      margin-top: 0.5rem;
+    }
+    .chip {
+      padding: 0.4rem 0.75rem;
+      border-radius: 999px;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      color: var(--muted);
+      font-size: 0.85rem;
+    }
+
+    nav.toc {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.5rem;
+      margin: 1.5rem 0 2rem;
+      animation: rise 0.7s ease both;
+    }
+    nav.toc a {
+      text-decoration: none;
+      color: var(--text);
+      padding: 0.45rem 0.85rem;
+      border-radius: 999px;
+      border: 1px solid var(--border);
+      background: rgba(0, 0, 0, 0.15);
+      font-size: 0.88rem;
+      font-weight: 500;
+      transition: background 0.2s, border-color 0.2s, transform 0.2s;
+    }
+    nav.toc a:hover {
+      background: var(--surface-strong);
+      border-color: rgba(46, 196, 182, 0.45);
+      transform: translateY(-1px);
+    }
+
+    section {
+      margin-bottom: 2.25rem;
+      animation: rise 0.75s ease both;
+    }
+    .section-head {
+      display: flex;
+      align-items: baseline;
+      justify-content: space-between;
+      gap: 1rem;
+      margin-bottom: 1rem;
+    }
+    .section-head h2 {
+      margin: 0;
+      font-size: 1.15rem;
+      font-weight: 600;
+      letter-spacing: -0.01em;
+    }
+    .section-head p {
+      margin: 0;
+      color: var(--muted);
+      font-size: 0.9rem;
+    }
+
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(12, 1fr);
+      gap: 1rem;
+    }
+    .card {
+      grid-column: span 6;
+      background: linear-gradient(180deg, rgba(255,255,255,0.09), rgba(255,255,255,0.04));
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      box-shadow: var(--shadow);
+      backdrop-filter: blur(10px);
+      overflow: hidden;
+      transition: transform 0.22s ease, border-color 0.22s ease;
+    }
+    .card:hover {
+      transform: translateY(-3px);
+      border-color: rgba(46, 196, 182, 0.35);
+    }
+    .card.span-4 { grid-column: span 4; }
+    .card.span-8 { grid-column: span 8; }
+    .card.span-12 { grid-column: span 12; }
+
+    .card-top {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 0.75rem;
+      padding: 1rem 1.15rem 0.65rem;
+    }
+    .title {
+      display: flex;
+      align-items: center;
+      gap: 0.7rem;
+      font-weight: 600;
+      font-size: 1.05rem;
+    }
+    .icon {
+      width: 2.1rem;
+      height: 2.1rem;
+      border-radius: 0.7rem;
+      display: grid;
+      place-items: center;
+      background: rgba(46, 196, 182, 0.15);
+      color: var(--accent);
+      font-size: 1rem;
+      flex-shrink: 0;
+    }
+    .icon.blue { background: rgba(61, 139, 253, 0.16); color: #8cbcff; }
+    .icon.warm { background: rgba(244, 162, 97, 0.16); color: #ffc089; }
+    .icon.ok { background: rgba(125, 207, 182, 0.16); color: var(--ok); }
+
+    .badge {
+      font-size: 0.72rem;
+      font-weight: 600;
+      letter-spacing: 0.04em;
+      text-transform: uppercase;
+      color: var(--muted);
+      border: 1px solid var(--border);
+      border-radius: 999px;
+      padding: 0.25rem 0.55rem;
+    }
+
+    .card-body { padding: 0.25rem 1.15rem 1.15rem; }
+    .rows { display: grid; gap: 0.55rem; margin: 0.75rem 0 1rem; }
+    .row {
+      display: grid;
+      grid-template-columns: 7.5rem 1fr auto;
+      gap: 0.5rem;
+      align-items: center;
+      padding: 0.55rem 0.7rem;
+      border-radius: 12px;
+      background: rgba(0, 0, 0, 0.18);
+      border: 1px solid rgba(255,255,255,0.05);
+    }
+    .label { color: var(--muted); font-size: 0.8rem; font-weight: 500; }
+    .value {
+      font-family: var(--mono);
+      font-size: 0.82rem;
+      word-break: break-all;
+      color: var(--text);
+    }
+    .value.secret { color: #ffb4c8; }
+    .note {
+      margin: 0 0 0.85rem;
+      color: var(--muted);
+      font-size: 0.88rem;
+      line-height: 1.45;
+    }
+
+    .actions { display: flex; flex-wrap: wrap; gap: 0.55rem; }
+    .btn {
+      appearance: none;
+      border: 0;
+      cursor: pointer;
+      text-decoration: none;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 0.4rem;
+      padding: 0.55rem 0.95rem;
+      border-radius: 999px;
+      font: inherit;
+      font-size: 0.88rem;
+      font-weight: 600;
+      transition: transform 0.15s ease, opacity 0.15s ease, background 0.15s ease;
+    }
+    .btn:hover { transform: translateY(-1px); }
+    .btn:active { transform: translateY(0); }
+    .btn-primary {
+      background: linear-gradient(135deg, var(--accent), #1fa89c);
+      color: #06241f;
+    }
+    .btn-ghost {
+      background: transparent;
+      color: var(--text);
+      border: 1px solid var(--border);
+    }
+    .btn-copy {
+      background: rgba(255,255,255,0.06);
+      color: var(--muted);
+      border: 1px solid var(--border);
+      padding: 0.3rem 0.55rem;
+      font-size: 0.75rem;
+      border-radius: 8px;
+    }
+    .btn-copy.copied { color: var(--ok); border-color: rgba(125, 207, 182, 0.45); }
+    .btn[aria-disabled="true"], .btn.disabled {
+      opacity: 0.45;
+      pointer-events: none;
+    }
+
+    footer {
+      margin-top: 2rem;
+      padding-top: 1.25rem;
+      border-top: 1px solid var(--border);
+      color: var(--muted);
+      font-size: 0.85rem;
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: space-between;
+      gap: 0.75rem;
+    }
+
+    @keyframes rise {
+      from { opacity: 0; transform: translateY(12px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+
+    @media (max-width: 900px) {
+      .card, .card.span-4, .card.span-8 { grid-column: span 12; }
+      .row { grid-template-columns: 1fr; gap: 0.25rem; }
+      .btn-copy { justify-self: start; }
+    }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <header class="hero">
+      <div class="eyebrow">Red Hat · Banking Demo</div>
+      <h1>Access &amp; credentials</h1>
+      <p class="lede">
+        One place for URLs and demo credentials across the hub (<code>acm</code>) and
+        managed clusters (<code>east</code> / <code>west</code>). Workshop defaults — rotate outside demos.
+      </p>
+      <div class="meta">
+        <span class="chip">Generated {{ generated_at }}</span>
+        {% if apps_domain %}<span class="chip">{{ apps_domain }}</span>{% endif %}
+      </div>
+    </header>
+
+    <nav class="toc" aria-label="Sections">
+      <a href="#identity">Identity</a>
+      <a href="#platform">Platform</a>
+      <a href="#devops">DevOps</a>
+      <a href="#security">Security</a>
+      <a href="#apps">Apps</a>
+      <a href="#clusters">Clusters</a>
+    </nav>
+
+    <section id="identity">
+      <div class="section-head">
+        <h2>Identity</h2>
+        <p>Keycloak on hub — banking + trustify realms</p>
+      </div>
+      <div class="grid">
+        <article class="card">
+          <div class="card-top">
+            <div class="title"><span class="icon">🔐</span> Keycloak Admin</div>
+            <span class="badge">Hub</span>
+          </div>
+          <div class="card-body">
+            <p class="note">Administration console for realms <strong>banking</strong> and <strong>trustify</strong>.</p>
+            <div class="rows">
+              <div class="row">
+                <span class="label">User</span>
+                <span class="value" data-copy>{{ keycloak_admin_user }}</span>
+                <button class="btn btn-copy" type="button" data-copy-btn>Copy</button>
+              </div>
+              <div class="row">
+                <span class="label">Password</span>
+                <span class="value secret" data-copy>{{ keycloak_admin_password }}</span>
+                <button class="btn btn-copy" type="button" data-copy-btn>Copy</button>
+              </div>
+            </div>
+            <div class="actions">
+              <a class="btn btn-primary{% if not keycloak_url %} disabled{% endif %}" {% if keycloak_url %}href="{{ keycloak_url }}" target="_blank" rel="noopener"{% else %}aria-disabled="true"{% endif %}>Open Keycloak</a>
+            </div>
+          </div>
+        </article>
+
+        <article class="card">
+          <div class="card-top">
+            <div class="title"><span class="icon ok">👤</span> Demo users</div>
+            <span class="badge">OIDC</span>
+          </div>
+          <div class="card-body">
+            <div class="rows">
+              <div class="row">
+                <span class="label">Banking</span>
+                <span class="value" data-copy>{{ banking_user }} / {{ banking_password }}</span>
+                <button class="btn btn-copy" type="button" data-copy-btn>Copy</button>
+              </div>
+              <div class="row">
+                <span class="label">Client</span>
+                <span class="value" data-copy>{{ banking_client }}</span>
+                <button class="btn btn-copy" type="button" data-copy-btn>Copy</button>
+              </div>
+              <div class="row">
+                <span class="label">TPA</span>
+                <span class="value" data-copy>{{ tpa_user }} / {{ tpa_password }}</span>
+                <button class="btn btn-copy" type="button" data-copy-btn>Copy</button>
+              </div>
+              <div class="row">
+                <span class="label">DB</span>
+                <span class="value secret" data-copy>{{ db_user }} / {{ db_password }}</span>
+                <button class="btn btn-copy" type="button" data-copy-btn>Copy</button>
+              </div>
+            </div>
+          </div>
+        </article>
+      </div>
+    </section>
+
+    <section id="platform">
+      <div class="section-head">
+        <h2>Platform</h2>
+        <p>GitOps, console, mesh observability, cloud IDE</p>
+      </div>
+      <div class="grid">
+        <article class="card span-4">
+          <div class="card-top">
+            <div class="title"><span class="icon blue">⎈</span> OpenShift</div>
+            <span class="badge">Console</span>
+          </div>
+          <div class="card-body">
+            <p class="note">Hub cluster console (kubeadmin / your SSO).</p>
+            <div class="actions">
+              <a class="btn btn-primary{% if not console_url %} disabled{% endif %}" {% if console_url %}href="{{ console_url }}" target="_blank" rel="noopener"{% else %}aria-disabled="true"{% endif %}>Open Console</a>
+            </div>
+          </div>
+        </article>
+
+        <article class="card span-4">
+          <div class="card-top">
+            <div class="title"><span class="icon">⟳</span> Argo CD</div>
+            <span class="badge">GitOps</span>
+          </div>
+          <div class="card-body">
+            <div class="rows">
+              <div class="row">
+                <span class="label">User</span>
+                <span class="value" data-copy>{{ argocd_admin_user }}</span>
+                <button class="btn btn-copy" type="button" data-copy-btn>Copy</button>
+              </div>
+              <div class="row">
+                <span class="label">Password</span>
+                <span class="value secret" data-copy>{{ argocd_admin_password }}</span>
+                <button class="btn btn-copy" type="button" data-copy-btn>Copy</button>
+              </div>
+            </div>
+            <div class="actions">
+              <a class="btn btn-primary{% if not argocd_url %} disabled{% endif %}" {% if argocd_url %}href="{{ argocd_url }}" target="_blank" rel="noopener"{% else %}aria-disabled="true"{% endif %}>Open Argo CD</a>
+            </div>
+          </div>
+        </article>
+
+        <article class="card span-4">
+          <div class="card-top">
+            <div class="title"><span class="icon warm">▦</span> Kiali</div>
+            <span class="badge">Mesh</span>
+          </div>
+          <div class="card-body">
+            <p class="note">Multi-cluster graph for <code>banking-apps</code> (promxy on hub).</p>
+            <div class="actions">
+              <a class="btn btn-primary{% if not kiali_url %} disabled{% endif %}" {% if kiali_url %}href="{{ kiali_url }}" target="_blank" rel="noopener"{% else %}aria-disabled="true"{% endif %}>Open Kiali</a>
+            </div>
+          </div>
+        </article>
+
+        <article class="card">
+          <div class="card-top">
+            <div class="title"><span class="icon blue">⌘</span> Dev Spaces</div>
+            <span class="badge">IDE</span>
+          </div>
+          <div class="card-body">
+            <p class="note">Cloud IDE on hub with RHDA → Trusted Profile Analyzer.</p>
+            <div class="actions">
+              <a class="btn btn-primary{% if not devspaces_url %} disabled{% endif %}" {% if devspaces_url %}href="{{ devspaces_url }}" target="_blank" rel="noopener"{% else %}aria-disabled="true"{% endif %}>Open Dev Spaces</a>
+            </div>
+          </div>
+        </article>
+
+        <article class="card">
+          <div class="card-top">
+            <div class="title"><span class="icon ok">◎</span> Trusted Profile Analyzer</div>
+            <span class="badge">TPA</span>
+          </div>
+          <div class="card-body">
+            <div class="rows">
+              <div class="row">
+                <span class="label">User</span>
+                <span class="value" data-copy>{{ tpa_user }}</span>
+                <button class="btn btn-copy" type="button" data-copy-btn>Copy</button>
+              </div>
+              <div class="row">
+                <span class="label">Password</span>
+                <span class="value secret" data-copy>{{ tpa_password }}</span>
+                <button class="btn btn-copy" type="button" data-copy-btn>Copy</button>
+              </div>
+            </div>
+            <div class="actions">
+              <a class="btn btn-primary{% if not tpa_url %} disabled{% endif %}" {% if tpa_url %}href="{{ tpa_url }}" target="_blank" rel="noopener"{% else %}aria-disabled="true"{% endif %}>Open TPA</a>
+            </div>
+          </div>
+        </article>
+      </div>
+    </section>
+
+    <section id="devops">
+      <div class="section-head">
+        <h2>DevOps</h2>
+        <p>Source control, CI, and container registry</p>
+      </div>
+      <div class="grid">
+        <article class="card">
+          <div class="card-top">
+            <div class="title"><span class="icon">⎇</span> Gitea</div>
+            <span class="badge">SCM</span>
+          </div>
+          <div class="card-body">
+            <div class="rows">
+              <div class="row">
+                <span class="label">User</span>
+                <span class="value" data-copy>{{ gitea_admin_user }}</span>
+                <button class="btn btn-copy" type="button" data-copy-btn>Copy</button>
+              </div>
+              <div class="row">
+                <span class="label">Password</span>
+                <span class="value secret" data-copy>{{ gitea_admin_password }}</span>
+                <button class="btn btn-copy" type="button" data-copy-btn>Copy</button>
+              </div>
+            </div>
+            <div class="actions">
+              <a class="btn btn-primary{% if not gitea_url %} disabled{% endif %}" {% if gitea_url %}href="{{ gitea_url }}" target="_blank" rel="noopener"{% else %}aria-disabled="true"{% endif %}>Open Gitea</a>
+            </div>
+          </div>
+        </article>
+
+        <article class="card">
+          <div class="card-top">
+            <div class="title"><span class="icon warm">⚒</span> Jenkins</div>
+            <span class="badge">CI</span>
+          </div>
+          <div class="card-body">
+            <div class="rows">
+              <div class="row">
+                <span class="label">User</span>
+                <span class="value" data-copy>{{ jenkins_admin_user }}</span>
+                <button class="btn btn-copy" type="button" data-copy-btn>Copy</button>
+              </div>
+              <div class="row">
+                <span class="label">Password</span>
+                <span class="value secret" data-copy>{{ jenkins_admin_password }}</span>
+                <button class="btn btn-copy" type="button" data-copy-btn>Copy</button>
+              </div>
+            </div>
+            <div class="actions">
+              <a class="btn btn-primary{% if not jenkins_url %} disabled{% endif %}" {% if jenkins_url %}href="{{ jenkins_url }}" target="_blank" rel="noopener"{% else %}aria-disabled="true"{% endif %}>Open Jenkins</a>
+            </div>
+          </div>
+        </article>
+
+        <article class="card span-12">
+          <div class="card-top">
+            <div class="title"><span class="icon blue">▣</span> Quay</div>
+            <span class="badge">Registry</span>
+          </div>
+          <div class="card-body">
+            <div class="rows">
+              <div class="row">
+                <span class="label">Admin</span>
+                <span class="value" data-copy>{{ quay_admin_user }} / {{ quay_admin_password }}</span>
+                <button class="btn btn-copy" type="button" data-copy-btn>Copy</button>
+              </div>
+              <div class="row">
+                <span class="label">Robot</span>
+                <span class="value secret" data-copy>{{ quay_robot_user }} / {{ quay_robot_password }}</span>
+                <button class="btn btn-copy" type="button" data-copy-btn>Copy</button>
+              </div>
+            </div>
+            <div class="actions">
+              <a class="btn btn-primary{% if not quay_url %} disabled{% endif %}" {% if quay_url %}href="{{ quay_url }}" target="_blank" rel="noopener"{% else %}aria-disabled="true"{% endif %}>Open Quay</a>
+            </div>
+          </div>
+        </article>
+      </div>
+    </section>
+
+    <section id="security">
+      <div class="section-head">
+        <h2>Security &amp; supply chain</h2>
+        <p>Secrets store and artifact signing</p>
+      </div>
+      <div class="grid">
+        <article class="card">
+          <div class="card-top">
+            <div class="title"><span class="icon">⛨</span> Conjur</div>
+            <span class="badge">Secrets</span>
+          </div>
+          <div class="card-body">
+            <div class="rows">
+              <div class="row">
+                <span class="label">Account</span>
+                <span class="value" data-copy>{{ conjur_account }}</span>
+                <button class="btn btn-copy" type="button" data-copy-btn>Copy</button>
+              </div>
+              <div class="row">
+                <span class="label">User</span>
+                <span class="value" data-copy>{{ conjur_admin_user }}</span>
+                <button class="btn btn-copy" type="button" data-copy-btn>Copy</button>
+              </div>
+              <div class="row">
+                <span class="label">API key</span>
+                <span class="value secret" data-copy>{{ conjur_admin_api_key }}</span>
+                <button class="btn btn-copy" type="button" data-copy-btn>Copy</button>
+              </div>
+            </div>
+            <div class="actions">
+              <a class="btn btn-primary{% if not conjur_url %} disabled{% endif %}" {% if conjur_url %}href="{{ conjur_url }}" target="_blank" rel="noopener"{% else %}aria-disabled="true"{% endif %}>Open Conjur</a>
+            </div>
+          </div>
+        </article>
+
+        <article class="card">
+          <div class="card-top">
+            <div class="title"><span class="icon ok">✎</span> RHTAS</div>
+            <span class="badge">Signing</span>
+          </div>
+          <div class="card-body">
+            <p class="note">Rekor search UI and TUF root for cosign / RHDA attestation flows.</p>
+            <div class="actions">
+              <a class="btn btn-primary{% if not rekor_url %} disabled{% endif %}" {% if rekor_url %}href="{{ rekor_url }}" target="_blank" rel="noopener"{% else %}aria-disabled="true"{% endif %}>Open Rekor UI</a>
+              <a class="btn btn-ghost{% if not tuf_url %} disabled{% endif %}" {% if tuf_url %}href="{{ tuf_url }}" target="_blank" rel="noopener"{% else %}aria-disabled="true"{% endif %}>TUF root</a>
+            </div>
+          </div>
+        </article>
+      </div>
+    </section>
+
+    <section id="apps">
+      <div class="section-head">
+        <h2>Demo applications</h2>
+        <p>API gateways on managed clusters</p>
+      </div>
+      <div class="grid">
+        <article class="card">
+          <div class="card-top">
+            <div class="title"><span class="icon">→</span> East gateway</div>
+            <span class="badge">east</span>
+          </div>
+          <div class="card-body">
+            <p class="note">Call with a banking JWT (<code>{{ banking_user }}</code> via Keycloak).</p>
+            {% if east_gateway_url %}
+            <div class="rows">
+              <div class="row">
+                <span class="label">URL</span>
+                <span class="value" data-copy>{{ east_gateway_url }}</span>
+                <button class="btn btn-copy" type="button" data-copy-btn>Copy</button>
+              </div>
+            </div>
+            {% endif %}
+            <div class="actions">
+              <a class="btn btn-primary{% if not east_gateway_url %} disabled{% endif %}" {% if east_gateway_url %}href="{{ east_gateway_url }}" target="_blank" rel="noopener"{% else %}aria-disabled="true"{% endif %}>Open East API</a>
+            </div>
+          </div>
+        </article>
+
+        <article class="card">
+          <div class="card-top">
+            <div class="title"><span class="icon">→</span> West gateway</div>
+            <span class="badge">west</span>
+          </div>
+          <div class="card-body">
+            <p class="note">Failover / multi-cluster path for the same banking APIs.</p>
+            {% if west_gateway_url %}
+            <div class="rows">
+              <div class="row">
+                <span class="label">URL</span>
+                <span class="value" data-copy>{{ west_gateway_url }}</span>
+                <button class="btn btn-copy" type="button" data-copy-btn>Copy</button>
+              </div>
+            </div>
+            {% endif %}
+            <div class="actions">
+              <a class="btn btn-primary{% if not west_gateway_url %} disabled{% endif %}" {% if west_gateway_url %}href="{{ west_gateway_url }}" target="_blank" rel="noopener"{% else %}aria-disabled="true"{% endif %}>Open West API</a>
+            </div>
+          </div>
+        </article>
+      </div>
+    </section>
+
+    <section id="clusters">
+      <div class="section-head">
+        <h2>Topology</h2>
+        <p>Quick reference</p>
+      </div>
+      <div class="grid">
+        <article class="card span-12">
+          <div class="card-top">
+            <div class="title"><span class="icon blue">◎</span> Clusters</div>
+            <span class="badge">RHACM</span>
+          </div>
+          <div class="card-body">
+            <div class="rows">
+              <div class="row">
+                <span class="label">Hub</span>
+                <span class="value">acm — GitOps, Keycloak, Conjur, Jenkins, Quay, Dev Spaces, TPA, Kiali</span>
+                <span></span>
+              </div>
+              <div class="row">
+                <span class="label">Managed</span>
+                <span class="value">east / west — mesh, banking-service, api-gateway, regional DB</span>
+                <span></span>
+              </div>
+            </div>
+          </div>
+        </article>
+      </div>
+    </section>
+
+    <footer>
+      <span>Banking Spring Demo · credentials dashboard</span>
+      <span>Do not use these passwords outside workshop environments.</span>
+    </footer>
+  </div>
+
+  <script>
+    document.querySelectorAll("[data-copy-btn]").forEach((btn) => {
+      btn.addEventListener("click", async () => {
+        const row = btn.closest(".row");
+        const el = row && row.querySelector("[data-copy]");
+        if (!el) return;
+        const text = el.textContent.trim();
+        try {
+          await navigator.clipboard.writeText(text);
+          btn.textContent = "Copied";
+          btn.classList.add("copied");
+          setTimeout(() => {
+            btn.textContent = "Copy";
+            btn.classList.remove("copied");
+          }, 1400);
+        } catch (_) {
+          btn.textContent = "Failed";
+          setTimeout(() => { btn.textContent = "Copy"; }, 1400);
+        }
+      });
+    });
+  </script>
+</body>
+</html>

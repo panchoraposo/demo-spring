@@ -21,10 +21,10 @@ oc --context acm apply -f gitops/bootstrap/acm-root.yaml -n openshift-gitops
 
 oc --context acm label managedcluster east \
   cluster.open-cluster-management.io/clusterset=banking-spokes \
-  banking-demo/role=spoke banking-demo/region=east --overwrite
+  banking-demo/role=managed banking-demo/region=east --overwrite
 oc --context acm label managedcluster west \
   cluster.open-cluster-management.io/clusterset=banking-spokes \
-  banking-demo/role=spoke banking-demo/region=west --overwrite
+  banking-demo/role=managed banking-demo/region=west --overwrite
 oc --context acm apply -k gitops/acm
 ```
 

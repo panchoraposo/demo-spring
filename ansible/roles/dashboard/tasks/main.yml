@@ -1,0 +1,116 @@
+---
+# Collect live URLs/credentials and publish a credentials dashboard on the hub.
+- name: Collect dashboard facts (oc)
+  ansible.builtin.command: "{{ role_path }}/files/collect_dashboard_facts.sh"
+  environment:
+    ACM_CONTEXT: "{{ acm_context }}"
+    EAST_CONTEXT: "{{ east_context }}"
+    WEST_CONTEXT: "{{ west_context }}"
+    KIALI_NAMESPACE: "{{ kiali_namespace | default('istio-system') }}"
+  register: dash_collect
+  changed_when: false
+
+- name: Parse collected dashboard facts
+  ansible.builtin.set_fact:
+    dash: "{{ dash_collect.stdout | from_json }}"
+
+- name: Build dashboard template variables (live values + demo defaults)
+  ansible.builtin.set_fact:
+    apps_domain: "{{ dash.apps_domain }}"
+    dashboard_hostname: "{{ dashboard_hostname | default('dashboard.' + (dash.apps_domain | default('apps.example.com'))) }}"
+    console_url: "{{ dash.console_url }}"
+    keycloak_url: "{{ dash.keycloak_url }}"
+    keycloak_admin_user: "{{ dash.keycloak_admin_user | default('', true) or 'admin' }}"
+    keycloak_admin_password: "{{ dash.keycloak_admin_password | default('', true) or 'admin-change-me' }}"
+    banking_user: teller
+    banking_password: teller-change-me
+    banking_client: banking-cli
+    tpa_user: tpaadmin
+    tpa_password: tpaadmin-change-me
+    tpa_url: "{{ dash.tpa_url }}"
+    argocd_url: "{{ dash.argocd_url }}"
+    argocd_admin_user: admin
+    argocd_admin_password: "{{ dash.argocd_admin_password | default('', true) or '(unavailable)' }}"
+    jenkins_url: "{{ dash.jenkins_url }}"
+    jenkins_admin_user: "{{ dash.jenkins_admin_user | default('', true) or 'admin' }}"
+    jenkins_admin_password: "{{ dash.jenkins_admin_password | default('', true) or '(unavailable)' }}"
+    gitea_url: "{{ dash.gitea_url }}"
+    gitea_admin_user: gitea_admin
+    gitea_admin_password: BankingGiteaChangeMe!
+    quay_url: "{{ dash.quay_url }}"
+    quay_admin_user: quayadmin
+    quay_admin_password: QuayAdminChangeMe1!
+    quay_robot_user: "{{ dash.quay_robot_user | default('', true) or 'banking+ci' }}"
+    quay_robot_password: "{{ dash.quay_robot_password | default('', true) or '(run scripts/bootstrap-quay-ci.sh)' }}"
+    conjur_url: "{{ dash.conjur_url }}"
+    conjur_account: banking
+    conjur_admin_user: admin
+    conjur_admin_api_key: "{{ dash.conjur_admin_api_key | default('', true) or '(retrieve via conjurctl)' }}"
+    kiali_url: "{{ dash.kiali_url }}"
+    devspaces_url: "{{ dash.devspaces_url }}"
+    rekor_url: "{{ dash.rekor_url }}"
+    tuf_url: "{{ dash.tuf_url }}"
+    east_gateway_url: "{{ dash.east_gateway_url }}"
+    west_gateway_url: "{{ dash.west_gateway_url }}"
+    db_user: banking
+    db_password: banking-demo-change-me
+    generated_at: "{{ lookup('pipe', 'date -u +%Y-%m-%dT%H:%M:%SZ') }}"
+
+- name: Ensure generated output directory
+  ansible.builtin.file:
+    path: "{{ playbook_dir }}/.generated"
+    state: directory
+    mode: "0755"
+
+- name: Render dashboard HTML
+  ansible.builtin.template:
+    src: demo-dashboard.html.j2
+    dest: "{{ playbook_dir }}/.generated/dashboard.html"
+    mode: "0644"
+
+- name: Ensure dashboard namespace
+  ansible.builtin.command: >
+    oc --context "{{ acm_context }}" create namespace dashboard
+  register: dash_ns
+  changed_when: dash_ns.rc == 0
+  failed_when: dash_ns.rc != 0 and ('AlreadyExists' not in dash_ns.stderr)
+
+- name: Apply dashboard ConfigMap from rendered HTML
+  ansible.builtin.shell: |
+    set -euo pipefail
+    oc --context "{{ acm_context }}" -n dashboard create configmap dashboard-html \
+      --from-file=index.html="{{ playbook_dir }}/.generated/dashboard.html" \
+      --dry-run=client -o yaml | oc --context "{{ acm_context }}" apply -f -
+  args:
+    executable: /bin/bash
+  changed_when: true
+
+- name: Render dashboard Deployment/Service/Route
+  ansible.builtin.template:
+    src: dashboard-manifests.yaml.j2
+    dest: "{{ playbook_dir }}/.generated/dashboard-manifests.yaml"
+    mode: "0644"
+
+- name: Apply dashboard Deployment/Service/Route
+  ansible.builtin.command: >
+    oc --context "{{ acm_context }}" apply -f "{{ playbook_dir }}/.generated/dashboard-manifests.yaml"
+  changed_when: true
+
+- name: Restart dashboard pods to pick up ConfigMap changes
+  ansible.builtin.command: >
+    oc --context "{{ acm_context }}" -n dashboard rollout restart deploy/dashboard
+  changed_when: true
+  failed_when: false
+
+- name: Wait for dashboard route
+  ansible.builtin.command: >
+    oc --context "{{ acm_context }}" -n dashboard get route dashboard -o jsonpath='{.spec.host}'
+  register: dashboard_route_host
+  changed_when: false
+  retries: 12
+  delay: 5
+  until: dashboard_route_host.stdout | length > 0
+
+- name: Installation finished — open the credentials dashboard
+  ansible.builtin.debug:
+    msg: "Banking Demo Dashboard → https://{{ dashboard_route_host.stdout }}"
