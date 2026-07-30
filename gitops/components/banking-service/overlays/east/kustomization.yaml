@@ -10,7 +10,8 @@ resources:
 
 images:
   - name: image-registry.openshift-image-registry.svc:5000/banking-apps/banking-service
-    newTag: 7
+    newName: banking-quay-quay-quay-enterprise.apps.cluster-k7kqp.k7kqp.sandbox3321.opentlc.com/banking/banking-service
+    newTag: 11
 
 commonLabels:
   cluster: east
