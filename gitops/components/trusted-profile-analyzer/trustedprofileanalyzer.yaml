@@ -30,6 +30,10 @@ spec:
   tracing:
     enabled: false
 
+  oidc:
+    # UI requests these scopes from Keycloak; `read:document` is required for dashboards/APIs.
+    uiScope: "openid read:document"
+
   # Init/migrations are expected at the top-level by the chart templates.
   createDatabase:
     enabled: true

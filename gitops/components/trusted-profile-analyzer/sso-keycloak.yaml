@@ -37,6 +37,19 @@ data:
           "implicitFlowEnabled": false,
           "directAccessGrantsEnabled": true,
           "serviceAccountsEnabled": false,
+          "defaultClientScopes": [
+            "profile",
+            "email",
+            "roles",
+            "web-origins",
+            "read:document"
+          ],
+          "optionalClientScopes": [
+            "create:document",
+            "update:document",
+            "delete:document",
+            "offline_access"
+          ],
           "redirectUris": [
             "https://server.apps.cluster-k7kqp.k7kqp.sandbox3321.opentlc.com/*"
           ],
@@ -52,6 +65,16 @@ data:
           "standardFlowEnabled": false,
           "directAccessGrantsEnabled": false,
           "serviceAccountsEnabled": true,
+          "defaultClientScopes": [
+            "profile",
+            "email",
+            "roles",
+            "web-origins",
+            "read:document",
+            "create:document",
+            "update:document",
+            "delete:document"
+          ],
           "clientAuthenticatorType": "client-secret",
           "secret": "replace-me-oidc-client-secret"
         }
