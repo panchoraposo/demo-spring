@@ -167,6 +167,7 @@ metadata:
   labels:
     app.kubernetes.io/name: tpa-sso
 spec:
+  host: sso.apps.cluster-k7kqp.k7kqp.sandbox3321.opentlc.com
   to:
     kind: Service
     name: tpa-sso
