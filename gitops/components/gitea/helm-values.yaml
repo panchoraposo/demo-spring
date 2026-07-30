@@ -72,7 +72,8 @@ gitea:
       DOMAIN: gitea-banking-git.apps.cluster-k7kqp.k7kqp.sandbox3321.opentlc.com
       SSH_DOMAIN: gitea-banking-git.apps.cluster-k7kqp.k7kqp.sandbox3321.opentlc.com
       ROOT_URL: https://gitea-banking-git.apps.cluster-k7kqp.k7kqp.sandbox3321.opentlc.com/
-      PROTOCOL: https
+      # OpenShift Route terminates TLS; Gitea listens HTTP in-cluster.
+      PROTOCOL: http
     service:
       DISABLE_REGISTRATION: true
       REQUIRE_SIGNIN_VIEW: false
