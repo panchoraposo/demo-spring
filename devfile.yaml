@@ -39,7 +39,7 @@ commands:
     exec:
       component: tools
       workingDir: ${PROJECT_SOURCE}/apps/banking-service
-      commandLine: ./mvnw -B -DskipTests package
+      commandLine: mvn -B -DskipTests package
       group:
         kind: build
         isDefault: true
@@ -47,14 +47,14 @@ commands:
     exec:
       component: tools
       workingDir: ${PROJECT_SOURCE}/apps/api-gateway
-      commandLine: ./mvnw -B -DskipTests package
+      commandLine: mvn -B -DskipTests package
       group:
         kind: build
   - id: run-banking-service
     exec:
       component: tools
       workingDir: ${PROJECT_SOURCE}/apps/banking-service
-      commandLine: ./mvnw -B spring-boot:run
+      commandLine: mvn -B spring-boot:run
       group:
         kind: run
         isDefault: true
@@ -62,9 +62,6 @@ commands:
     exec:
       component: tools
       workingDir: ${PROJECT_SOURCE}/apps/api-gateway
-      commandLine: ./mvnw -B spring-boot:run -Dspring-boot.run.arguments=--server.port=8081
+      commandLine: mvn -B spring-boot:run -Dspring-boot.run.arguments=--server.port=8081
       group:
         kind: run
-events:
-  postStart:
-    - build-banking-service

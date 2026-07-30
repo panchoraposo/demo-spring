@@ -19,48 +19,29 @@ Credentials are sourced from **CyberArk Conjur** on the hub via the **External S
 - Realm `trustify` for TPA
 
 ```mermaid
-flowchart TB
-  subgraph acmHub [Cluster acm]
-    ACM[RHACM ApplicationSets]
-    Conjur[CyberArk Conjur]
-    Jenkins[Jenkins CI]
-    KialiHub[Kiali multi-cluster]
-  end
+flowchart LR
+  ACM[RHACM on acm] --> E[east cluster]
+  ACM --> W[west cluster]
 
-  subgraph eastCluster [Cluster east]
-    ArgoE[OpenShift GitOps]
-    MeshE[OSSM 3.4 ambient]
-    PGE[(PostgreSQL)]
-    KCE[Keycloak (hub)]
-    GWE[api-gateway]
-    BSE[banking-service]
-  end
+  Conjur[Conjur on acm] --> ESOE[ESO east]
+  Conjur --> ESOW[ESO west]
 
-  subgraph westCluster [Cluster west]
-    ArgoW[OpenShift GitOps]
-    MeshW[OSSM 3.4 ambient]
-    PGW[(PostgreSQL)]
-    KCW[Keycloak (hub)]
-    GWW[api-gateway]
-    BSW[banking-service]
-  end
+  Keycloak[Keycloak on acm] --> E
+  Keycloak --> W
 
-  ACM --> ArgoE
-  ACM --> ArgoW
-  Conjur --> ESO_E[ESO east]
-  Conjur --> ESO_W[ESO west]
-  GWE --> BSE
-  BSE --> PGE
-  GWE --> KCE
-  BSE --> KCE
-  GWW --> BSW
-  BSW --> PGW
-  GWW --> KCW
-  BSW --> KCW
-  MeshE <-->|HBONE peering| MeshW
-  Jenkins -->|newTag east+west| GitRepo[Git repository]
-  GitRepo --> ArgoE
-  GitRepo --> ArgoW
+  E --> GW_E[api-gateway]
+  GW_E --> BS_E[banking-service]
+  BS_E --> PG_E[PostgreSQL]
+
+  W --> GW_W[api-gateway]
+  GW_W --> BS_W[banking-service]
+  BS_W --> PG_W[PostgreSQL]
+
+  BS_E <---> BS_W
+
+  Jenkins[Jenkins on acm] --> Git[Git repository]
+  Git --> E
+  Git --> W
 ```
 
 ## Red Hat / catalog components
