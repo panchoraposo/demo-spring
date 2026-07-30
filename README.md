@@ -15,15 +15,15 @@ flowchart LR
   Client --> Gateway[Spring Cloud Gateway]
   Gateway --> Banking[Banking Service]
   Banking --> PG[PostgreSQL 16]
-  Gateway --> Keycloak[RHBK OIDC (hub)]
+  Gateway --> Keycloak["RHBK OIDC hub"]
   Dev[Developer] --> Jenkins[Jenkins on acm]
   Jenkins --> Build[OpenShift Builds]
-  Build --> Quay[Quay + SBOM/sign/att]
+  Build --> Quay["Quay SBOM sign attest"]
   Quay --> TAS[Trusted Artifact Signer]
   Jenkins --> Git[Git repo]
   Git --> East
   Git --> West
-  DS[Dev Spaces on acm] --> RHDA[RHDA → TPA on acm]
+  DS[Dev Spaces on acm] --> RHDA["RHDA to TPA on acm"]
 ```
 
 | Layer | Red Hat / catalog component |
