@@ -37,7 +37,7 @@ metadata:
 spec:
   project: default
   sources:
-    - repoURL: oci://docker.gitea.com/charts
+    - repoURL: oci://docker.gitea.com/charts/gitea
       chart: gitea
       targetRevision: 12.7.0
       helm:
