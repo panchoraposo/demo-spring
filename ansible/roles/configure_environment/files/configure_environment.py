@@ -134,13 +134,19 @@ def main() -> int:
             root / f"gitops/components/external-secrets/overlays/{cluster}/env/conjur.env",
             [f"CONJUR_URL_SPOKE={conjur_url}"],
         )
+        jwk = f"{keycloak_issuer}/protocol/openid-connect/certs"
         write_env(
             root / f"gitops/components/banking-service/overlays/{cluster}/env/banking-service.env",
-            [f"KEYCLOAK_ISSUER={keycloak_issuer}", f"OIDC_TRUSTED_ISSUERS={keycloak_issuer}"],
+            [
+                f"KEYCLOAK_ISSUER={keycloak_issuer}",
+                f"OIDC_TRUSTED_ISSUERS={keycloak_issuer}",
+                f"BANKING_CLUSTER={cluster}",
+                f"KEYCLOAK_JWK_SET_URI={jwk}",
+            ],
         )
         write_env(
             root / f"gitops/components/api-gateway/overlays/{cluster}/env/api-gateway.env",
-            [f"KEYCLOAK_ISSUER={keycloak_issuer}"],
+            [f"KEYCLOAK_ISSUER={keycloak_issuer}", f"KEYCLOAK_JWK_SET_URI={jwk}"],
         )
 
     write_env(

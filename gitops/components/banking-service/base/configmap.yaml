@@ -11,3 +11,5 @@ data:
   # Mesh failover: accept JWTs issued by either spoke Keycloak (comma-separated).
   # Patched per environment.
   OIDC_TRUSTED_ISSUERS: https://sso.apps.example.com/realms/banking
+  # Surfaced as X-Banking-Cluster by ClusterIdentityFilter (east|west).
+  BANKING_CLUSTER: unknown

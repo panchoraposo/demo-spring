@@ -1,10 +1,13 @@
 #!/usr/bin/env bash
 # Live demo: banking APIs + mesh failover, with Kiali on the ACM hub.
 #
+# Screen stays compact (one status line). Verbose request/response details go to
+# a log file you can open if needed — keep the terminal + Kiali visible.
+#
 # Presenter flow (press Enter between steps):
-#   1) Open Kiali (east+west topology)
+#   1) Open Kiali (east+west topology, namespaces banking-apps + banking-db)
 #   2) Start continuous traffic via east api-gateway
-#   3) "Lose" east banking-service (scale to 0) — mesh should fail over to west
+#   3) Drain east banking-service — mesh fails over to west (API stays 200)
 #   4) Recover
 #
 # Usage:
@@ -16,10 +19,11 @@
 #   ./scripts/demo-mesh-failover.sh status
 #
 # Env:
-#   FAIL_CLUSTER=east          # spoke whose banking-service is drained
-#   ENTRY_CLUSTER=east         # spoke whose api-gateway / Keycloak the client uses
+#   FAIL_CLUSTER=east          # cluster whose banking-service is drained
+#   ENTRY_CLUSTER=east         # cluster whose api-gateway the client uses
 #   HUB_CONTEXT=acm
 #   INTERVAL=1                 # seconds between API calls
+#   DETAIL_LOG=./.demo-failover.log
 set -euo pipefail
 
 HUB_CONTEXT="${HUB_CONTEXT:-acm}"
@@ -28,9 +32,11 @@ ENTRY_CLUSTER="${ENTRY_CLUSTER:-east}"
 PEER_CLUSTER="${PEER_CLUSTER:-}"
 INTERVAL="${INTERVAL:-1}"
 BANKING_NS="${BANKING_NS:-banking-apps}"
+DB_NS="${DB_NS:-banking-db}"
 CLIENT_ID="${BANKING_CLIENT_ID:-banking-cli}"
 USER="${BANKING_USER:-teller}"
 PASS="${BANKING_PASSWORD:-teller-change-me}"
+DETAIL_LOG="${DETAIL_LOG:-$(pwd)/.demo-failover.log}"
 
 if [[ -z "${PEER_CLUSTER}" ]]; then
   if [[ "${FAIL_CLUSTER}" == "east" ]]; then PEER_CLUSTER=west; else PEER_CLUSTER=east; fi
@@ -52,6 +58,11 @@ banner() {
   echo "════════════════════════════════════════════════════════"
 }
 
+detail() {
+  # Full detail for the log file only (not the presenter screen).
+  printf '%s\n' "$*" >> "${DETAIL_LOG}"
+}
+
 kiali_url() {
   local host
   host="$(oc --context "${HUB_CONTEXT}" -n istio-system get route kiali -o jsonpath='{.spec.host}' 2>/dev/null || true)"
@@ -66,9 +77,31 @@ gateway_url() {
 }
 
 keycloak_url() {
+  # Prefer explicit URL; else hub Route; else issuer host from a known managed-cluster ConfigMap.
+  if [[ -n "${KEYCLOAK_URL:-}" ]]; then
+    echo "${KEYCLOAK_URL}"
+    return
+  fi
+  local host
+  host="$(oc --context "${HUB_CONTEXT}" -n banking-idp get route sso -o jsonpath='{.spec.host}' 2>/dev/null || true)"
+  if [[ -z "${host}" ]]; then
+    host="$(oc --context "${ENTRY_CLUSTER}" -n "${BANKING_NS}" get cm api-gateway-config \
+      -o jsonpath='{.data.SPRING_SECURITY_OAUTH2_RESOURCESERVER_JWT_ISSUER_URI}' 2>/dev/null \
+      | sed -E 's|^https?://||; s|/realms/.*||')"
+  fi
+  echo "https://${host}"
+}
+
+replicas() {
   local ctx="$1"
-  # Single IdP on the hub (acm): banking-idp/sso
-  echo "https://$(oc --context "${HUB_CONTEXT}" -n banking-idp get route sso -o jsonpath='{.spec.host}')"
+  oc --context "${ctx}" -n "${BANKING_NS}" get deploy banking-service \
+    -o jsonpath='{.status.readyReplicas}' 2>/dev/null || echo 0
+}
+
+ns_mesh_label() {
+  local ctx="$1" ns="$2"
+  oc --context "${ctx}" get ns "${ns}" \
+    -o jsonpath='{.metadata.labels.istio\.io/dataplane-mode}' 2>/dev/null || true
 }
 
 get_token() {
@@ -80,14 +113,41 @@ get_token() {
     -d "grant_type=password" | jq -r '.access_token // empty'
 }
 
+# Returns: code|cluster|bytes|snippet  (cluster from X-Banking-Cluster when present)
 call_customers() {
   local gw="$1" token="$2"
-  local code body
+  local hdrs body code cluster bytes snippet
+  hdrs="$(mktemp)"
   body="$(mktemp)"
-  code="$(curl -sk -o "${body}" -w '%{http_code}' -H "Authorization: Bearer ${token}" \
+  code="$(curl -sk -D "${hdrs}" -o "${body}" -w '%{http_code}' \
+    -H "Authorization: Bearer ${token}" \
+    -H "Accept: application/json" \
     "${gw}/api/v1/customers" || echo 000)"
-  echo "${code}"
-  rm -f "${body}"
+  cluster="$(awk 'BEGIN{IGNORECASE=1} /^X-Banking-Cluster:/{gsub(/\r/,""); sub(/^[^:]+:[[:space:]]*/,""); print; exit}' "${hdrs}")"
+  [[ -n "${cluster}" ]] || cluster="?"
+  bytes="$(wc -c < "${body}" | tr -d ' ')"
+  snippet="$(head -c 120 "${body}" | tr '\n' ' ')"
+  count="$(jq -r 'if type=="array" then length else "?" end' "${body}" 2>/dev/null || echo "?")"
+  detail "---- $(date -u +%Y-%m-%dT%H:%M:%SZ) GET ${gw}/api/v1/customers"
+  detail "HTTP ${code}  X-Banking-Cluster=${cluster}  customers=${count}  bytes=${bytes}"
+  detail "body: ${snippet}"
+  detail "headers:"
+  detail "$(grep -E -i '^(HTTP/|x-banking-cluster:|content-type:|server:|x-envoy)' "${hdrs}" | tr -d '\r' || true)"
+  rm -f "${hdrs}" "${body}"
+  printf '%s|%s|%s|%s\n' "${code}" "${cluster}" "${count}" "${snippet}"
+}
+
+# Compact single-line status for the presenter screen.
+# args: code cluster customers phase
+show_line() {
+  local code="$1" cluster="$2" customers="$3" phase="$4"
+  local east_r west_r
+  east_r="$(replicas east)"
+  west_r="$(replicas west)"
+  # Clear line + print (works in demos without flooding scrollback)
+  printf '\r\033[K[%s] %s  HTTP %-3s  svc=%-5s  customers=%-3s  east_ready=%s west_ready=%s' \
+    "$(date +%H:%M:%S)" "${phase}" "${code}" "${cluster}" "${customers}" \
+    "${east_r:-0}" "${west_r:-0}"
 }
 
 pause_argo() {
@@ -102,68 +162,84 @@ resume_argo() {
     --type merge -p '{"spec":{"syncPolicy":{"automated":{"prune":true,"selfHeal":true}}}}' >/dev/null 2>&1 || true
 }
 
+init_log() {
+  mkdir -p "$(dirname "${DETAIL_LOG}")"
+  : > "${DETAIL_LOG}"
+  detail "demo-mesh-failover detail log started $(date -u +%Y-%m-%dT%H:%M:%SZ)"
+  detail "entry=${ENTRY_CLUSTER} fail=${FAIL_CLUSTER} peer=${PEER_CLUSTER}"
+}
+
 cmd_preflight() {
+  init_log
   banner "Preflight"
   local kiali
   kiali="$(kiali_url)"
-  echo "Kiali (hub):     ${kiali:-MISSING — run scripts/mesh/sync-kiali-multicluster-secrets.sh}"
-  echo "Entry cluster:   ${ENTRY_CLUSTER}  gateway=$(gateway_url "${ENTRY_CLUSTER}")"
-  echo "Fail cluster:    ${FAIL_CLUSTER}"
-  echo "Peer cluster:    ${PEER_CLUSTER}  gateway=$(gateway_url "${PEER_CLUSTER}")"
+  echo "Kiali (hub):   ${kiali:-MISSING}"
+  echo "Detail log:    ${DETAIL_LOG}"
+  echo "Entry gateway: $(gateway_url "${ENTRY_CLUSTER}")"
+  echo "Fail / peer:   ${FAIL_CLUSTER} → ${PEER_CLUSTER}"
+  echo
 
-  for ctx in "${ENTRY_CLUSTER}" "${PEER_CLUSTER}"; do
-    local ready
-    ready="$(oc --context "${ctx}" -n "${BANKING_NS}" get deploy banking-service \
-      -o jsonpath='{.status.readyReplicas}' 2>/dev/null || echo 0)"
-    echo "banking-service/${ctx}: readyReplicas=${ready:-0}"
+  local ctx ns mode
+  for ctx in east west; do
+    for ns in "${BANKING_NS}" "${DB_NS}"; do
+      mode="$(ns_mesh_label "${ctx}" "${ns}")"
+      printf '  %-5s ns/%-12s dataplane-mode=%s\n' "${ctx}" "${ns}" "${mode:-unset}"
+      if [[ "${mode}" != "ambient" ]]; then
+        echo "    WARN: expected istio.io/dataplane-mode=ambient for mTLS" >&2
+      fi
+    done
+    printf '  %-5s banking-service readyReplicas=%s\n' "${ctx}" "$(replicas "${ctx}")"
   done
 
-  local secrets
-  secrets="$(oc --context "${HUB_CONTEXT}" -n istio-system get secret \
-    -l kiali.io/multiCluster=true -o name 2>/dev/null | wc -l | tr -d ' ')"
-  echo "Kiali remote secrets: ${secrets}"
-
-  local tok
-  tok="$(get_token "$(keycloak_url "${ENTRY_CLUSTER}")")"
-  [[ -n "${tok}" ]] || { echo "FAIL: cannot get JWT from ${ENTRY_CLUSTER} Keycloak" >&2; exit 1; }
-  local code
-  code="$(call_customers "$(gateway_url "${ENTRY_CLUSTER}")" "${tok}")"
-  echo "Baseline GET /api/v1/customers via ${ENTRY_CLUSTER}: HTTP ${code}"
-  [[ "${code}" =~ ^2 ]] || { echo "FAIL: baseline API not healthy" >&2; exit 1; }
-  echo "OK"
+  local tok result code cluster
+  tok="$(get_token "$(keycloak_url)")"
+  [[ -n "${tok}" ]] || { echo "FAIL: cannot get JWT from hub Keycloak" >&2; exit 1; }
+  result="$(call_customers "$(gateway_url "${ENTRY_CLUSTER}")" "${tok}")"
+  code="${result%%|*}"
+  cluster="$(echo "${result}" | cut -d'|' -f2)"
+  echo
+  echo "Baseline via ${ENTRY_CLUSTER}: HTTP ${code}  X-Banking-Cluster=${cluster}"
+  [[ "${code}" =~ ^2 ]] || { echo "FAIL: baseline API not healthy (see ${DETAIL_LOG})" >&2; exit 1; }
+  echo "OK — open Kiali graph for banking-apps (and banking-db for DB mTLS edges)."
 }
 
 cmd_status() {
   banner "Status"
   echo "Kiali: $(kiali_url)"
+  echo "Log:   ${DETAIL_LOG}"
   for ctx in east west; do
-    printf '%-6s banking-service replicas=%s ready=%s\n' "${ctx}" \
-      "$(oc --context "${ctx}" -n "${BANKING_NS}" get deploy banking-service -o jsonpath='{.spec.replicas}' 2>/dev/null || echo '?')" \
-      "$(oc --context "${ctx}" -n "${BANKING_NS}" get deploy banking-service -o jsonpath='{.status.readyReplicas}' 2>/dev/null || echo '?')"
+    printf '%-6s banking-service ready=%s  apps_mesh=%s  db_mesh=%s\n' "${ctx}" \
+      "$(replicas "${ctx}")" \
+      "$(ns_mesh_label "${ctx}" "${BANKING_NS}")" \
+      "$(ns_mesh_label "${ctx}" "${DB_NS}")"
   done
-  local tok code
-  tok="$(get_token "$(keycloak_url "${ENTRY_CLUSTER}")")"
-  code="$(call_customers "$(gateway_url "${ENTRY_CLUSTER}")" "${tok}")"
-  echo "Entry ${ENTRY_CLUSTER} API: HTTP ${code}"
-  tok="$(get_token "$(keycloak_url "${PEER_CLUSTER}")")"
-  code="$(call_customers "$(gateway_url "${PEER_CLUSTER}")" "${tok}")"
-  echo "Peer  ${PEER_CLUSTER} API: HTTP ${code}"
+  local tok result
+  tok="$(get_token "$(keycloak_url)")"
+  result="$(call_customers "$(gateway_url "${ENTRY_CLUSTER}")" "${tok}")"
+  echo "Entry API: HTTP ${result%%|*}  cluster=$(echo "${result}" | cut -d'|' -f2)"
 }
 
 traffic_loop() {
-  local label="$1" gw="$2" kc="$3"
-  local tok code ok=0 fail=0
+  local phase="$1" gw="$2" kc="$3"
+  local tok result code cluster ok=0 fail=0
   tok="$(get_token "${kc}")"
-  [[ -n "${tok}" ]] || { echo "[${label}] no token"; return 1; }
+  [[ -n "${tok}" ]] || { echo "[${phase}] no token"; return 1; }
+  echo "Traffic → ${gw}"
+  echo "Screen: one status line | details → ${DETAIL_LOG}"
+  echo "CTRL+C to stop."
+  echo
   while true; do
-    code="$(call_customers "${gw}" "${tok}")"
+    result="$(call_customers "${gw}" "${tok}")"
+    code="${result%%|*}"
+    cluster="$(echo "${result}" | cut -d'|' -f2)"
+    customers="$(echo "${result}" | cut -d'|' -f3)"
     if [[ "${code}" =~ ^2 ]]; then
       ok=$((ok + 1))
-      printf '[%s] %s HTTP %s  ok=%d fail=%d\n' "$(date +%H:%M:%S)" "${label}" "${code}" "${ok}" "${fail}"
+      show_line "${code}" "${cluster}" "${customers}" "${phase} ok=${ok}"
     else
       fail=$((fail + 1))
-      printf '[%s] %s HTTP %s  ok=%d fail=%d  ← check Kiali graph\n' "$(date +%H:%M:%S)" "${label}" "${code}" "${ok}" "${fail}"
-      # refresh token on auth failures
+      show_line "${code}" "${cluster}" "${customers}" "${phase} FAIL=${fail}"
       if [[ "${code}" == "401" || "${code}" == "403" ]]; then
         tok="$(get_token "${kc}")"
       fi
@@ -173,52 +249,54 @@ traffic_loop() {
 }
 
 cmd_traffic() {
+  init_log
   banner "Traffic — watch Kiali"
-  local kiali gw kc
+  local kiali
   kiali="$(kiali_url)"
-  gw="$(gateway_url "${ENTRY_CLUSTER}")"
-  kc="$(keycloak_url "${ENTRY_CLUSTER}")"
-  echo "Open Kiali → Applications → banking-apps → banking-service"
-  echo "  ${kiali}"
-  echo "  Graph: namespace=banking-apps  versioned app graph  clusters=east,west"
+  echo "Kiali: ${kiali}"
+  echo "Graph tip: namespaces banking-apps (+ banking-db), clusters east+west"
   echo
-  echo "Traffic via ${ENTRY_CLUSTER} gateway (mesh → banking-service)."
-  echo "CTRL+C to stop."
-  echo
-  traffic_loop "${ENTRY_CLUSTER}" "${gw}" "${kc}"
+  traffic_loop "traffic" "$(gateway_url "${ENTRY_CLUSTER}")" "$(keycloak_url)"
 }
 
 cmd_fail() {
+  init_log
   banner "FAIL — drain banking-service on ${FAIL_CLUSTER}"
-  echo "Pausing ArgoCD self-heal on ${FAIL_CLUSTER}/banking-service..."
+  echo "Pausing Argo self-heal; scaling ${FAIL_CLUSTER}/banking-service → 0"
   pause_argo "${FAIL_CLUSTER}"
   oc --context "${FAIL_CLUSTER}" -n "${BANKING_NS}" scale deploy/banking-service --replicas=0
-  echo "Scaled ${FAIL_CLUSTER}/banking-service → 0"
   echo
-  echo "In Kiali: banking-service on ${FAIL_CLUSTER} should go unhealthy / empty;"
-  echo "remote endpoints on ${PEER_CLUSTER} remain. Mesh DestinationRule"
-  echo "(outlierDetection + locality failover) should shift traffic to ${PEER_CLUSTER}."
+  echo "Watch Kiali: ${FAIL_CLUSTER} workload empties; traffic continues via mesh to ${PEER_CLUSTER}."
+  echo "Sampling ${ENTRY_CLUSTER} gateway (compact line; details in ${DETAIL_LOG})..."
   echo
-  echo "Sampling entry-cluster API for 20s..."
-  local gw kc tok code ok=0 fail=0 i
+
+  local gw kc tok result code cluster ok=0 fail=0 i
   gw="$(gateway_url "${ENTRY_CLUSTER}")"
-  kc="$(keycloak_url "${ENTRY_CLUSTER}")"
+  kc="$(keycloak_url)"
   tok="$(get_token "${kc}")"
-  for i in $(seq 1 20); do
-    code="$(call_customers "${gw}" "${tok}")"
+  for i in $(seq 1 25); do
+    result="$(call_customers "${gw}" "${tok}")"
+    code="${result%%|*}"
+    cluster="$(echo "${result}" | cut -d'|' -f2)"
+    customers="$(echo "${result}" | cut -d'|' -f3)"
     if [[ "${code}" =~ ^2 ]]; then ok=$((ok + 1)); else fail=$((fail + 1)); fi
-    printf '  [%02d] HTTP %s\n' "${i}" "${code}"
+    show_line "${code}" "${cluster}" "${customers}" "failover ${i}/25"
     sleep 1
   done
-  echo "Result via ${ENTRY_CLUSTER} gateway: ok=${ok} fail=${fail}"
+  echo
+  echo
+  echo "Result: ok=${ok} fail=${fail}  (entry=${ENTRY_CLUSTER}, drained=${FAIL_CLUSTER}, peer=${PEER_CLUSTER})"
   if [[ "${ok}" -gt 0 ]]; then
-    echo "✓ Mesh failover serving APIs through ${ENTRY_CLUSTER} → ${PEER_CLUSTER} banking-service"
+    echo "✓ API kept working through the entry gateway while ${FAIL_CLUSTER} banking-service was scaled to 0"
+    echo "  That is service-mesh failover (DestinationRule + ambient multi-network)."
+    if [[ "${cluster}" == "${PEER_CLUSTER}" ]]; then
+      echo "✓ X-Banking-Cluster=${cluster} confirms responses from the peer"
+    elif [[ "${cluster}" == "?" ]]; then
+      echo "  Tip: after the next banking-service image build, X-Banking-Cluster will name the serving cluster."
+    fi
   else
-    echo "⚠ Entry path still failing — check EW gateway / shared CA / ambient multi-network."
-    echo "  Peer ${PEER_CLUSTER} should still answer locally:"
-    tok="$(get_token "$(keycloak_url "${PEER_CLUSTER}")")"
-    code="$(call_customers "$(gateway_url "${PEER_CLUSTER}")" "${tok}")"
-    echo "  ${PEER_CLUSTER} gateway HTTP ${code}"
+    echo "⚠ Entry path still failing — see ${DETAIL_LOG}"
+    echo "  Check EW gateway / shared CA / ambient multi-network / DestinationRule."
   fi
 }
 
@@ -227,45 +305,47 @@ cmd_recover() {
   oc --context "${FAIL_CLUSTER}" -n "${BANKING_NS}" scale deploy/banking-service --replicas=1
   resume_argo "${FAIL_CLUSTER}"
   oc --context "${FAIL_CLUSTER}" -n "${BANKING_NS}" rollout status deploy/banking-service --timeout=180s
-  local tok code
-  tok="$(get_token "$(keycloak_url "${ENTRY_CLUSTER}")")"
-  code="$(call_customers "$(gateway_url "${ENTRY_CLUSTER}")" "${tok}")"
-  echo "Entry API HTTP ${code}"
-  echo "Restored. Resume traffic and confirm both clusters in Kiali."
+  local tok result
+  tok="$(get_token "$(keycloak_url)")"
+  result="$(call_customers "$(gateway_url "${ENTRY_CLUSTER}")" "${tok}")"
+  echo "Entry API HTTP ${result%%|*}  cluster=$(echo "${result}" | cut -d'|' -f2)"
+  echo "Restored. Both clusters should appear healthy in Kiali."
 }
 
 cmd_demo() {
   cmd_preflight
   pause
 
-  banner "Step 1 — Open Kiali (centralized on ACM)"
+  banner "Step 1 — Open Kiali on ACM"
   echo "$(kiali_url)"
   echo
   echo "Suggested view:"
-  echo "  • Overview: clusters east + west visible"
-  echo "  • Graph → namespace banking-apps → show all clusters"
-  echo "  • Select banking-service (workloads on east and west)"
+  echo "  • Graph → namespaces: banking-apps (add banking-db for DB mTLS edges)"
+  echo "  • Show clusters east + west"
+  echo "  • Focus banking-service (global) + api-gateway"
   pause
 
-  banner "Step 2 — Generate live traffic (background)"
-  echo "Starting traffic loop via ${ENTRY_CLUSTER} (log below)."
-  echo "Leave this terminal visible; open Kiali beside it."
+  banner "Step 2 — Live traffic (one status line)"
+  echo "Terminal stays readable; full responses append to:"
+  echo "  ${DETAIL_LOG}"
   pause
 
   local gw kc
   gw="$(gateway_url "${ENTRY_CLUSTER}")"
-  kc="$(keycloak_url "${ENTRY_CLUSTER}")"
-  traffic_loop "${ENTRY_CLUSTER}" "${gw}" "${kc}" &
+  kc="$(keycloak_url)"
+  traffic_loop "baseline" "${gw}" "${kc}" &
   local tid=$!
-  trap 'kill ${tid} 2>/dev/null || true' EXIT
+  trap 'kill ${tid} 2>/dev/null || true; echo' EXIT
 
-  sleep 5
+  sleep 8
+  echo
   pause
 
-  banner "Step 3 — Lose ${FAIL_CLUSTER} banking-service (mesh failover)"
+  banner "Step 3 — Lose ${FAIL_CLUSTER} banking-service"
   kill "${tid}" 2>/dev/null || true
   wait "${tid}" 2>/dev/null || true
   trap - EXIT
+  echo
   NONINTERACTIVE=1 cmd_fail
   pause
 
@@ -273,6 +353,7 @@ cmd_demo() {
   NONINTERACTIVE=1 cmd_recover
   banner "Demo complete"
   echo "Kiali: $(kiali_url)"
+  echo "Log:   ${DETAIL_LOG}"
 }
 
 case "${1:-demo}" in

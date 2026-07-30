@@ -4,6 +4,9 @@ metadata:
   name: banking-db
   labels:
     app.kubernetes.io/part-of: banking-demo
+    istio.io/dataplane-mode: ambient
+    istio-discovery: enabled
+    openshift.io/user-monitoring: "true"
 ---
 apiVersion: v1
 kind: Namespace

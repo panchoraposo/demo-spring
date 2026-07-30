@@ -50,3 +50,23 @@ replacements:
           name: banking-service-config
         fieldPaths:
           - data.OIDC_TRUSTED_ISSUERS
+  - source:
+      kind: ConfigMap
+      name: env-config-banking-service
+      fieldPath: data.KEYCLOAK_JWK_SET_URI
+    targets:
+      - select:
+          kind: ConfigMap
+          name: banking-service-config
+        fieldPaths:
+          - data.SPRING_SECURITY_OAUTH2_RESOURCESERVER_JWT_JWK_SET_URI
+  - source:
+      kind: ConfigMap
+      name: env-config-banking-service
+      fieldPath: data.BANKING_CLUSTER
+    targets:
+      - select:
+          kind: ConfigMap
+          name: banking-service-config
+        fieldPaths:
+          - data.BANKING_CLUSTER

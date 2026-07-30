@@ -4,4 +4,7 @@ metadata:
   name: banking-db
   labels:
     app.kubernetes.io/part-of: banking-demo
-    cluster: east
+    # Ambient dataplane so app ↔ DB traffic is mTLS via ztunnel (same mesh as banking-apps).
+    istio.io/dataplane-mode: ambient
+    istio-discovery: enabled
+    openshift.io/user-monitoring: "true"

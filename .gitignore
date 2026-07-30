@@ -39,4 +39,5 @@ ansible/**/__pycache__/
 
 # Logs
 *.log
+.demo-failover.log
 hs_err_pid*

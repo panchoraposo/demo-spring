@@ -33,3 +33,13 @@ replacements:
           name: api-gateway-config
         fieldPaths:
           - data.SPRING_SECURITY_OAUTH2_RESOURCESERVER_JWT_ISSUER_URI
+  - source:
+      kind: ConfigMap
+      name: env-config-api-gateway
+      fieldPath: data.KEYCLOAK_JWK_SET_URI
+    targets:
+      - select:
+          kind: ConfigMap
+          name: api-gateway-config
+        fieldPaths:
+          - data.SPRING_SECURITY_OAUTH2_RESOURCESERVER_JWT_JWK_SET_URI

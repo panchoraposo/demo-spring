@@ -2,6 +2,8 @@
 
 GitOps manifests for Sail Operator ambient mode (Istio **v1.30-latest**), multi-primary peering, and DestinationRule locality failover for `banking-service`.
 
+Ambient dataplane namespaces (mTLS via ztunnel): **`banking-apps`** (api-gateway + banking-service) and **`banking-db`** (PostgreSQL). Live failover demo: [`scripts/demo-mesh-failover.sh`](../../../scripts/demo-mesh-failover.sh).
+
 Patterns adapted from [ossm3-ambient-mode](https://github.com/panchoraposo/ossm3-ambient-mode) (`istio1.29` / multi-cluster roles).
 
 ## Included
