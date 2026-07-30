@@ -8,6 +8,8 @@ metadata:
     app.kubernetes.io/part-of: banking-demo
 data:
   apiVersion: cluster.open-cluster-management.io/v1beta1
-  kind: PlacementDecision
+  # NOTE: OpenShift GitOps ApplicationSet controller expects the *resource* name here.
+  # Using Kind (PlacementDecision) makes it try to list resource "PlacementDecision" and fail RBAC/discovery.
+  resource: placementdecisions
   statusListKey: decisions
   matchKey: clusterName
