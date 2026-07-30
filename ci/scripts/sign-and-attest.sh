@@ -74,25 +74,32 @@ syft "registry:${QUAY_IMAGE}" -o cyclonedx-json="${ARTIFACT_DIR}/sbom.cdx.json"
 syft "registry:${QUAY_IMAGE}" -o spdx-json="${ARTIFACT_DIR}/sbom.spdx.json"
 
 echo "==> Upload SBOM to Trusted Profile Analyzer (Trustify) when available"
+# In CI we require the SBOM upload to succeed (so SBOM is left in TPA).
+# Developers can override with TPA_UPLOAD_REQUIRED=false when running locally.
+TPA_UPLOAD_REQUIRED="${TPA_UPLOAD_REQUIRED:-}"
+if [ -z "${TPA_UPLOAD_REQUIRED}" ]; then
+  if [ -n "${JENKINS_URL:-}" ] || [ -n "${BUILD_NUMBER:-}" ]; then
+    TPA_UPLOAD_REQUIRED=true
+  else
+    TPA_UPLOAD_REQUIRED=false
+  fi
+fi
+
 TPA_URL="${TPA_URL:-}"
 if [ -z "${TPA_URL}" ] && oc -n trusted-profile-analyzer get route >/dev/null 2>&1; then
-  # Prefer a server/console route created by the rhtpa-operator instance.
-  TPA_HOST="$(oc -n trusted-profile-analyzer get route -o jsonpath='{.items[?(@.spec.to.name!="rhda-backend")][0].spec.host}' 2>/dev/null || true)"
+  # Prefer the Trustify server route (not RHDA backend).
+  TPA_HOST="$(oc -n trusted-profile-analyzer get route -o jsonpath='{range .items[*]}{.metadata.name}{"\t"}{.spec.host}{"\t"}{.spec.to.name}{"\n"}{end}' 2>/dev/null \
+    | awk -F'\t' '$3 != "rhda-backend" && $2 != "" { print $2; exit }' || true)"
   [ -n "${TPA_HOST}" ] && TPA_URL="https://${TPA_HOST}"
 fi
 
-if [ -n "${TPA_URL}" ]; then
-  # In CI we require the SBOM upload to succeed (so SBOM is left in TPA).
-  # Developers can override with TPA_UPLOAD_REQUIRED=false when running locally.
-  TPA_UPLOAD_REQUIRED="${TPA_UPLOAD_REQUIRED:-}"
-  if [ -z "${TPA_UPLOAD_REQUIRED}" ]; then
-    if [ -n "${JENKINS_URL:-}" ] || [ -n "${BUILD_NUMBER:-}" ]; then
-      TPA_UPLOAD_REQUIRED=true
-    else
-      TPA_UPLOAD_REQUIRED=false
-    fi
+if [ -z "${TPA_URL}" ]; then
+  echo "WARN: TPA_URL not found; leaving SBOM in Quay only."
+  if [ "${TPA_UPLOAD_REQUIRED}" = "true" ]; then
+    echo "ERROR: TPA upload is required in CI but TPA_URL is unset (set TPA_URL or grant route read access)." >&2
+    exit 1
   fi
-
+else
   hdr_auth=()
   # Prefer pre-provided token, otherwise obtain a non-interactive OIDC token for CI.
   if [ -z "${TPA_TOKEN:-}" ]; then
@@ -121,9 +128,9 @@ if [ -n "${TPA_URL}" ]; then
         -d "client_id=${TPA_OIDC_CLIENT_ID}" \
         -d "client_secret=${TPA_OIDC_CLIENT_SECRET}" \
         -d "scope=${TPA_OIDC_SCOPES}" || true)"
-      TPA_TOKEN="$(sed -n 's/.*\"access_token\"[[:space:]]*:[[:space:]]*\"\\([^\"]*\\)\".*/\\1/p' /tmp/tpa-oidc.json | head -1 || true)"
+      TPA_TOKEN="$(python3 -c 'import json,sys; print(json.load(open("/tmp/tpa-oidc.json")).get("access_token",""))' 2>/dev/null || true)"
       if [ -z "${TPA_TOKEN}" ]; then
-        err="$(sed -n 's/.*\"error\"[[:space:]]*:[[:space:]]*\"\\([^\"]*\\)\".*/\\1/p' /tmp/tpa-oidc.json | head -1 || true)"
+        err="$(python3 -c 'import json; j=json.load(open("/tmp/tpa-oidc.json")); print(j.get("error"), j.get("error_description",""))' 2>/dev/null || true)"
         echo "WARN: Failed to obtain TPA token (HTTP ${token_http}) issuer=${TPA_OIDC_ISSUER_URL} err=${err}" >&2
       fi
     else
@@ -151,8 +158,6 @@ if [ -n "${TPA_URL}" ]; then
       exit 1
     fi
   fi
-else
-  echo "WARN: TPA_URL not found; leaving SBOM in Quay only."
 fi
 
 # RHTAS env (optional keyless). Always set Rekor/TUF when available on-cluster.

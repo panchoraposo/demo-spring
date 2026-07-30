@@ -107,8 +107,10 @@ pipeline {
 
                 # Prefer file from cosign-signing-key secret mounted by JCasC / oc extract
                 chmod +x ci/scripts/sign-and-attest.sh
+                # TPA_URL / TPA_OIDC_* come from Jenkins controller env (JCasC/helm-values).
                 APP="${APP}" IMAGE_TAG="${IMAGE_TAG}" APPS_NS="${APPS_NS}" \
                   QUAY_HOST="${QUAY_HOST}" QUAY_ORG="${QUAY_ORG}" TOOLS_DIR="${TOOLS_DIR}" \
+                  TPA_UPLOAD_REQUIRED=true \
                   ci/scripts/sign-and-attest.sh
               '''
             }

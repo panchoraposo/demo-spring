@@ -89,6 +89,10 @@ controller:
           name: cosign-signing-key
           key: cosign.key
           optional: true
+    - name: TPA_URL
+      value: https://server.apps.cluster-k7kqp.k7kqp.sandbox3321.opentlc.com
+    - name: TPA_OIDC_ISSUER_URL
+      value: https://sso.apps.cluster-k7kqp.k7kqp.sandbox3321.opentlc.com/realms/trustify
     - name: TPA_OIDC_CLIENT_ID
       value: cli
     - name: TPA_OIDC_CLIENT_SECRET
