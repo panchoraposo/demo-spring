@@ -30,11 +30,6 @@ spec:
   tracing:
     enabled: false
 
-  # For sandbox/demo: disable authentication (no external OIDC required).
-  authenticator: |
-    authentication:
-      clients: []
-
   # Init/migrations are expected at the top-level by the chart templates.
   createDatabase:
     enabled: true
@@ -48,6 +43,9 @@ spec:
     server:
       enabled: true
       disableSwaggerOidc: true
+      authenticator: |
+        authentication:
+          clients: []
       replicas: 1
       resources:
         requests:
