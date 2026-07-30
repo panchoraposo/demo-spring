@@ -7,10 +7,15 @@ Prep layout for RHACM ApplicationSets plus per-spoke data/IdP. **Do not apply** 
 | Cluster | Role | Workloads |
 | --- | --- | --- |
 | **acm** | Hub | RHACM, GitOps, Gitea, Conjur, Jenkins, ODF, Quay, RHTAS, TPA, hub Kiali MC + OSSMC |
-| **east** | Spoke | GitOps, ESO, OSSM 3.4 ambient, Dev Spaces, PostgreSQL, Keycloak, Spring apps |
-| **west** | Spoke | Same as east (independent DB + IdP) |
+| **east** | Spoke | GitOps, ESO, OSSM 3.4 ambient, Dev Spaces, PostgreSQL, Spring apps |
+| **west** | Spoke | Same as east (independent DB) |
 
-**Failover is mesh traffic only.** Scaling east `banking-service` to 0 lets ambient locality send traffic to west endpoints. PostgreSQL and Keycloak are **not** shared; clients that land on west use west Keycloak (different issuer).
+**Failover is mesh traffic only.** Scaling east `banking-service` to 0 lets ambient locality send traffic to west endpoints. PostgreSQL is **not** shared.
+
+**OIDC is centralized on the hub**: a single Keycloak instance on **acm** provides two realms:
+
+- `banking` (Spring apps)
+- `trustify` (TPA)
 
 ## Bootstrap order
 

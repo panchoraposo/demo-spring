@@ -7,11 +7,16 @@ This demo targets three OpenShift clusters:
 | Cluster | Role |
 | --- | --- |
 | **acm** | RHACM hub, Conjur, Jenkins, ODF, Quay, RHTAS, TPA, hub Kiali |
-| **east** / **west** | Spokes with GitOps, ESO, OSSM 3.4 ambient, Dev Spaces, PostgreSQL, Keycloak, Spring apps |
+| **east** / **west** | Spokes with GitOps, ESO, OSSM 3.4 ambient, Dev Spaces, PostgreSQL, Spring apps |
 
 Credentials are sourced from **CyberArk Conjur** on the hub via the **External Secrets Operator** on each cluster. Spring apps never talk to Conjur; they only mount Kubernetes Secrets that ESO materializes.
 
-**Traffic failover ≠ data failover.** Mesh locality can send `banking-service` traffic to the peer spoke; each spoke keeps its own PostgreSQL and Keycloak issuer.
+**Traffic failover ≠ data failover.** Mesh locality can send `banking-service` traffic to the peer spoke; each spoke keeps its own PostgreSQL.
+
+**OIDC is centralized on the hub.** A single Keycloak instance on **acm** provides:
+
+- Realm `banking` for Spring apps
+- Realm `trustify` for TPA
 
 ```mermaid
 flowchart TB
@@ -26,7 +31,7 @@ flowchart TB
     ArgoE[OpenShift GitOps]
     MeshE[OSSM 3.4 ambient]
     PGE[(PostgreSQL)]
-    KCE[Keycloak]
+    KCE[Keycloak (hub)]
     GWE[api-gateway]
     BSE[banking-service]
   end
@@ -35,7 +40,7 @@ flowchart TB
     ArgoW[OpenShift GitOps]
     MeshW[OSSM 3.4 ambient]
     PGW[(PostgreSQL)]
-    KCW[Keycloak]
+    KCW[Keycloak (hub)]
     GWW[api-gateway]
     BSW[banking-service]
   end
@@ -68,7 +73,7 @@ flowchart TB
 | Service mesh | OpenShift Service Mesh 3.4 (Sail, ambient, Istio ~1.30) |
 | Secrets sync | External Secrets Operator for Red Hat OpenShift |
 | Secrets backend | CyberArk Conjur OSS (Helm chart, GitOps Application on acm) |
-| Identity (OIDC) | Red Hat build of Keycloak (`rhbk-operator`) — **per spoke** |
+| Identity (OIDC) | Red Hat build of Keycloak (`rhbk-operator`) — **hub (acm)** |
 | Banking DB | [`registry.redhat.io/rhel10/postgresql-16`](https://catalog.redhat.com/en/software/containers/rhel10/postgresql-16/677d13af607921b4d74fca88) — **per spoke** |
 | App runtime images | UBI 9 OpenJDK 21 |
 | Object storage | OpenShift Data Foundation (Multicloud Object Gateway) on acm |
@@ -83,17 +88,17 @@ flowchart TB
 1. **acm:** [`gitops/bootstrap/acm-root.yaml`](../gitops/bootstrap/acm-root.yaml) → [`gitops/applications/acm`](../gitops/applications/acm) (Conjur, Jenkins, hub ESO, Kiali).
 2. **RHACM:** [`gitops/acm`](../gitops/acm) Placement + ApplicationSet `banking-spoke-roots` generates Applications that sync `gitops/applications/{{east|west}}` to each ManagedCluster.
 3. **Spoke waves (east/west):**
-   - `0` platform operators (RHBK, ESO, Sail, GitOps)
+  - `0` platform operators (ESO, Sail, GitOps)
    - `1` ESO operand
    - `2` mesh (Istio / CNI / ZTunnel / east-west GW / DestinationRule)
    - `3` `ClusterSecretStore` + app `ExternalSecret`s (Conjur URL → acm)
-   - `4+` PostgreSQL, Keycloak, banking-service, api-gateway
+  - `4+` PostgreSQL, banking-service, api-gateway
 
 Details: [secrets-management.md](secrets-management.md), [multi-cluster.md](multi-cluster.md).
 
 ## Security model
 
-- Clients obtain an access token from the **local** Keycloak realm `banking`.
+- Clients obtain an access token from the **hub** Keycloak realm `banking`.
 - **api-gateway** validates the JWT (`issuer-uri`) and proxies `/api/**` to **banking-service**.
 - **banking-service** is also an OAuth2 resource server.
 - Actuator health endpoints remain unauthenticated for probes.
