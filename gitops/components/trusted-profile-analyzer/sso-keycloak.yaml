@@ -37,6 +37,9 @@ data:
           "implicitFlowEnabled": false,
           "directAccessGrantsEnabled": true,
           "serviceAccountsEnabled": false,
+          "attributes": {
+            "client.use.lightweight.access.token.enabled": "false"
+          },
           "defaultClientScopes": [
             "profile",
             "email",

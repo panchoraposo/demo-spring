@@ -46,10 +46,6 @@ spec:
       enabled: true
     server:
       enabled: true
-      disableSwaggerOidc: true
-      authenticator: |
-        authentication:
-          clients: []
       replicas: 1
       resources:
         requests:
