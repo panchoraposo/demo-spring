@@ -22,6 +22,9 @@ spec:
       key: password
   http:
     httpEnabled: true
+  proxy:
+    # Ensure Keycloak derives https issuer/redirects behind OpenShift Route edge termination.
+    headers: xforwarded
   hostname:
     # Patched per environment/cluster overlay.
     hostname: sso.apps.example.com
