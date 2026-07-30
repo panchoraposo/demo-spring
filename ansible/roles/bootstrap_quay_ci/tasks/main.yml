@@ -1,0 +1,14 @@
+---
+- name: Check for existing Quay CI secret
+  ansible.builtin.command: >
+    oc --context "{{ acm_context }}" -n banking-ci get secret quay-ci
+  register: quay_ci_secret
+  changed_when: false
+  failed_when: false
+
+- name: Bootstrap Quay org/robot and quay-ci secret when missing
+  when: quay_ci_secret.rc != 0
+  ansible.builtin.command: "{{ playbook_dir }}/../../scripts/bootstrap-quay-ci.sh"
+  environment:
+    CTX: "{{ acm_context }}"
+  changed_when: true

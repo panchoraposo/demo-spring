@@ -12,9 +12,9 @@ flowchart LR
   Boot -->|conjur-creds| HubESO[ESO on acm]
   Sync[sync-conjur-creds-to-clusters.sh] -->|creds + CA| ClusterESO[ESO on east/west]
   HubESO -->|ClusterSecretStore local SVC| Conjur
-  SpokeESO -->|ClusterSecretStore Conjur Route| Conjur
-  SpokeESO --> AppSecrets[PG / Keycloak / Spring Secrets]
-  HubESO --> CiSecrets[Jenkins / github-ci Secrets]
+  ClusterESO -->|ClusterSecretStore Conjur Route| Conjur
+  ClusterESO --> AppSecrets[PG / Spring Secrets]
+  HubESO --> HubSecrets[Jenkins / Keycloak / github-ci Secrets]
 ```
 
 | Piece | Location |
@@ -23,13 +23,14 @@ flowchart LR
 | Policy / seed / ESO host | [`gitops/components/conjur-config/`](../gitops/components/conjur-config/) on **acm** |
 | Hub `ClusterSecretStore` + Jenkins ES | [`gitops/components/external-secrets-hub/`](../gitops/components/external-secrets-hub/) |
 | Managed-cluster `ClusterSecretStore` + app ES | [`gitops/components/external-secrets/`](../gitops/components/external-secrets/) |
+| Keycloak ES | [`gitops/components/keycloak/`](../gitops/components/keycloak/) on **acm** (`banking-idp`) |
 
 ## Hub vs managed clusters
 
 | Cluster | Conjur URL in ClusterSecretStore | ExternalSecrets |
 | --- | --- | --- |
-| acm | `https://conjur-oss.banking-conjur.svc` | jenkins-admin, github-ci |
-| east / west | Hub Conjur Route (set in `gitops/components/external-secrets/overlays/{east,west}/env/conjur.env`) | postgresql, keycloak, banking-service |
+| acm | `https://conjur-oss.banking-conjur.svc` | jenkins-admin, github-ci, Keycloak (banking-idp), promxy tokens |
+| east / west | Hub Conjur Route (set in `gitops/components/external-secrets/overlays/{east,west}/env/conjur.env`) | postgresql, banking-service |
 
 After Conjur bootstrap on acm, copy credentials:
 
@@ -46,18 +47,19 @@ That creates `external-secrets/conjur-creds` and `external-secrets/conjur-ssl-ca
 | 1 | `eso-operand`, `conjur` |
 | 2 | `conjur-config` (bootstrap Job) |
 | 3 | `external-secrets-config` (hub store + Jenkins secrets) |
-| 4+ | Jenkins, CI BuildConfigs |
+| 4+ | Jenkins, Keycloak, CI BuildConfigs |
 
 ## Conjur variables (account `banking`)
 
 | Variable ID | Consumed by |
 | --- | --- |
 | `banking/postgresql/*` | Managed-cluster `ExternalSecret/postgresql-credentials` |
-| `banking/keycloak-db/*` | Managed-cluster `ExternalSecret/keycloak-db-secret` |
-| `banking/keycloak-admin/*` | Managed-cluster `ExternalSecret/keycloak-admin` |
+| `banking/keycloak-db/*` | Hub `ExternalSecret` in `banking-idp` |
+| `banking/keycloak-admin/*` | Hub `ExternalSecret` in `banking-idp` |
 | `banking/banking-service/*` | Managed-cluster `ExternalSecret/banking-service-db` |
 | `banking/jenkins/*` | Hub `ExternalSecret/jenkins-admin` |
 | `banking/github-ci/*` | Hub `ExternalSecret/github-ci` |
+| `banking/promxy/*` | Hub `ExternalSecret/promxy-upstream-tokens` |
 
 ## Bootstrap behaviour
 

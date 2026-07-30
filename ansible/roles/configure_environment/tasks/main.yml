@@ -1,0 +1,90 @@
+---
+- name: Discover domains/routes and rewrite GitOps env for this environment
+  ansible.builtin.command: >
+    python3 "{{ role_path }}/files/configure_environment.py"
+  environment:
+    ACM_CONTEXT: "{{ acm_context }}"
+    EAST_CONTEXT: "{{ east_context }}"
+    WEST_CONTEXT: "{{ west_context }}"
+    REPO_ROOT: "{{ playbook_dir }}/../.."
+    GIT_REPO_URL: "{{ git_repo_url }}"
+    GIT_TARGET_REVISION: "{{ git_target_revision }}"
+    RESET_IMAGE_TAGS: "{{ reset_image_tags | default(false) | string }}"
+  register: configure_env
+  changed_when: "'wrote ' in configure_env.stdout or 'patched ' in configure_env.stdout"
+
+- name: Show configure_environment summary
+  ansible.builtin.debug:
+    msg: "{{ configure_env.stdout_lines | default([]) }}"
+
+- name: Load discovered environment facts
+  ansible.builtin.shell: |
+    set -euo pipefail
+    # shellcheck disable=SC1091
+    set -a
+    source "{{ playbook_dir }}/.generated/environment.env"
+    set +a
+    python3 - <<'PY'
+    import os, json
+    keys = [
+      "HUB_APPS_DOMAIN", "EAST_APPS_DOMAIN", "WEST_APPS_DOMAIN",
+      "CONJUR_URL", "KEYCLOAK_HOST", "KEYCLOAK_ISSUER", "QUAY_HOST",
+      "TPA_URL", "RHDA_BACKEND_URL", "EAST_THANOS_HOST", "WEST_THANOS_HOST",
+      "GIT_REPO_URL", "GIT_TARGET_REVISION",
+    ]
+    print(json.dumps({k.lower(): os.environ.get(k, "") for k in keys}))
+    PY
+  args:
+    executable: /bin/bash
+  register: env_facts_json
+  changed_when: false
+
+- name: Set discovered environment facts
+  ansible.builtin.set_fact:
+    discovered_env: "{{ env_facts_json.stdout | from_json }}"
+    conjur_url_spoke: "{{ (env_facts_json.stdout | from_json).conjur_url }}"
+    east_thanos_host: "{{ (env_facts_json.stdout | from_json).east_thanos_host }}"
+    west_thanos_host: "{{ (env_facts_json.stdout | from_json).west_thanos_host }}"
+
+- name: Optionally commit and push environment configuration
+  when: auto_push_env | default(false) | bool
+  ansible.builtin.shell: |
+    set -euo pipefail
+    ROOT="$(cd "{{ playbook_dir }}/../.." && pwd)"
+    cd "${ROOT}"
+    git add \
+      gitops/applications/*/env/common.env \
+      gitops/components/*/overlays/*/env/*.env \
+      gitops/components/trusted-profile-analyzer/env/tpa.env \
+      gitops/components/promxy/promxy-config.yaml \
+      gitops/components/banking-service/overlays/*/kustomization.yaml \
+      gitops/components/jenkins/helm-values.yaml \
+      gitops/components/gitea/helm-values.yaml \
+      gitops/components/conjur/helm-values.yaml \
+      gitops/components/keycloak/base/trustify-realm-import.yaml \
+      gitops/acm/applicationsets/spoke-root.yaml \
+      gitops/environments/default/*.env \
+      || true
+    if git diff --cached --quiet; then
+      echo "No environment changes to commit"
+      exit 0
+    fi
+    git commit -m "$(cat <<'EOF'
+    Configure GitOps values for the current OpenShift environment.
+
+    EOF
+    )"
+    git push origin HEAD
+  args:
+    executable: /bin/bash
+  changed_when: true
+
+- name: Remind operator that Argo reads env values from the Git remote
+  when: not (auto_push_env | default(false) | bool)
+  ansible.builtin.debug:
+    msg: >-
+      configure_environment updated local GitOps files for
+      {{ discovered_env.hub_apps_domain | default('this hub') }}.
+      Commit and push to {{ git_repo_url }} (revision {{ git_target_revision }})
+      before managed-cluster Applications sync, or re-run with -e auto_push_env=true.
+      Prefer a per-environment branch/fork so sandbox values are not shared.

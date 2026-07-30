@@ -31,6 +31,8 @@ local.properties
 # Ansible rendered artifacts (may contain live passwords)
 ansible/playbooks/.generated/
 ansible/**/.rendered-*.yaml
+ansible/**/__pycache__/
+*.pyc
 
 # Maven
 .mvn/wrapper/maven-wrapper.jar

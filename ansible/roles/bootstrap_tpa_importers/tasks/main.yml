@@ -1,0 +1,9 @@
+---
+# Idempotent: enable TPA vulnerability/advisory importers via Trustify API.
+# Complements modules.createImporters.importers in the TrustedProfileAnalyzer CR
+# (createImporters may leave sources disabled on first seed).
+- name: Enable TPA vulnerability importers (osv-github, cve, redhat-csaf)
+  ansible.builtin.command: "{{ playbook_dir }}/../../scripts/bootstrap-tpa-importers.sh"
+  environment:
+    CTX: "{{ acm_context }}"
+  changed_when: true

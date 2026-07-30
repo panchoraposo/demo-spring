@@ -1,37 +1,49 @@
 # Multi-cluster (acm / east / west)
 
-Prep layout for RHACM ApplicationSets plus per-cluster regional data/IdP. **Do not apply** until clusters are ready.
+Layout for RHACM ApplicationSets plus per-cluster regional data. Prefer the Ansible installer once clusters are joined.
 
 ## Topology
 
 | Cluster | Role | Workloads |
 | --- | --- | --- |
-| **acm** | Hub | RHACM, GitOps, Gitea, Conjur, Jenkins, ODF, Quay, RHTAS, TPA, hub Kiali MC + OSSMC |
+| **acm** | Hub | RHACM, GitOps, Conjur, Keycloak, Jenkins, ODF, Quay, RHTAS, TPA, Dev Spaces, hub Kiali MC + OSSMC, credentials dashboard |
 | **east** | Managed cluster | GitOps, ESO, OSSM 3.4 ambient, PostgreSQL, Spring apps |
 | **west** | Managed cluster | Same as east (independent DB) |
 
 **Failover is mesh traffic only.** Scaling east `banking-service` to 0 lets ambient locality send traffic to west endpoints. PostgreSQL is **not** shared.
 
-**OIDC is centralized on the hub**: a single Keycloak instance on **acm** provides two realms:
+**OIDC is centralized on the hub**: a single Keycloak instance on **acm** (`banking-idp` Route `sso`) provides realms `banking` (Spring apps) and `trustify` (TPA).
 
-- `banking` (Spring apps)
-- `trustify` (TPA)
+## Recommended install (Ansible)
 
-## Bootstrap order
+Prerequisites: RHACM on acm; east/west joined as Available ManagedClusters; `oc` contexts `acm`/`east`/`west`; `istioctl` installed.
+
+```bash
+cd ansible
+cp inventory.example.yml inventory.yml
+# Set git_repo_url + git_target_revision to a per-environment branch/fork
+ansible-playbook -i inventory.yml playbooks/install.yml
+# If Argo must read the rewritten env files from Git:
+# ansible-playbook -i inventory.yml playbooks/install.yml -e auto_push_env=true
+```
+
+What the playbook covers (env discovery, hub root, Argo cluster secrets, Conjur/Quay sync, mesh peering, promxy tokens, dashboard) is listed in [`ansible/README.md`](../ansible/README.md).
+
+## Manual bootstrap order
 
 1. Install RHACM on **acm**; join **east** and **west** as ManagedClusters.
-2. Install OpenShift GitOps on acm; run [`scripts/bootstrap-acm.sh`](../scripts/bootstrap-acm.sh) (installs Gitea, seeds `banking/demo-spring`, stores CI PAT in Conjur, applies acm-root).
-3. Ensure hub capacity (required for Dev Spaces + Jenkins on small hubs):
+2. Install OpenShift GitOps on acm; run [`scripts/bootstrap-acm.sh`](../scripts/bootstrap-acm.sh) (applies acm-root only).
+3. Optional Gitea seed: [`scripts/bootstrap-gitea.sh`](../scripts/bootstrap-gitea.sh).
+4. Ensure hub capacity (required for Dev Spaces + Jenkins on small hubs):
 
 ```bash
 # Some environments provision the hub with 0 workers by default.
-# Dev Spaces and Jenkins may remain Pending until a worker is added.
 oc --context acm -n openshift-machine-api get machineset.machine.openshift.io -o wide
 oc --context acm -n openshift-machine-api scale machineset.machine.openshift.io/<worker-machineset> --replicas=1
 oc --context acm get nodes -o wide
 ```
 
-4. Label managed clusters and apply Placement + ApplicationSets:
+5. Label managed clusters and apply Placement + ApplicationSets:
 
 ```bash
 oc --context acm label managedcluster east \
@@ -41,12 +53,11 @@ oc --context acm label managedcluster west \
   cluster.open-cluster-management.io/clusterset=banking-managed \
   banking-demo/role=managed banking-demo/region=west --overwrite
 
-# Placement + ManagedClusterSetBinding live in openshift-gitops (with ApplicationSets).
+# Hub Argo needs cluster Secrets labeled banking-demo/role=managed (Ansible register_argocd_clusters).
 oc --context acm apply -k gitops/acm
 ```
 
-5. Ensure hub Argo can reach managed cluster APIs (ACM GitOps Cluster addon or cluster secrets).
-6. Set environment values (no repo-wide placeholder script):
+6. Set environment values (Ansible `configure_environment` does this automatically):
    - Git repo URL + revision: `gitops/applications/{acm,east,west}/env/common.env`
    - Hub Keycloak + TPA domain values:
      - `gitops/components/keycloak/overlays/acm/env/keycloak.env` (Route host `sso.<appsDomain>`)
@@ -55,13 +66,17 @@ oc --context acm apply -k gitops/acm
      - `gitops/components/{api-gateway,banking-service}/overlays/{east,west}/env/*.env`
    - Cluster Conjur URL (ESO ClusterSecretStore): `gitops/components/external-secrets/overlays/{east,west}/env/conjur.env`
 7. After Conjur bootstrap on acm: [`scripts/sync-conjur-creds-to-clusters.sh`](../scripts/sync-conjur-creds-to-clusters.sh)
-8. After both meshes are Ready:
+8. After Quay is HTTP-ready: [`scripts/bootstrap-quay-ci.sh`](../scripts/bootstrap-quay-ci.sh) then [`scripts/sync-quay-pull-secret-to-clusters.sh`](../scripts/sync-quay-pull-secret-to-clusters.sh)
+9. After both meshes are Ready:
    - Shared CA: [`scripts/mesh/sync-shared-cacerts.sh`](../scripts/mesh/sync-shared-cacerts.sh)
    - Peering: [`scripts/mesh/exchange-remote-secrets.sh`](../scripts/mesh/exchange-remote-secrets.sh)
-9. Hub Kiali multi-cluster secrets: [`scripts/mesh/sync-kiali-multicluster-secrets.sh`](../scripts/mesh/sync-kiali-multicluster-secrets.sh) (feeds OSSMC / Service Mesh console on acm).
-10. Cluster metrics for Kiali graphs: [`scripts/mesh/enable-user-workload-monitoring.sh`](../scripts/mesh/enable-user-workload-monitoring.sh) + mesh `PodMonitor`s, then hub promxy [`scripts/mesh/sync-promxy.sh`](../scripts/mesh/sync-promxy.sh).
-11. Live failover demo: [`scripts/demo-mesh-failover.sh`](../scripts/demo-mesh-failover.sh)
-12. After Jenkins / Quay / RHTAS Routes exist: [`scripts/apply-console-banners.sh`](../scripts/apply-console-banners.sh) (cluster banners + ApplicationMenu ConsoleLinks).
+10. Hub Kiali multi-cluster secrets: [`scripts/mesh/sync-kiali-multicluster-secrets.sh`](../scripts/mesh/sync-kiali-multicluster-secrets.sh)
+11. Cluster metrics for Kiali graphs: [`scripts/mesh/enable-user-workload-monitoring.sh`](../scripts/mesh/enable-user-workload-monitoring.sh) + mesh `PodMonitor`s, then hub promxy [`scripts/mesh/sync-promxy.sh`](../scripts/mesh/sync-promxy.sh)
+12. Console UX:
+    - Banners: [`scripts/apply-console-banners.sh`](../scripts/apply-console-banners.sh)
+    - ApplicationMenu links: [`scripts/apply-console-links.sh`](../scripts/apply-console-links.sh)
+13. Credentials dashboard (Ansible): `ansible-playbook -i ansible/inventory.example.yml ansible/playbooks/dashboard.yml`
+14. Live failover demo: [`scripts/demo-mesh-failover.sh`](../scripts/demo-mesh-failover.sh)
 
 Managed cluster GitOps prerequisite: Subscription in `gitops/platform/operators-managed` (synced once Applications start).
 
@@ -81,50 +96,26 @@ Managed cluster GitOps prerequisite: Subscription in `gitops/platform/operators-
 
 ## Failover demo (Kiali + mesh)
 
-Interactive presenter script (traffic loop, scale-down, recover):
-
 ```bash
 ./scripts/demo-mesh-failover.sh
 ```
 
 Kiali on ACM: `https://$(oc --context acm -n istio-system get route kiali -o jsonpath='{.spec.host}')`
 
-Manual equivalent:
-
-```bash
-# Pause Argo self-heal, then drain local banking-service
-oc --context east -n openshift-gitops patch applications.argoproj.io banking-service \
-  --type merge -p '{"spec":{"syncPolicy":null}}'
-oc --context east -n banking-apps scale deploy/banking-service --replicas=0
-
-# api-gateway on east keeps calling banking-service.banking-apps.svc.cluster.local;
-# ambient multi-network + DestinationRule should shift to west endpoints (EW HBONE).
-# West PG data may differ; JWT issuers are trusted on both clusters (OIDC_TRUSTED_ISSUERS).
-
-oc --context east -n banking-apps scale deploy/banking-service --replicas=1
-```
-
 ## CI images / supply chain
 
 Jenkins on **acm** builds via OpenShift BuildConfigs, mirrors to **Quay**, generates SBOM + attestation + signature (RHTAS), then bumps `newTag`/`newName` on **both** east and west overlays. Details: [ci-cd.md](ci-cd.md), [supply-chain.md](supply-chain.md).
 
-Legacy ImageStream mirror (if Quay is not yet Ready):
-
-```bash
-scripts/mirror-image-to-clusters.sh banking-service <tag>
-scripts/mirror-image-to-clusters.sh api-gateway <tag>
-```
-
 Console UX on acm:
 - Banner **Hub Cluster** — GitOps [`gitops/components/console-banners`](../gitops/components/console-banners) (+ script for east/west).
-- ApplicationMenu links (Gitea, Jenkins, Quay, Rekor Search UI, Kiali) — [`scripts/apply-console-links.sh`](../scripts/apply-console-links.sh) (Gitea also created by `bootstrap-gitea.sh`).
-- Service Mesh console (OSSMC) — [`gitops/components/kiali-multicluster/ossmconsole.yaml`](../gitops/components/kiali-multicluster/ossmconsole.yaml); refresh the OpenShift console after the plugin is Ready.
+- ApplicationMenu links (Gitea, Jenkins, Quay, Rekor Search UI, Kiali) — [`scripts/apply-console-links.sh`](../scripts/apply-console-links.sh).
+- Service Mesh console (OSSMC) — [`gitops/components/kiali-multicluster/ossmconsole.yaml`](../gitops/components/kiali-multicluster/ossmconsole.yaml).
 
 ## Repo paths
 
 | Path | Purpose |
 | --- | --- |
 | [`gitops/applications/acm`](../gitops/applications/acm) | Hub Applications |
-| [`gitops/applications/east`](../gitops/applications/east) / [`west`](../gitops/applications/west) | Spoke Applications |
+| [`gitops/applications/east`](../gitops/applications/east) / [`west`](../gitops/applications/west) | Managed-cluster Applications |
 | [`gitops/acm`](../gitops/acm) | Placement + ApplicationSets |
 | [`gitops/components/mesh`](../gitops/components/mesh) | OSSM ambient + failover |

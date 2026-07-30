@@ -1,7 +1,29 @@
 ---
+- name: Ensure ApplicationSet uses inventory git repo/revision
+  ansible.builtin.shell: |
+    set -euo pipefail
+    python3 - <<'PY'
+    from pathlib import Path
+    import re
+    path = Path("{{ playbook_dir }}/../../gitops/acm/applicationsets/spoke-root.yaml")
+    text = path.read_text()
+    repo = "{{ git_repo_url }}"
+    rev = "{{ git_target_revision }}"
+    text2 = re.sub(r"(?m)^(\s*)repoURL:\s*.*$", rf"\1repoURL: {repo}", text, count=1)
+    text2 = re.sub(r"(?m)^(\s*)targetRevision:\s*.*$", rf"\1targetRevision: {rev}", text2, count=1)
+    if text2 != text:
+      path.write_text(text2)
+      print(f"patched {path}")
+    else:
+      print(f"unchanged {path}")
+    PY
+  args:
+    executable: /bin/bash
+  register: configure_appset
+  changed_when: "'patched ' in (configure_appset.stdout | default(''))"
+
 - name: Apply Placement + ApplicationSets on hub
   ansible.builtin.command: oc --context "{{ acm_context }}" apply -k gitops/acm
   args:
     chdir: "{{ playbook_dir }}/../.."
   changed_when: true
-

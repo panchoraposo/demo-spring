@@ -1,23 +1,24 @@
-# Cluster east (spoke)
+# Cluster east (managed)
 
 | Namespace | Contents |
 | --- | --- |
-| `openshift-gitops` | OpenShift GitOps (Applications from ACM ApplicationSet or spoke-root) |
+| `openshift-gitops` | OpenShift GitOps (Applications from ACM ApplicationSet) |
 | `external-secrets-operator` / `external-secrets` | ESO → Conjur on **acm** |
 | `istio-system` / `istio-cni` / `ztunnel` | OSSM 3.4 ambient |
 | `banking-db` | PostgreSQL 16 (local; not failed over) |
-| _(hub)_ `trusted-profile-analyzer` | Shared Keycloak on **acm** (Route `sso`) + TPA/RHDA |
 | `banking-apps` | api-gateway + banking-service (ambient + global Service) |
-| `openshift-devspaces` | OpenShift Dev Spaces (Spring + RHDA → TPA on acm) |
 
-Conjur, Jenkins, Quay, RHTAS, and TPA are **not** installed here (hub only).
+Conjur, Keycloak, Jenkins, Quay, RHTAS, TPA, and Dev Spaces are **not** installed here (hub only).
+
+OIDC uses shared Keycloak on **acm** (`banking-idp` Route `sso`).
 
 ## Prerequisites before sync
 
-1. OpenShift GitOps Operator installed.
-2. Set spoke Conjur URL: `gitops/components/external-secrets/overlays/east/env/conjur.env` (or your env overlay).
-3. `scripts/sync-conjur-creds-to-spokes.sh` copied `conjur-creds` + CA from acm.
-4. Mesh peering after west is up: `scripts/mesh/exchange-remote-secrets.sh`.
+1. OpenShift GitOps Operator installed (via managed operators wave).
+2. Set Conjur URL: `gitops/components/external-secrets/overlays/east/env/conjur.env` (or run Ansible `configure_environment`).
+3. `scripts/sync-conjur-creds-to-clusters.sh` copied `conjur-creds` + CA from acm.
+4. Quay pull secret: `scripts/sync-quay-pull-secret-to-clusters.sh` → `banking-apps/quay-pull`.
+5. Mesh peering after west is up: `scripts/mesh/exchange-remote-secrets.sh`.
 
 ## Kube context
 

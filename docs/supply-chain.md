@@ -23,6 +23,15 @@ Operators: [`gitops/platform/operators-hub`](../gitops/platform/operators-hub).
    - Fulcio OIDC issuer for RHTAS (`gitops/components/trusted-artifact-signer/env/rhtas.env`)
    - RHDA/TPA URLs for Dev Spaces (`devfile.yaml` / CheCluster overlays)
 
+### TPA post-install (vulnerability importers)
+
+SBOM upload alone does not show CVEs until advisory sources are ingested. Install enables:
+
+- GitOps: `modules.createImporters.importers` in [`trustedprofileanalyzer.yaml`](../gitops/components/trusted-profile-analyzer/trustedprofileanalyzer.yaml) (`osv-github`, `cve`, `redhat-csaf`)
+- Ansible: `bootstrap_tpa_importers` → [`scripts/bootstrap-tpa-importers.sh`](../scripts/bootstrap-tpa-importers.sh) (idempotent API enable after TPA/SSO are up)
+
+First sync of OSV/CVE/CSAF can take a long time on small hubs.
+
 ### Quay post-install
 
 See [`gitops/components/quay/README.md`](../gitops/components/quay/README.md): create org `banking`, repos, robot; store `quay-ci` in `banking-ci`.
@@ -32,12 +41,12 @@ See [`gitops/components/quay/README.md`](../gitops/components/quay/README.md): c
 - Interactive / keyless: configure Fulcio OIDC issuer, then `cosign sign` with OIDC.
 - CI (Jenkins): cosign key in `cosign-signing-key` + Rekor URL from the Securesign instance (`ci/scripts/sign-and-attest.sh`).
 
-## Regional clusters (east / west)
+## Dev Spaces (hub)
 
 | Component | Path |
 | --- | --- |
-| Dev Spaces operator | `gitops/platform/operators-hub/subscription-devspaces.yaml` (runs on hub) |
-| CheCluster | `gitops/components/devspaces` |
+| Dev Spaces operator | `gitops/platform/operators-hub/subscription-devspaces.yaml` |
+| CheCluster | `gitops/components/devspaces/overlays/acm` |
 
 ### Default Spring workspace
 
@@ -63,5 +72,7 @@ oc -n trusted-profile-analyzer get route -l app.kubernetes.io/component=server \
 
 ```bash
 scripts/apply-console-banners.sh
-# acm → "Hub Cluster"; east/west unchanged
+# acm → "Hub Cluster"; east → "East Cluster"; west → "West Cluster"
+scripts/apply-console-links.sh
+# ApplicationMenu links (Gitea, Jenkins, Quay, Rekor, Kiali)
 ```

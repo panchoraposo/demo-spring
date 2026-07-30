@@ -100,4 +100,9 @@ images:
     newTag: <BUILD_NUMBER>
 ```
 
-Spokes need pull access to Quay (pull secret in `banking-apps` or global pull secret).
+Managed clusters need pull access to Quay. After `scripts/bootstrap-quay-ci.sh`, run:
+
+```bash
+scripts/sync-quay-pull-secret-to-clusters.sh
+# creates banking-apps/quay-pull on east/west (also done by Ansible install)
+```

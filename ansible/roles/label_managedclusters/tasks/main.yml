@@ -7,7 +7,4 @@
     banking-demo/region={{ item.region }}
     --overwrite
   changed_when: true
-  loop:
-    - { name: "east", region: "east" }
-    - { name: "west", region: "west" }
-
+  loop: "{{ managed_clusters }}"

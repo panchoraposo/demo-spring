@@ -5,16 +5,26 @@
   gather_facts: false
 
   vars:
-    spoke_contexts:
-      - "{{ east_context }}"
-      - "{{ west_context }}"
+    spoke_contexts: "{{ managed_clusters | map(attribute='context') | list }}"
 
   roles:
     - role: preflight
+    - role: configure_environment
     - role: bootstrap_gitops_hub
+    - role: wait_hub_ready
+      vars:
+        wait_for_managed_gitops: false
     - role: label_managedclusters
+    - role: register_argocd_clusters
     - role: apply_acm_gitops
+    - role: wait_hub_ready
+      vars:
+        wait_for_conjur: false
+        wait_for_keycloak: false
+        wait_for_managed_gitops: true
     - role: sync_conjur_creds_to_spokes
+    - role: bootstrap_quay_ci
+    - role: bootstrap_tpa_importers
     - role: sync_quay_pull_secret
     - role: mesh_shared_ca
     - role: mesh_remote_secrets
@@ -22,4 +32,3 @@
     - role: promxy_tokens
     - role: postflight
     - role: dashboard
-

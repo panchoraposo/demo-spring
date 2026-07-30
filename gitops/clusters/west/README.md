@@ -1,6 +1,6 @@
-# Cluster west (spoke)
+# Cluster west (managed)
 
-Mirror of [east](../east/README.md) with independent PostgreSQL and Dev Spaces.
+Mirror of [east](../east/README.md) with independent PostgreSQL.
 
 | Overlay | Path |
 | --- | --- |
@@ -9,7 +9,7 @@ Mirror of [east](../east/README.md) with independent PostgreSQL and Dev Spaces.
 | api-gateway | `gitops/components/api-gateway/overlays/west` |
 | Mesh | `gitops/components/mesh/overlays/west` |
 
-OIDC uses the shared Keycloak on **acm** (Route `trusted-profile-analyzer/sso`).
+OIDC uses the shared Keycloak on **acm** (`banking-idp` Route `sso`).
 
 ## Kube context
 

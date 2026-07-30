@@ -10,6 +10,8 @@ and update the `*.env` files, then point the Argo root apps at that environment
 ### Files
 - `common.env`: Git repo URL and revision.
 - `acm.env`: hub-specific endpoints.
-- `east.env`: east spoke ingress domain and derived Keycloak issuer/host.
-- `west.env`: west spoke ingress domain and derived Keycloak issuer/host.
+- `east.env`: east managed-cluster ingress domain and hub Keycloak issuer/host.
+- `west.env`: west managed-cluster ingress domain and hub Keycloak issuer/host.
+
+Ansible role `configure_environment` rewrites these from live cluster Routes.
 

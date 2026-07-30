@@ -61,14 +61,14 @@ flowchart LR
 | Container registry | Red Hat Quay on acm (SBOM, signature, attestation) |
 | Artifact signing | Red Hat Trusted Artifact Signer (Securesign) |
 | Dependency analytics | Red Hat Trusted Profile Analyzer + RHDA backend |
-| Developer workspaces | OpenShift Dev Spaces on east/west |
+| Developer workspaces | OpenShift Dev Spaces on **acm** |
 | CI | Jenkins on acm + OpenShift BuildConfig → Quay sign/attest |
 
 ## GitOps ownership
 
-1. **acm:** [`gitops/bootstrap/acm-root.yaml`](../gitops/bootstrap/acm-root.yaml) → [`gitops/applications/acm`](../gitops/applications/acm) (Conjur, Jenkins, hub ESO, Kiali).
+1. **acm:** [`gitops/bootstrap/acm-root.yaml`](../gitops/bootstrap/acm-root.yaml) → [`gitops/applications/acm`](../gitops/applications/acm) (Conjur, Keycloak, Jenkins, ODF, Quay, RHTAS, TPA, Dev Spaces, hub ESO, Kiali, promxy, CI BuildConfigs).
 2. **RHACM:** [`gitops/acm`](../gitops/acm) Placement + ApplicationSet generates Applications that sync `gitops/applications/{{east|west}}` to each ManagedCluster.
-3. **Regional cluster waves (east/west):**
+3. **Managed cluster waves (east/west):**
   - `0` platform operators (ESO, Sail, GitOps)
    - `1` ESO operand
    - `2` mesh (Istio / CNI / ZTunnel / east-west GW / DestinationRule)
@@ -89,6 +89,6 @@ Details: [secrets-management.md](secrets-management.md), [multi-cluster.md](mult
 
 - `banking-service` Service: `istio.io/global=true` + waypoint
 - DestinationRule: `outlierDetection` + `localityLbSetting.failoverPriority: topology.istio.io/cluster`
-- PostgreSQL / Keycloak Services stay local (no global label)
+- PostgreSQL Services stay local (no global label); Keycloak is hub-only
 
 See [multi-cluster.md](multi-cluster.md) for the scale-to-zero demo.

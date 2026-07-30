@@ -1,0 +1,67 @@
+---
+- name: Wait for hub OpenShift GitOps server
+  ansible.builtin.command: >
+    oc --context "{{ acm_context }}" -n openshift-gitops
+    rollout status deploy/openshift-gitops-server --timeout=300s
+  changed_when: false
+
+- name: Wait for Conjur credentials on the hub
+  ansible.builtin.shell: |
+    set -euo pipefail
+    for i in $(seq 1 90); do
+      if oc --context "{{ acm_context }}" -n external-secrets get secret conjur-creds >/dev/null 2>&1; then
+        echo "conjur-creds present"
+        exit 0
+      fi
+      # Bootstrap Job may still be running
+      phase="$(oc --context "{{ acm_context }}" -n banking-conjur get job conjur-bootstrap \
+        -o jsonpath='{.status.succeeded}' 2>/dev/null || true)"
+      echo "[$i] waiting for conjur-creds (bootstrap succeeded=${phase:-?})"
+      sleep 10
+    done
+    echo "ERROR: conjur-creds not created in time" >&2
+    exit 1
+  args:
+    executable: /bin/bash
+  changed_when: false
+  when: wait_for_conjur | default(true) | bool
+
+- name: Wait for hub Keycloak Route
+  ansible.builtin.shell: |
+    set -euo pipefail
+    for i in $(seq 1 60); do
+      host="$(oc --context "{{ acm_context }}" -n banking-idp get route sso \
+        -o jsonpath='{.spec.host}' 2>/dev/null || true)"
+      if [[ -n "${host}" ]]; then
+        echo "keycloak=${host}"
+        exit 0
+      fi
+      echo "[$i] waiting for banking-idp/sso route"
+      sleep 10
+    done
+    echo "WARN: Keycloak route not ready yet; continuing" >&2
+    exit 0
+  args:
+    executable: /bin/bash
+  changed_when: false
+  when: wait_for_keycloak | default(true) | bool
+
+- name: Wait for managed-cluster OpenShift GitOps servers
+  ansible.builtin.shell: |
+    set -euo pipefail
+    ctx="{{ item }}"
+    for i in $(seq 1 60); do
+      if oc --context "${ctx}" -n openshift-gitops get deploy openshift-gitops-server >/dev/null 2>&1; then
+        oc --context "${ctx}" -n openshift-gitops rollout status deploy/openshift-gitops-server --timeout=120s
+        exit 0
+      fi
+      echo "[$i] waiting for GitOps on ${ctx}"
+      sleep 15
+    done
+    echo "WARN: GitOps server not ready on ${ctx}; continuing" >&2
+    exit 0
+  args:
+    executable: /bin/bash
+  loop: "{{ spoke_contexts }}"
+  changed_when: false
+  when: wait_for_managed_gitops | default(true) | bool

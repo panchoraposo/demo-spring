@@ -7,17 +7,33 @@ all:
     east_context: east
     west_context: west
 
-    # Git repo used by ArgoCD Applications
+    # ManagedCluster names/regions/contexts (must match ACM join + oc contexts)
+    managed_clusters:
+      - { name: east, region: east, context: east }
+      - { name: west, region: west, context: west }
+
+    # Git repo used by Argo CD Applications / ApplicationSets
     git_repo_url: https://github.com/panchoraposo/demo-spring.git
     git_target_revision: main
 
-    # Required for spoke ESO ClusterSecretStore (hub Conjur Route)
-    conjur_url_spoke: https://conjur-banking-conjur.apps.cluster-k7kqp.k7kqp.sandbox3321.opentlc.com
+    # After configure_environment rewrites sandbox hosts for this env, commit+push
+    # so Argo can sync the updated *.env / promxy / Quay image hosts.
+    # Prefer a per-environment branch or fork.
+    auto_push_env: false
 
-    # promxy upstream targets (Thanos Querier routes on spokes)
-    east_thanos_host: thanos-querier-openshift-monitoring.apps.cluster-4487j.4487j.sandbox2772.opentlc.com
-    west_thanos_host: thanos-querier-openshift-monitoring.apps.cluster-mj6n9.mj6n9.sandbox990.opentlc.com
+    # Set true on a brand-new env before the first CI build; keep false when reusing existing tags
+    reset_image_tags: false
+
+    # Optional overrides (configure_environment discovers these from live Routes)
+    # conjur_url_spoke: https://conjur-banking-conjur.apps.example.com
+    # east_thanos_host: thanos-querier-openshift-monitoring.apps.east.example.com
+    # west_thanos_host: thanos-querier-openshift-monitoring.apps.west.example.com
+
+    # Hub worker scale target for Dev Spaces / Jenkins / ODF (hub_capacity)
+    hub_worker_replicas: 1
 
     # Kiali hub namespace
     kiali_namespace: istio-system
 
+    # Optional postflight mesh failover check
+    run_failover_test: false

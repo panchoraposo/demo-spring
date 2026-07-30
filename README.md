@@ -4,7 +4,7 @@ Demonstration of a banking Spring application on **OpenShift**, consuming **Post
 
 Multi-cluster layout: **acm** (RHACM hub — Conjur, Jenkins, ODF, Quay, Trusted Artifact Signer, Trusted Profile Analyzer) manages **east** / **west** as regional managed clusters via ApplicationSets. East/west run OpenShift GitOps, ESO, OSSM 3.4 ambient, independent PostgreSQL, and the Spring apps. Mesh traffic can fail over; data does not.
 
-> **Prep status:** manifests and docs are in-repo. Apply only when acm/east/west are ready — see [docs/multi-cluster.md](docs/multi-cluster.md).
+> **Install:** join acm/east/west, then run the Ansible installer — see [ansible/README.md](ansible/README.md) and [docs/multi-cluster.md](docs/multi-cluster.md).
 
 ## Architecture
 
@@ -76,26 +76,26 @@ All routes are exposed through the gateway and require a valid JWT from Keycloak
 
 ## Quick start (multi-cluster)
 
-1. Install RHACM + OpenShift GitOps on **acm**; join east/west.
-2. `scripts/bootstrap-acm.sh` then `oc apply -k gitops/acm` (after labeling ManagedClusters).
-3. Replace Conjur / Keycloak / OIDC / RHDA placeholders; sync Conjur creds to managed clusters.
-4. Bootstrap Quay org + robot; create `quay-ci` and `cosign-signing-key` in `banking-ci`.
-5. `scripts/apply-console-banners.sh` (acm banner: **Hub Cluster**).
-6. Exchange mesh remote secrets; obtain a token from the hub Keycloak realm `banking` and call either cluster gateway.
+1. Install RHACM on **acm**; join east/west as Available ManagedClusters; configure `oc` contexts.
+2. Copy `ansible/inventory.example.yml` → `inventory.yml` (set `git_repo_url` / `git_target_revision` to a per-environment branch or fork).
+3. `cd ansible && ansible-playbook -i inventory.yml playbooks/install.yml`  
+   Use `-e auto_push_env=true` if Argo must read the rewritten env hosts from Git.
+4. Optional: `scripts/bootstrap-gitea.sh`, `scripts/apply-console-banners.sh`, `scripts/apply-console-links.sh`.
+5. Open the hub credentials dashboard Route in `namespace/dashboard`, get a JWT from hub Keycloak realm `banking`, call either cluster gateway.
 
-See [docs/multi-cluster.md](docs/multi-cluster.md), [docs/supply-chain.md](docs/supply-chain.md), and [docs/getting-started.md](docs/getting-started.md).
+See [ansible/README.md](ansible/README.md), [docs/multi-cluster.md](docs/multi-cluster.md), and [docs/getting-started.md](docs/getting-started.md).
 
 ## Documentation
 
 - [Architecture](docs/architecture.md)
 - [Multi-cluster](docs/multi-cluster.md)
+- [Ansible installer](ansible/README.md)
 - [Supply chain (ODF, Quay, RHTAS, TPA, Dev Spaces)](docs/supply-chain.md)
 - [Getting started](docs/getting-started.md)
 - [Secrets management](docs/secrets-management.md)
 - [CI/CD](docs/ci-cd.md)
 - [Conjur PAT + secret sync demo](docs/conjur-pat-and-sync.md)
 - [API reference](docs/api-reference.md)
-- [PostgreSQL image recommendation (PoC)](docs/postgresql-image.md)
 
 ## License
 

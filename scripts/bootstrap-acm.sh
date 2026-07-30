@@ -35,12 +35,19 @@ cat <<EOF
 
 Hub bootstrap submitted on context ${CONTEXT}.
 
-Next (when spokes are ready):
-  1. Label ManagedClusters and apply Placement/ApplicationSets:
+Prefer the full installer (env discovery, Argo cluster secrets, mesh, dashboard):
+  cd ansible && ansible-playbook -i inventory.example.yml playbooks/install.yml
+
+Manual next steps (when managed clusters are ready):
+  1. Optional Gitea seed: scripts/bootstrap-gitea.sh
+  2. Label ManagedClusters + register hub Argo cluster secrets, then:
        oc --context ${CONTEXT} apply -k gitops/acm
-  2. Sync Conjur creds to spokes:
-       scripts/sync-conjur-creds-to-spokes.sh
-  3. Exchange mesh remote secrets:
+  3. Sync Conjur creds to managed clusters:
+       scripts/sync-conjur-creds-to-clusters.sh
+  4. Bootstrap Quay CI + pull secrets:
+       scripts/bootstrap-quay-ci.sh
+       scripts/sync-quay-pull-secret-to-clusters.sh
+  5. Exchange mesh remote secrets:
        scripts/mesh/exchange-remote-secrets.sh
 
 EOF

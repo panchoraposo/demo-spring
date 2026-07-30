@@ -1,0 +1,47 @@
+---
+- name: Register managed clusters as Argo CD cluster secrets on the hub
+  ansible.builtin.shell: |
+    set -euo pipefail
+    hub="{{ acm_context }}"
+    name="{{ item.name }}"
+    ctx="{{ item.context }}"
+    region="{{ item.region }}"
+    ns="openshift-gitops"
+    sa="banking-argocd-manager"
+
+    server="$(oc --context "${ctx}" whoami --show-server)"
+    # Namespace may not exist yet (GitOps operator arrives via ApplicationSet).
+    oc --context "${ctx}" create namespace "${ns}" --dry-run=client -o yaml \
+      | oc --context "${ctx}" apply -f -
+    oc --context "${ctx}" -n "${ns}" create sa "${sa}" --dry-run=client -o yaml \
+      | oc --context "${ctx}" apply -f -
+    oc --context "${ctx}" adm policy add-cluster-role-to-user cluster-admin \
+      "system:serviceaccount:${ns}:${sa}" >/dev/null
+    token="$(oc --context "${ctx}" -n "${ns}" create token "${sa}" --duration=8760h)"
+    ca_b64="$(oc --context "${ctx}" get cm -n kube-public kube-root-ca.crt -o jsonpath='{.data.ca\.crt}' | base64 | tr -d '\n')"
+
+    config="$(TOKEN="${token}" CA_B64="${ca_b64}" python3 - <<'PY'
+    import json, os
+    print(json.dumps({
+      "bearerToken": os.environ["TOKEN"],
+      "tlsClientConfig": {"insecure": False, "caData": os.environ["CA_B64"]},
+    }))
+    PY
+    )"
+
+    oc --context "${hub}" -n "${ns}" create secret generic "cluster-${name}" \
+      --from-literal=name="${name}" \
+      --from-literal=server="${server}" \
+      --from-literal=config="${config}" \
+      --dry-run=client -o yaml \
+      | oc --context "${hub}" apply -f -
+
+    oc --context "${hub}" -n "${ns}" label secret "cluster-${name}" \
+      argocd.argoproj.io/secret-type=cluster \
+      banking-demo/role=managed \
+      banking-demo/region="${region}" \
+      --overwrite
+  args:
+    executable: /bin/bash
+  loop: "{{ managed_clusters }}"
+  changed_when: true

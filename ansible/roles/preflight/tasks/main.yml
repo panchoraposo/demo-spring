@@ -1,12 +1,14 @@
 ---
 - name: Check required CLIs exist
-  ansible.builtin.command: "{{ item }} --version"
+  ansible.builtin.command: bash -lc "command -v {{ item }}"
   changed_when: false
   loop:
     - oc
     - jq
     - curl
     - openssl
+    - python3
+    - istioctl
 
 - name: Validate oc contexts are present
   ansible.builtin.command: oc config get-contexts -o name
@@ -21,3 +23,33 @@
       - west_context in oc_contexts.stdout_lines
     fail_msg: "Missing one or more oc contexts (expected: {{ acm_context }}, {{ east_context }}, {{ west_context }})"
 
+- name: Verify ManagedClusters exist and are Available
+  ansible.builtin.shell: |
+    set -euo pipefail
+    name="{{ item.name }}"
+    avail="$(oc --context "{{ acm_context }}" get managedcluster "${name}" \
+      -o jsonpath='{.status.conditions[?(@.type=="ManagedClusterConditionAvailable")].status}' 2>/dev/null || true)"
+    if [[ "${avail}" != "True" ]]; then
+      echo "ERROR: ManagedCluster ${name} is not Available (status=${avail:-missing})" >&2
+      oc --context "{{ acm_context }}" get managedcluster "${name}" -o wide >&2 || true
+      exit 1
+    fi
+    echo "ManagedCluster ${name} Available"
+  args:
+    executable: /bin/bash
+  loop: "{{ managed_clusters }}"
+  changed_when: false
+
+- name: Verify hub OpenShift GitOps server exists (or can be installed by bootstrap)
+  ansible.builtin.command: >
+    oc --context "{{ acm_context }}" -n openshift-gitops get deploy openshift-gitops-server
+  register: hub_gitops
+  changed_when: false
+  failed_when: false
+
+- name: Warn if hub GitOps is not installed yet
+  when: hub_gitops.rc != 0
+  ansible.builtin.debug:
+    msg: >-
+      Hub OpenShift GitOps server not found yet.
+      bootstrap_gitops_hub / scripts/bootstrap-acm.sh will install the subscription.
