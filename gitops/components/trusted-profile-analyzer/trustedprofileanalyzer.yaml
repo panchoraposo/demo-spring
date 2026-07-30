@@ -20,6 +20,9 @@ spec:
     name: rhtpadb
     username: tpa
     password: replace-me-tpa-db
+    # Sandbox defaults: keep connection pool small.
+    minimumConnections: 1
+    maximumConnections: 10
   storage:
     type: filesystem
     size: 20Gi
