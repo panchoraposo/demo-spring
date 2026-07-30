@@ -128,10 +128,13 @@ else
         -d "client_id=${TPA_OIDC_CLIENT_ID}" \
         -d "client_secret=${TPA_OIDC_CLIENT_SECRET}" \
         -d "scope=${TPA_OIDC_SCOPES}" || true)"
-      TPA_TOKEN="$(python3 -c 'import json,sys; print(json.load(open("/tmp/tpa-oidc.json")).get("access_token",""))' 2>/dev/null || true)"
+      # Jenkins controller image may not have python3; parse with sed.
+      TPA_TOKEN="$(sed -n 's/.*"access_token"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p' /tmp/tpa-oidc.json | head -1 || true)"
       if [ -z "${TPA_TOKEN}" ]; then
-        err="$(python3 -c 'import json; j=json.load(open("/tmp/tpa-oidc.json")); print(j.get("error"), j.get("error_description",""))' 2>/dev/null || true)"
+        err="$(sed -n 's/.*"error"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p' /tmp/tpa-oidc.json | head -1 || true)"
         echo "WARN: Failed to obtain TPA token (HTTP ${token_http}) issuer=${TPA_OIDC_ISSUER_URL} err=${err}" >&2
+        head -c 300 /tmp/tpa-oidc.json 2>/dev/null || true
+        echo >&2
       fi
     else
       echo "WARN: Missing TPA_OIDC_CLIENT_SECRET; cannot obtain CI token for TPA upload." >&2
