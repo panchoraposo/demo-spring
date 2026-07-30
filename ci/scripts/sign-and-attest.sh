@@ -147,12 +147,14 @@ else
     exit 1
   fi
 
+  # Trustify 3.x: POST /api/v3/sbom (v2 only supports GET). Body is raw bytes.
+  upload_url="${TPA_URL}/api/v3/sbom?format=cyclonedx&labels.labels.app=${APP}&labels.labels.tag=${IMAGE_TAG}"
   code="$(curl -sk -o /tmp/tpa-upload.json -w '%{http_code}' \
-    -X POST "${TPA_URL}/api/v2/sbom?format=cyclonedx&labels.labels.app=${APP}&labels.labels.tag=${IMAGE_TAG}" \
-    -H 'Content-Type: application/vnd.cyclonedx+json' \
+    -X POST "${upload_url}" \
+    -H 'Content-Type: application/octet-stream' \
     --data-binary "@${ARTIFACT_DIR}/sbom.cdx.json" \
     "${hdr_auth[@]}" || true)"
-  echo "TPA upload HTTP=${code} url=${TPA_URL}"
+  echo "TPA upload HTTP=${code} url=${upload_url}"
   if [ "${code}" != "200" ] && [ "${code}" != "201" ] && [ "${code}" != "202" ]; then
     echo "WARN: SBOM upload to TPA failed (HTTP ${code})." >&2
     head -c 400 /tmp/tpa-upload.json 2>/dev/null || true
@@ -160,6 +162,9 @@ else
       echo "ERROR: SBOM upload to TPA is required in CI." >&2
       exit 1
     fi
+  else
+    head -c 400 /tmp/tpa-upload.json 2>/dev/null || true
+    echo
   fi
 fi
 
