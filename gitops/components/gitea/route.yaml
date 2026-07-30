@@ -1,0 +1,22 @@
+# Public OpenShift Route for the Gitea UI and HTTPS git clone.
+# Host is assigned by the cluster apps domain (gitea-banking-git.<domain>).
+apiVersion: route.openshift.io/v1
+kind: Route
+metadata:
+  name: gitea
+  namespace: banking-git
+  labels:
+    app.kubernetes.io/part-of: banking-demo
+    app.kubernetes.io/name: gitea
+    cluster: acm
+spec:
+  to:
+    kind: Service
+    name: gitea-http
+    weight: 100
+  port:
+    targetPort: http
+  tls:
+    termination: edge
+    insecureEdgeTerminationPolicy: Redirect
+  wildcardPolicy: None

@@ -1,0 +1,269 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: gitea-bootstrap-script
+  namespace: banking-git
+  labels:
+    app.kubernetes.io/part-of: banking-demo
+    app.kubernetes.io/component: gitea-config
+data:
+  bootstrap.sh: |
+    #!/usr/bin/env bash
+    # Seed Gitea with demo-spring (Spring apps + GitOps), create a CI PAT,
+    # store it in Conjur (banking/github-ci/*), and publish clone URL for Jenkins.
+    set -euo pipefail
+
+    GITEA_URL="${GITEA_URL:-http://gitea-http.banking-git.svc:3000}"
+    GITEA_NS="${GITEA_NS:-banking-git}"
+    ADMIN_USER="${ADMIN_USER:-gitea_admin}"
+    ADMIN_PASSWORD="${ADMIN_PASSWORD:-BankingGiteaChangeMe!}"
+    ORG="${GITEA_ORG:-banking}"
+    REPO="${GITEA_REPO:-demo-spring}"
+    CI_USER="${CI_USER:-git}"
+    CI_PASSWORD="${CI_PASSWORD:-BankingGitCiChangeMe!}"
+    SOURCE_REPO="${SOURCE_REPO:-https://github.com/panchoraposo/demo-spring.git}"
+    CONJUR_URL="${CONJUR_URL:-https://conjur-oss.banking-conjur.svc}"
+    CONJUR_NS="${CONJUR_NS:-banking-conjur}"
+    CONJUR_ACCOUNT="${CONJUR_ACCOUNT:-banking}"
+    CONJUR_RELEASE="${CONJUR_RELEASE:-conjur-oss}"
+    CI_NS="${CI_NS:-banking-ci}"
+    GITOPS_NS="${GITOPS_NS:-openshift-gitops}"
+
+    echo "Waiting for Gitea at ${GITEA_URL}..."
+    for i in $(seq 1 90); do
+      CODE="$(curl -sS -o /dev/null -w '%{http_code}' "${GITEA_URL}/api/v1/version" || true)"
+      if [[ "${CODE}" == "200" ]]; then
+        break
+      fi
+      sleep 5
+      if [[ "${i}" -eq 90 ]]; then
+        echo "Gitea API did not become ready" >&2
+        exit 1
+      fi
+    done
+
+    api() {
+      local method="$1" path="$2" data="${3:-}"
+      if [[ -n "${data}" ]]; then
+        curl -sS -X "${method}" \
+          -H "Authorization: token ${ADMIN_TOKEN}" \
+          -H "Content-Type: application/json" \
+          -d "${data}" \
+          "${GITEA_URL}${path}"
+      else
+        curl -sS -X "${method}" \
+          -H "Authorization: token ${ADMIN_TOKEN}" \
+          -H "Content-Type: application/json" \
+          "${GITEA_URL}${path}"
+      fi
+    }
+
+    echo "Creating admin API token..."
+    ADMIN_TOKEN=""
+    for i in $(seq 1 30); do
+      RESP="$(curl -sS -u "${ADMIN_USER}:${ADMIN_PASSWORD}" \
+        -H "Content-Type: application/json" \
+        -X POST \
+        -d "{\"name\":\"bootstrap-$(date +%s)\",\"scopes\":[\"all\"]}" \
+        "${GITEA_URL}/api/v1/users/${ADMIN_USER}/tokens" || true)"
+      ADMIN_TOKEN="$(printf '%s' "${RESP}" | python3 -c 'import sys,json; print(json.load(sys.stdin).get("sha1",""))' 2>/dev/null || true)"
+      if [[ -n "${ADMIN_TOKEN}" ]]; then
+        break
+      fi
+      # Fallback scopes for older Gitea
+      RESP="$(curl -sS -u "${ADMIN_USER}:${ADMIN_PASSWORD}" \
+        -H "Content-Type: application/json" \
+        -X POST \
+        -d "{\"name\":\"bootstrap-$(date +%s)-v1\",\"scopes\":[\"write:repository\",\"write:organization\",\"write:user\",\"write:admin\"]}" \
+        "${GITEA_URL}/api/v1/users/${ADMIN_USER}/tokens" || true)"
+      ADMIN_TOKEN="$(printf '%s' "${RESP}" | python3 -c 'import sys,json; print(json.load(sys.stdin).get("sha1",""))' 2>/dev/null || true)"
+      if [[ -n "${ADMIN_TOKEN}" ]]; then
+        break
+      fi
+      sleep 5
+    done
+    [[ -n "${ADMIN_TOKEN}" ]] || { echo "Failed to create admin token: ${RESP:-}" >&2; exit 1; }
+
+    echo "Ensuring org ${ORG}..."
+    CODE="$(curl -sS -o /tmp/org.json -w '%{http_code}' \
+      -H "Authorization: token ${ADMIN_TOKEN}" \
+      "${GITEA_URL}/api/v1/orgs/${ORG}" || true)"
+    if [[ "${CODE}" != "200" ]]; then
+      api POST /api/v1/orgs \
+        "{\"username\":\"${ORG}\",\"full_name\":\"Banking Demo\",\"visibility\":\"public\"}" >/dev/null
+    fi
+
+    echo "Ensuring CI user ${CI_USER}..."
+    CODE="$(curl -sS -o /dev/null -w '%{http_code}' \
+      -H "Authorization: token ${ADMIN_TOKEN}" \
+      "${GITEA_URL}/api/v1/users/${CI_USER}" || true)"
+    if [[ "${CODE}" != "200" ]]; then
+      api POST /api/v1/admin/users \
+        "{\"username\":\"${CI_USER}\",\"email\":\"${CI_USER}@banking-demo.local\",\"password\":\"${CI_PASSWORD}\",\"must_change_password\":false,\"visibility\":\"public\"}" >/dev/null || true
+    fi
+
+    # Add CI user to org owners team (best-effort)
+    TEAM_ID="$(api GET "/api/v1/orgs/${ORG}/teams" | python3 -c 'import sys,json; teams=json.load(sys.stdin); print(next((t["id"] for t in teams if t.get("name") in ("Owners","owners")), teams[0]["id"] if teams else ""))' 2>/dev/null || true)"
+    if [[ -n "${TEAM_ID}" ]]; then
+      curl -sS -o /dev/null -X PUT \
+        -H "Authorization: token ${ADMIN_TOKEN}" \
+        "${GITEA_URL}/api/v1/teams/${TEAM_ID}/members/${CI_USER}" || true
+    fi
+
+    echo "Ensuring repo ${ORG}/${REPO} (migrate from ${SOURCE_REPO} if missing)..."
+    CODE="$(curl -sS -o /dev/null -w '%{http_code}' \
+      -H "Authorization: token ${ADMIN_TOKEN}" \
+      "${GITEA_URL}/api/v1/repos/${ORG}/${REPO}" || true)"
+    if [[ "${CODE}" != "200" ]]; then
+      MIGRATE_RESP="$(api POST /api/v1/repos/migrate \
+        "{\"clone_addr\":\"${SOURCE_REPO}\",\"repo_owner\":\"${ORG}\",\"repo_name\":\"${REPO}\",\"mirror\":false,\"private\":false,\"service\":\"git\",\"description\":\"Banking demo Spring apps + GitOps\"}")"
+      MIGRATE_OK="$(printf '%s' "${MIGRATE_RESP}" | python3 -c 'import sys,json; d=json.load(sys.stdin); print("1" if d.get("full_name") or d.get("name") else "0")' 2>/dev/null || echo 0)"
+      if [[ "${MIGRATE_OK}" != "1" ]]; then
+        echo "Migrate response: ${MIGRATE_RESP}" >&2
+        # Create empty repo as fallback; scripts/bootstrap-gitea.sh can push.
+        api POST "/api/v1/orgs/${ORG}/repos" \
+          "{\"name\":\"${REPO}\",\"private\":false,\"auto_init\":true,\"default_branch\":\"main\",\"description\":\"Banking demo Spring apps + GitOps\"}" >/dev/null || true
+      fi
+    else
+      echo "Repo ${ORG}/${REPO} already exists"
+    fi
+
+    echo "Creating CI PAT for ${CI_USER}..."
+    # Delete prior token with same name (ignore errors)
+    curl -sS -o /dev/null -X DELETE \
+      -u "${CI_USER}:${CI_PASSWORD}" \
+      "${GITEA_URL}/api/v1/users/${CI_USER}/tokens/jenkins-ci" || true
+    CI_TOKEN_RESP="$(curl -sS -u "${CI_USER}:${CI_PASSWORD}" \
+      -H "Content-Type: application/json" \
+      -X POST \
+      -d '{"name":"jenkins-ci","scopes":["write:repository","write:organization","read:user"]}' \
+      "${GITEA_URL}/api/v1/users/${CI_USER}/tokens" || true)"
+    CI_TOKEN="$(printf '%s' "${CI_TOKEN_RESP}" | python3 -c 'import sys,json; print(json.load(sys.stdin).get("sha1",""))' 2>/dev/null || true)"
+    if [[ -z "${CI_TOKEN}" ]]; then
+      # Admin-created token for CI user
+      CI_TOKEN_RESP="$(api POST "/api/v1/users/${CI_USER}/tokens" \
+        '{"name":"jenkins-ci-admin","scopes":["all"]}')"
+      CI_TOKEN="$(printf '%s' "${CI_TOKEN_RESP}" | python3 -c 'import sys,json; print(json.load(sys.stdin).get("sha1",""))' 2>/dev/null || true)"
+    fi
+    [[ -n "${CI_TOKEN}" ]] || { echo "Failed to create CI PAT: ${CI_TOKEN_RESP:-}" >&2; exit 1; }
+    echo "CI PAT created (len=${#CI_TOKEN})"
+
+    CLONE_URL="${GITEA_URL}/${ORG}/${REPO}.git"
+    ROUTE_HOST="$(oc -n "${GITEA_NS}" get route gitea -o jsonpath='{.spec.host}' 2>/dev/null || true)"
+    PUBLIC_URL=""
+    if [[ -n "${ROUTE_HOST}" ]]; then
+      PUBLIC_URL="https://${ROUTE_HOST}/${ORG}/${REPO}.git"
+    fi
+
+    echo "Writing Conjur banking/github-ci/* ..."
+    for i in $(seq 1 60); do
+      if curl -skf "${CONJUR_URL}/status" >/dev/null 2>&1 || curl -skf "${CONJUR_URL}/" >/dev/null 2>&1; then
+        break
+      fi
+      sleep 5
+    done
+
+    CA_FILE="/tmp/conjur-ca.crt"
+    oc -n "${CONJUR_NS}" get secret "${CONJUR_RELEASE}-conjur-ssl-ca-cert" \
+      -o jsonpath='{.data.tls\.crt}' | base64 -d > "${CA_FILE}"
+
+    POD=""
+    ADMIN_API_KEY=""
+    for i in $(seq 1 60); do
+      POD="$(oc -n "${CONJUR_NS}" get pod -l app=conjur-oss --field-selector=status.phase=Running \
+        -o jsonpath='{.items[0].metadata.name}' 2>/dev/null || true)"
+      if [[ -z "${POD}" ]]; then
+        POD="$(oc -n "${CONJUR_NS}" get pod -l app.kubernetes.io/name=conjur-oss --field-selector=status.phase=Running \
+          -o jsonpath='{.items[0].metadata.name}' 2>/dev/null || true)"
+      fi
+      if [[ -n "${POD}" ]]; then
+        ADMIN_API_KEY="$(oc -n "${CONJUR_NS}" exec "${POD}" -c conjur-oss -- \
+          conjurctl role retrieve-key "${CONJUR_ACCOUNT}:user:admin" 2>/dev/null | tr -d '\r\n' || true)"
+        [[ -n "${ADMIN_API_KEY}" ]] && break
+      fi
+      sleep 5
+    done
+    [[ -n "${ADMIN_API_KEY}" ]] || { echo "WARN: Conjur admin key not ready; PAT not written yet" >&2; ADMIN_API_KEY=""; }
+
+    if [[ -n "${ADMIN_API_KEY}" ]]; then
+      auth_token() {
+        local enc_login
+        enc_login="$(python3 -c 'import urllib.parse,sys; print(urllib.parse.quote(sys.argv[1], safe=""))' admin)"
+        curl -sf --cacert "${CA_FILE}" -X POST \
+          --data-binary "${ADMIN_API_KEY}" \
+          "${CONJUR_URL}/authn/${CONJUR_ACCOUNT}/${enc_login}/authenticate" \
+          | base64 | tr -d '\n'
+      }
+      set_var() {
+        local id="$1" value="$2" enc_id token
+        enc_id="$(python3 -c 'import urllib.parse,sys; print(urllib.parse.quote(sys.argv[1], safe=""))' "${id}")"
+        token="$(auth_token)"
+        curl -sf --cacert "${CA_FILE}" -X POST \
+          -H "Authorization: Token token=\"${token}\"" \
+          -H "Content-Type: text/plain" \
+          --data-binary "${value}" \
+          "${CONJUR_URL}/secrets/${CONJUR_ACCOUNT}/variable/${enc_id}" >/dev/null
+        echo "  Conjur set ${id}"
+      }
+      set_var "banking/github-ci/username" "${CI_USER}"
+      set_var "banking/github-ci/token" "${CI_TOKEN}"
+    fi
+
+    echo "Publishing clone URL ConfigMap in ${CI_NS}..."
+    oc create namespace "${CI_NS}" --dry-run=client -o yaml | oc apply -f - >/dev/null
+    oc -n "${CI_NS}" create configmap gitea-repo \
+      --from-literal=cloneUrl="${CLONE_URL}" \
+      --from-literal=publicUrl="${PUBLIC_URL:-}" \
+      --from-literal=org="${ORG}" \
+      --from-literal=repo="${REPO}" \
+      --dry-run=client -o yaml | oc apply -f -
+
+    echo "Registering Argo CD repository credential..."
+    oc -n "${GITOPS_NS}" create secret generic repo-banking-gitea \
+      --from-literal=type=git \
+      --from-literal=url="${CLONE_URL}" \
+      --from-literal=username="${CI_USER}" \
+      --from-literal=password="${CI_TOKEN}" \
+      --dry-run=client -o yaml | oc apply -f -
+    oc -n "${GITOPS_NS}" label secret repo-banking-gitea \
+      argocd.argoproj.io/secret-type=repository \
+      app.kubernetes.io/part-of=banking-demo --overwrite
+
+    if oc -n "${CI_NS}" get externalsecret github-ci >/dev/null 2>&1; then
+      oc -n "${CI_NS}" annotate externalsecret github-ci \
+        force-sync="$(date +%s)" \
+        reconcile.external-secrets.io/requested-at="$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
+        --overwrite || true
+    fi
+
+    if oc -n "${CI_NS}" get sts jenkins >/dev/null 2>&1; then
+      echo "Restarting Jenkins to reload github-ci credential..."
+      oc -n "${CI_NS}" delete pod -l app.kubernetes.io/component=jenkins-controller --wait=false 2>/dev/null || true
+    fi
+
+    if [[ -n "${ROUTE_HOST}" ]]; then
+      echo "Ensuring ConsoleLink banking-demo-gitea..."
+      # Official Gitea community logo (go-gitea/gitea assets/logo.svg)
+      GITEA_ICON="https://raw.githubusercontent.com/go-gitea/gitea/main/assets/logo.svg"
+      printf '%s\n' \
+        'apiVersion: console.openshift.io/v1' \
+        'kind: ConsoleLink' \
+        'metadata:' \
+        '  name: banking-demo-gitea' \
+        '  labels:' \
+        '    app.kubernetes.io/part-of: banking-demo' \
+        '    cluster: acm' \
+        'spec:' \
+        "  href: https://${ROUTE_HOST}" \
+        '  location: ApplicationMenu' \
+        '  text: Gitea' \
+        '  applicationMenu:' \
+        '    section: Banking Demo' \
+        "    imageURL: \"${GITEA_ICON}\"" \
+        | oc apply -f -
+    fi
+
+    echo "Gitea bootstrap complete."
+    echo "  clone (in-cluster): ${CLONE_URL}"
+    echo "  public:             ${PUBLIC_URL:-n/a}"
+    echo "  Conjur:             banking/github-ci/{username,token}"

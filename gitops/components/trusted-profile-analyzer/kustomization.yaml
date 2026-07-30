@@ -8,4 +8,5 @@ resources:
   - objectbucketclaim.yaml
   - secrets.yaml
   - postgresql.yaml
+  - redis.yaml
   - rhda-backend.yaml

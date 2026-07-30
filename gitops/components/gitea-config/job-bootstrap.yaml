@@ -1,0 +1,64 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: gitea-bootstrap
+  namespace: banking-git
+  labels:
+    app.kubernetes.io/part-of: banking-demo
+    app.kubernetes.io/component: gitea-config
+  annotations:
+    argocd.argoproj.io/sync-wave: "3"
+spec:
+  backoffLimit: 8
+  ttlSecondsAfterFinished: 86400
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: gitea-bootstrap
+    spec:
+      restartPolicy: OnFailure
+      serviceAccountName: gitea-bootstrap
+      containers:
+        - name: bootstrap
+          image: registry.redhat.io/openshift4/ose-cli:latest
+          command: ["/bin/bash", "/scripts/bootstrap.sh"]
+          env:
+            - name: GITEA_URL
+              value: http://gitea-http.banking-git.svc:3000
+            - name: GITEA_NS
+              value: banking-git
+            - name: ADMIN_USER
+              value: gitea_admin
+            - name: ADMIN_PASSWORD
+              value: BankingGiteaChangeMe!
+            - name: GITEA_ORG
+              value: banking
+            - name: GITEA_REPO
+              value: demo-spring
+            - name: CI_USER
+              value: git
+            - name: CI_PASSWORD
+              value: BankingGitCiChangeMe!
+            - name: SOURCE_REPO
+              # Initial seed source (public). After migrate, GitOps/CI use in-cluster Gitea.
+              value: https://github.com/panchoraposo/demo-spring.git
+            - name: CONJUR_URL
+              value: https://conjur-oss.banking-conjur.svc
+            - name: CONJUR_NS
+              value: banking-conjur
+            - name: CONJUR_ACCOUNT
+              value: banking
+            - name: CONJUR_RELEASE
+              value: conjur-oss
+            - name: CI_NS
+              value: banking-ci
+            - name: GITOPS_NS
+              value: openshift-gitops
+          volumeMounts:
+            - name: scripts
+              mountPath: /scripts
+      volumes:
+        - name: scripts
+          configMap:
+            name: gitea-bootstrap-script
+            defaultMode: 0755

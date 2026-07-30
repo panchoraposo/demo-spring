@@ -10,6 +10,8 @@ metadata:
     app.kubernetes.io/part-of: banking-demo
 spec:
   replicas: 1
+  strategy:
+    type: Recreate
   selector:
     matchLabels:
       app.kubernetes.io/name: rhda-backend
@@ -24,11 +26,31 @@ spec:
           ports:
             - containerPort: 8080
               name: http
+            - containerPort: 9000
+              name: mgmt
           env:
             - name: TPA_URL
               value: http://banking-tpa-server.trusted-profile-analyzer.svc:8080
             - name: QUARKUS_HTTP_PORT
               value: "8080"
+            - name: QUARKUS_DATASOURCE_DB_KIND
+              value: postgresql
+            - name: QUARKUS_DATASOURCE_JDBC_URL
+              value: jdbc:postgresql://tpa-postgresql.trusted-profile-analyzer.svc:5432/rhtpadb
+            - name: QUARKUS_DATASOURCE_USERNAME
+              valueFrom:
+                secretKeyRef:
+                  name: postgresql-credentials
+                  key: db.user
+            - name: QUARKUS_DATASOURCE_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: postgresql-credentials
+                  key: db.password
+            - name: QUARKUS_REDIS_HOSTS
+              value: redis://rhda-redis.trusted-profile-analyzer.svc:6379
+            - name: QUARKUS_HIBERNATE_ORM_DATABASE_GENERATION
+              value: update
           resources:
             requests:
               cpu: 100m
@@ -39,13 +61,13 @@ spec:
           readinessProbe:
             httpGet:
               path: /q/health/ready
-              port: http
+              port: mgmt
             initialDelaySeconds: 15
             periodSeconds: 10
           livenessProbe:
             httpGet:
               path: /q/health/live
-              port: http
+              port: mgmt
             initialDelaySeconds: 30
             periodSeconds: 20
 ---

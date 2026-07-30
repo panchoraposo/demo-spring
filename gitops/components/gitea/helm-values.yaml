@@ -1,0 +1,80 @@
+# Official Gitea chart (https://dl.gitea.com/charts/) on acm.
+# Public exposure: OpenShift Route in route.yaml (not the chart's route).
+# Jenkins/Argo on acm also use the in-cluster Service gitea-http:3000.
+
+openshift:
+  enabled: true
+
+image:
+  rootless: true
+
+postgresql-ha:
+  enabled: false
+
+postgresql:
+  enabled: true
+  global:
+    postgresql:
+      auth:
+        username: gitea
+        password: gitea-demo-change-me
+        database: gitea
+  primary:
+    persistence:
+      enabled: true
+      size: 8Gi
+
+valkey-cluster:
+  enabled: false
+
+valkey:
+  enabled: true
+  architecture: standalone
+  primary:
+    persistence:
+      enabled: true
+      size: 1Gi
+
+persistence:
+  enabled: true
+  create: true
+  mount: true
+  size: 10Gi
+  accessModes:
+    - ReadWriteOnce
+
+service:
+  http:
+    type: ClusterIP
+    port: 3000
+  ssh:
+    type: ClusterIP
+
+ingress:
+  enabled: false
+
+# Route is managed by gitops/components/gitea/route.yaml so it stays visible
+# in GitOps and is applied even when Helm is installed from bootstrap-gitea.sh.
+route:
+  enabled: false
+
+gitea:
+  admin:
+    username: gitea_admin
+    password: BankingGiteaChangeMe!
+    email: gitea-admin@banking-demo.local
+    passwordMode: initialOnlyNoReset
+  config:
+    server:
+      # bootstrap-gitea.sh install overrides these with the real Route URL
+      # (https://gitea-banking-git.<apps-domain>/). Placeholders keep the chart valid
+      # until that step runs.
+      DOMAIN: gitea-banking-git.apps.cluster-k7kqp.k7kqp.sandbox3321.opentlc.com
+      SSH_DOMAIN: gitea-banking-git.apps.cluster-k7kqp.k7kqp.sandbox3321.opentlc.com
+      ROOT_URL: https://gitea-banking-git.apps.cluster-k7kqp.k7kqp.sandbox3321.opentlc.com/
+      PROTOCOL: https
+    service:
+      DISABLE_REGISTRATION: true
+      REQUIRE_SIGNIN_VIEW: false
+    repository:
+      DEFAULT_BRANCH: main
