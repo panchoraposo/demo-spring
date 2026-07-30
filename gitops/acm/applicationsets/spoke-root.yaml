@@ -15,12 +15,10 @@ metadata:
     app.kubernetes.io/part-of: banking-demo
 spec:
   generators:
-    - clusterDecisionResource:
-        configMapRef: acm-placement
-        labelSelector:
+    - clusters:
+        selector:
           matchLabels:
-            cluster.open-cluster-management.io/placement: banking-spokes
-        requeueAfterSeconds: 180
+            banking-demo/role: spoke
   template:
     metadata:
       name: 'banking-{{name}}-root'
