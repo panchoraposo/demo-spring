@@ -70,8 +70,12 @@ else
 fi
 
 echo "==> Generate CycloneDX SBOM"
-syft "registry:${QUAY_IMAGE}" -o cyclonedx-json="${ARTIFACT_DIR}/sbom.cdx.json"
-syft "registry:${QUAY_IMAGE}" -o spdx-json="${ARTIFACT_DIR}/sbom.spdx.json"
+# Use short app name (not the full Quay path) so TPA displays banking-service / api-gateway.
+syft "registry:${QUAY_IMAGE}" \
+  --source-name "${APP}" \
+  --source-version "${IMAGE_TAG}" \
+  -o cyclonedx-json="${ARTIFACT_DIR}/sbom.cdx.json" \
+  -o spdx-json="${ARTIFACT_DIR}/sbom.spdx.json"
 
 echo "==> Upload SBOM to Trusted Profile Analyzer (Trustify) when available"
 # In CI we require the SBOM upload to succeed (so SBOM is left in TPA).
