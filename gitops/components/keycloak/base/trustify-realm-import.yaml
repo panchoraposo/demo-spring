@@ -55,7 +55,7 @@ spec:
         directAccessGrantsEnabled: false
         serviceAccountsEnabled: true
         clientAuthenticatorType: client-secret
-        secret: replace-me-oidc-client-secret
+        secret: replace-me-oidc-cli-client-secret
         fullScopeAllowed: true
         defaultClientScopes:
           - read:document

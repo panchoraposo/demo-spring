@@ -130,7 +130,7 @@ data:
     set_var "banking/github-ci/token" "replace-me"
 
     # Trusted Profile Analyzer (TPA)
-    set_var "banking/tpa/oidc-cli-client-secret" "tpa-oidc-cli-secret-change-me"
+    set_var "banking/tpa/oidc-cli-client-secret" "replace-me-oidc-cli-client-secret"
     set_var "banking/tpa/postgresql-db-host" "tpa-postgresql"
     set_var "banking/tpa/postgresql-db-name" "rhtpadb"
     set_var "banking/tpa/postgresql-db-user" "tpa"
@@ -139,6 +139,11 @@ data:
     set_var "banking/tpa/postgresql-db-port" "5432"
     set_var "banking/tpa/postgresql-admin-user" "postgres"
     set_var "banking/tpa/postgresql-admin-password" "replace-me-tpa-admin"
+
+    # Promxy Thanos bearer tokens (replaced by ansible role promxy_tokens / mesh scripts).
+    # Placeholders keep ExternalSecret Ready until real tokens are written.
+    set_var "banking/promxy/east-token" "replace-me"
+    set_var "banking/promxy/west-token" "replace-me"
 
     echo "Rotating API key for host banking/eso..."
     # Re-auth in case token TTL is short
