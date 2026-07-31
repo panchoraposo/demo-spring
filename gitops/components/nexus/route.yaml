@@ -1,0 +1,17 @@
+apiVersion: route.openshift.io/v1
+kind: Route
+metadata:
+  name: nexus
+  namespace: nexus
+  labels:
+    app.kubernetes.io/part-of: banking-demo
+    app.kubernetes.io/name: nexus
+spec:
+  to:
+    kind: Service
+    name: nexus
+  port:
+    targetPort: http
+  tls:
+    termination: edge
+    insecureEdgeTerminationPolicy: Redirect

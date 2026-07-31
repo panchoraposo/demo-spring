@@ -88,9 +88,25 @@ kiali_href() {
   [[ -n "${host}" ]] && echo "https://${host}"
 }
 
+acs_href() {
+  local host
+  host="$(oc --context "${CTX}" -n stackrox get route central \
+    -o jsonpath='{.spec.host}' 2>/dev/null || true)"
+  [[ -n "${host}" ]] && echo "https://${host}"
+}
+
+nexus_href() {
+  local host
+  host="$(oc --context "${CTX}" -n nexus get route nexus \
+    -o jsonpath='{.spec.host}' 2>/dev/null || true)"
+  [[ -n "${host}" ]] && echo "https://${host}"
+}
+
 apply_link banking-demo-gitea "Gitea" "$(gitea_href)" "$(console_link_icon_gitea)"
 apply_link banking-demo-jenkins "Jenkins" "$(jenkins_href)" "$(console_link_icon_jenkins)"
 apply_link banking-demo-quay "Quay" "$(quay_href)" "$(console_link_icon_quay)"
+apply_link banking-demo-nexus "Nexus" "$(nexus_href)" "$(console_link_icon_quay)"
+apply_link banking-demo-acs "ACS Central" "$(acs_href)" "$(console_link_icon_rekor)"
 apply_link banking-demo-rekor-search-ui "Rekor Search UI" "$(rekor_search_ui_href)" "$(console_link_icon_rekor)"
 apply_link banking-demo-kiali "Kiali" "$(kiali_href)" "$(console_link_icon_kiali)"
 

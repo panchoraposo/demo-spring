@@ -1,0 +1,20 @@
+# Secure the hub cluster (runtime + admission). Jenkins image checks use the
+# Central API token from scripts/bootstrap-acs-ci.sh and do not require this CR,
+# but it makes the ACS console useful for the demo.
+apiVersion: platform.stackrox.io/v1alpha1
+kind: SecuredCluster
+metadata:
+  name: stackrox-secured-cluster-services
+  namespace: stackrox
+  labels:
+    app.kubernetes.io/part-of: banking-demo
+  annotations:
+    argocd.argoproj.io/sync-options: SkipDryRunOnMissingResource=true
+    argocd.argoproj.io/sync-wave: "1"
+spec:
+  clusterName: acm
+  centralEndpoint: central.stackrox.svc:443
+  admissionControl:
+    listenOnCreates: true
+    listenOnUpdates: true
+    listenOnEvents: true

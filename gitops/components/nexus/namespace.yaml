@@ -1,0 +1,7 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: nexus
+  labels:
+    app.kubernetes.io/part-of: banking-demo
+    openshift.io/cluster-monitoring: "true"

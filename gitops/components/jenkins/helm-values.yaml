@@ -101,6 +101,20 @@ controller:
           name: tpa-oidc-cli
           key: client-secret
           optional: true
+    - name: ACS_API_TOKEN
+      valueFrom:
+        secretKeyRef:
+          name: acs-ci
+          key: api-token
+          optional: true
+    - name: ACS_CENTRAL_URL
+      valueFrom:
+        secretKeyRef:
+          name: acs-ci
+          key: central-url
+          optional: true
+    - name: NEXUS_MAVEN_URL
+      value: http://nexus.nexus.svc.cluster.local:8081/repository/maven-public/
   sidecars:
     configAutoReload:
       enabled: false
@@ -111,7 +125,7 @@ controller:
     configScripts:
       banking-demo: |
         jenkins:
-          systemMessage: "Banking Demo CI — build → Quay SBOM/attest/sign (RHTAS) → GitOps"
+          systemMessage: "Banking Demo CI — Maven/Nexus → build → Quay/RHTAS → ACS → GitOps"
           crumbIssuer:
             standard: {}
         credentials:
@@ -135,10 +149,20 @@ controller:
                       id: cosign-private-key
                       secret: "${COSIGN_PRIVATE_KEY:-}"
                       description: "Cosign private key PEM for CI signing (Rekor via RHTAS)"
+                  - string:
+                      scope: GLOBAL
+                      id: acs-ci-token
+                      secret: "${ACS_API_TOKEN:-}"
+                      description: "RHACS API token for roxctl image check"
+                  - string:
+                      scope: GLOBAL
+                      id: acs-central-url
+                      secret: "${ACS_CENTRAL_URL:-}"
+                      description: "RHACS Central URL (https://central-…)"
         jobs:
           - script: |
               pipelineJob('banking-service-ci') {
-                description('CI for apps/banking-service → Build → Quay (sbom/attest/sign) → GitOps')
+                description('CI for apps/banking-service → Nexus/Maven → Quay/RHTAS → ACS → GitOps')
                 parameters {
                   booleanParam('FORCE_BUILD', true, 'Build even without path changes')
                   stringParam('GITOPS_BRANCH', 'main', 'Branch for GitOps commits')
@@ -169,7 +193,7 @@ controller:
               }
           - script: |
               pipelineJob('api-gateway-ci') {
-                description('CI for apps/api-gateway → Build → Quay (sbom/attest/sign) → GitOps')
+                description('CI for apps/api-gateway → Nexus/Maven → Quay/RHTAS → ACS → GitOps')
                 parameters {
                   booleanParam('FORCE_BUILD', true, 'Build even without path changes')
                   stringParam('GITOPS_BRANCH', 'main', 'Branch for GitOps commits')

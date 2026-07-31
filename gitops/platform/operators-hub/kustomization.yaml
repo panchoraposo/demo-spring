@@ -1,8 +1,8 @@
 apiVersion: kustomize.config.k8s.io/v1beta1
 kind: Kustomization
 
-# Hub (acm): ESO, GitOps, ODF (Quay/TPA object storage), Quay, RHTAS, RHTPA.
-# Mesh/SI demos use per-cluster OpenShift Routes on east/west (no Connectivity Link).
+# Hub (acm): ESO, GitOps, ODF (Quay/TPA object storage), Quay, RHTAS, RHTPA, RHACS.
+# Nexus is a plain Deployment (no OLM) under gitops/components/nexus.
 resources:
   - namespace-eso.yaml
   - subscription-eso.yaml
@@ -15,3 +15,4 @@ resources:
   - namespace-quay.yaml
   - namespace-rhtas.yaml
   - namespace-rhtpa.yaml
+  - namespace-rhacs.yaml

@@ -6,7 +6,7 @@ This demo targets three OpenShift clusters:
 
 | Cluster | Role |
 | --- | --- |
-| **acm** | RHACM hub, Conjur, Keycloak, Jenkins, ODF, Quay, RHTAS, TPA, Dev Spaces, Kiali/promxy |
+| **acm** | RHACM hub, Conjur, Keycloak, Jenkins, ODF, Quay, Nexus, RHTAS, TPA, ACS, Dev Spaces, Kiali/promxy |
 | **east** / **west** | Managed clusters with GitOps, ESO, OSSM 3.4 ambient, PostgreSQL, Spring apps |
 
 Credentials are sourced from **CyberArk Conjur** on the hub via the **External Secrets Operator** on each cluster. Spring apps never talk to Conjur; they only mount Kubernetes Secrets that ESO materializes.
@@ -25,7 +25,7 @@ A parallel demo path uses **Service Interconnect** in `banking-si-*` namespaces 
 ```mermaid
 flowchart LR
   subgraph acm ["acm hub"]
-    HubSvc["RHACM · GitOps · Conjur · Keycloak<br/>Jenkins · ODF · Quay · RHTAS · TPA<br/>Dev Spaces · Kiali"]
+    HubSvc["RHACM · GitOps · Conjur · Keycloak<br/>Jenkins · ODF · Quay · Nexus · ACS<br/>RHTAS · TPA · Dev Spaces · Kiali"]
   end
   subgraph east ["east"]
     EastSvc["GitOps · ESO · OSSM ambient<br/>api-gateway · banking-service · PostgreSQL"]
@@ -71,8 +71,10 @@ flowchart LR
   RHDA --> TPA[TPA on acm]
   Dev --> Jenkins
   Jenkins --> BC[BuildConfig]
+  BC --> Nexus[Nexus Maven]
   BC --> Quay
   Jenkins --> TAS[RHTAS]
+  Jenkins --> ACS[ACS image check]
   Jenkins --> Git[Git repo]
   Git --> Argo[GitOps on acm east west]
   Quay --> Apps[banking-service images]
@@ -95,14 +97,17 @@ flowchart LR
 | App runtime images | UBI 9 OpenJDK 21 |
 | Object storage | OpenShift Data Foundation (Multicloud Object Gateway) on acm |
 | Container registry | Red Hat Quay on acm (SBOM, signature, attestation) |
+| Maven repository | Nexus on acm (`maven-public` = Central + Red Hat GA) |
+| Image policy | RHACS on acm (`roxctl image check` in Jenkins) |
 | Artifact signing | Red Hat Trusted Artifact Signer (Securesign) |
 | Dependency analytics | Red Hat Trusted Profile Analyzer + RHDA backend |
 | Developer workspaces | OpenShift Dev Spaces on **acm** |
+| CI | Jenkins → Nexus → BuildConfig → Quay/RHTAS → ACS → GitOps |
 | CI | Jenkins on acm + OpenShift BuildConfig → Quay sign/attest |
 
 ## GitOps ownership
 
-1. **acm:** [`gitops/bootstrap/acm-root.yaml`](../gitops/bootstrap/acm-root.yaml) → [`gitops/applications/acm`](../gitops/applications/acm) (Conjur, Keycloak, Jenkins, ODF, Quay, RHTAS, TPA, Dev Spaces, hub ESO, Kiali, promxy, CI BuildConfigs).
+1. **acm:** [`gitops/bootstrap/acm-root.yaml`](../gitops/bootstrap/acm-root.yaml) → [`gitops/applications/acm`](../gitops/applications/acm) (Conjur, Keycloak, Jenkins, ODF, Quay, Nexus, ACS, RHTAS, TPA, Dev Spaces, hub ESO, Kiali, promxy, CI BuildConfigs).
 2. **RHACM:** [`gitops/acm`](../gitops/acm) Placement + ApplicationSet generates Applications that sync `gitops/applications/{{east|west}}` to each ManagedCluster.
 3. **Managed cluster waves (east/west):**
   - `0` platform operators (ESO, Sail, GitOps)

@@ -24,10 +24,12 @@ resources:
   - conjur-config.yaml
   - quay.yaml
   - trusted-artifact-signer.yaml
+  - rhacs.yaml
   # wave 3
   - external-secrets-config.yaml
   - promxy.yaml
   - trusted-profile-analyzer.yaml
+  - nexus.yaml
   # wave 4+
   - devspaces.yaml
   - keycloak.yaml
@@ -56,9 +58,13 @@ replacements:
         fieldPaths: [ spec.source.repoURL ]
       - select: { kind: Application, name: trusted-artifact-signer }
         fieldPaths: [ spec.source.repoURL ]
+      - select: { kind: Application, name: rhacs }
+        fieldPaths: [ spec.source.repoURL ]
       - select: { kind: Application, name: external-secrets-config }
         fieldPaths: [ spec.source.repoURL ]
       - select: { kind: Application, name: trusted-profile-analyzer }
+        fieldPaths: [ spec.source.repoURL ]
+      - select: { kind: Application, name: nexus }
         fieldPaths: [ spec.source.repoURL ]
       - select: { kind: Application, name: promxy }
         fieldPaths: [ spec.source.repoURL ]
@@ -97,9 +103,13 @@ replacements:
         fieldPaths: [ spec.source.targetRevision ]
       - select: { kind: Application, name: trusted-artifact-signer }
         fieldPaths: [ spec.source.targetRevision ]
+      - select: { kind: Application, name: rhacs }
+        fieldPaths: [ spec.source.targetRevision ]
       - select: { kind: Application, name: external-secrets-config }
         fieldPaths: [ spec.source.targetRevision ]
       - select: { kind: Application, name: trusted-profile-analyzer }
+        fieldPaths: [ spec.source.targetRevision ]
+      - select: { kind: Application, name: nexus }
         fieldPaths: [ spec.source.targetRevision ]
       - select: { kind: Application, name: promxy }
         fieldPaths: [ spec.source.targetRevision ]

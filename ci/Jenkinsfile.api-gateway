@@ -1,4 +1,4 @@
-// CI: OpenShift Build → Quay (image + sbom + attestation + signature via RHTAS) → GitOps.
+// CI: OpenShift Build (Maven via Nexus) → Quay SBOM/sign (RHTAS) → ACS check → GitOps.
 
 pipeline {
   agent any
@@ -56,6 +56,8 @@ pipeline {
           changeset "ci/Jenkinsfile.app"
           changeset "ci/Jenkinsfile.api-gateway"
           changeset "ci/scripts/sign-and-attest.sh"
+          changeset "ci/scripts/acs-image-check.sh"
+          changeset "ci/maven/**"
         }
       }
       stages {
@@ -65,7 +67,7 @@ pipeline {
               set -euo pipefail
               export PATH="${TOOLS_DIR}:${PATH}"
               oc whoami
-              # Prefer -n over `oc project` — Jenkins home kubeconfig can be corrupt/incomplete.
+              cp -f ci/maven/settings.xml "apps/${APP}/settings.xml"
               oc start-build "${APP}" --from-dir="apps/${APP}" --follow --wait -n "${APPS_NS}"
               oc tag "${APPS_NS}/${APP}:latest" "${APPS_NS}/${APP}:${IMAGE_TAG}" -n "${APPS_NS}"
               oc get istag "${APP}:${IMAGE_TAG}" -n "${APPS_NS}"
@@ -110,6 +112,35 @@ pipeline {
                   QUAY_HOST="${QUAY_HOST}" QUAY_ORG="${QUAY_ORG}" TOOLS_DIR="${TOOLS_DIR}" \
                   TPA_UPLOAD_REQUIRED=true \
                   ci/scripts/sign-and-attest.sh
+              '''
+            }
+          }
+        }
+
+        stage('ACS image check') {
+          steps {
+            withCredentials([
+              string(credentialsId: 'acs-ci-token', variable: 'ACS_API_TOKEN', optional: true),
+              string(credentialsId: 'acs-central-url', variable: 'ACS_CENTRAL_URL', optional: true)
+            ]) {
+              sh '''
+                set -euo pipefail
+                export PATH="${TOOLS_DIR}:${PATH}"
+                chmod +x ci/scripts/acs-image-check.sh
+                if [ -z "${QUAY_HOST:-}" ] && [ -f .ci-quay.env ]; then
+                  # shellcheck disable=SC1091
+                  . ./.ci-quay.env
+                fi
+                if [ -z "${QUAY_HOST:-}" ]; then
+                  QUAY_HOST="$(oc -n quay-enterprise get route -l quay-component=quay-app-route -o jsonpath='{.items[0].spec.host}' 2>/dev/null || true)"
+                fi
+                if [ -z "${QUAY_HOST:-}" ]; then
+                  echo "WARN: Quay host unknown; ACS check skipped"
+                  exit 0
+                fi
+                export IMAGE="${QUAY_HOST}/${QUAY_ORG}/${APP}:${IMAGE_TAG}"
+                export TOOLS_DIR ACS_API_TOKEN ACS_CENTRAL_URL
+                ci/scripts/acs-image-check.sh
               '''
             }
           }
@@ -196,7 +227,7 @@ pipeline {
 
   post {
     success {
-      echo "CI OK for ${env.APP}: tag=${env.IMAGE_TAG} (build → sbom/attest/sign → GitOps)."
+      echo "CI OK for ${env.APP}: tag=${env.IMAGE_TAG} (build → sign → ACS → GitOps)."
     }
     unsuccessful {
       echo "CI finished with status ${currentBuild.currentResult} for ${env.APP}."

@@ -10,16 +10,20 @@ Prep manifests for hub supply-chain services and developer workspaces. **Do not 
 | Red Hat Quay | `gitops/components/quay` | Managed `objectstorage` via ODF |
 | Trusted Artifact Signer | `gitops/components/trusted-artifact-signer` | Securesign (Fulcio/Rekor/TUF/TSA) |
 | Trusted Profile Analyzer | `gitops/components/trusted-profile-analyzer` | Advisories + RHDA backend |
+| Advanced Cluster Security | `gitops/components/rhacs` | Central + SecuredCluster on acm |
+| Nexus Repository Manager | `gitops/components/nexus` | Maven Central + Red Hat GA group |
 
-Operators: [`gitops/platform/operators-hub`](../gitops/platform/operators-hub).
+Operators: [`gitops/platform/operators-hub`](../gitops/platform/operators-hub) (RHACS Subscription). Nexus is a Deployment (no OLM).
 
 ### Bootstrap order
 
-1. Platform operators (wave 0) including `odf-operator`, `quay-operator`, `rhtas-operator`, `rhtpa-operator`.
+1. Platform operators (wave 0) including `odf-operator`, `quay-operator`, `rhtas-operator`, `rhtpa-operator`, `rhacs-operator`.
 2. ODF `StorageCluster` MCG-only — wait until `openshift-storage.noobaa.io` StorageClass exists.
-3. QuayRegistry + Securesign.
-4. TPA PostgreSQL + `rhda-backend` + Keycloak SSO (GitOps managed; secrets via Conjur/ESO).
-5. Optional values:
+3. QuayRegistry + Securesign + RHACS Central.
+4. Nexus Deployment → `./scripts/bootstrap-nexus.sh` (repos + anonymous read).
+5. TPA PostgreSQL + `rhda-backend` + Keycloak SSO (GitOps managed; secrets via Conjur/ESO).
+6. ACS CI token: `./scripts/bootstrap-acs-ci.sh` → `banking-ci/acs-ci` for Jenkins.
+7. Optional values:
    - Fulcio OIDC issuer for RHTAS (`gitops/components/trusted-artifact-signer/env/rhtas.env`)
    - RHDA/TPA URLs for Dev Spaces (`devfile.yaml` / CheCluster overlays)
 
@@ -52,9 +56,16 @@ See [`gitops/components/quay/README.md`](../gitops/components/quay/README.md): c
 
 Opening this Git repo in Dev Spaces loads:
 
-- [`devfile.yaml`](../devfile.yaml) — UDI + Maven/Spring commands
+- [`devfile.yaml`](../devfile.yaml) — UDI + Maven/Spring commands using **Nexus** (`ci/maven/settings.xml`)
 - [`.vscode/extensions.json`](../.vscode/extensions.json) — Java, Spring Boot, **Red Hat Dependency Analytics** (`redhat.fabric8-analytics`)
 - [`.vscode/settings.json`](../.vscode/settings.json) — `redhat.dependency.analytics.exhort.backendUrl` → acm `rhda-backend` Route (private TPA)
+
+Laptop Maven (outside the cluster):
+
+```bash
+./scripts/generate-maven-settings.sh > ~/.m2/settings.xml
+mvn -f apps/banking-service/pom.xml -DskipTests package
+```
 
 ```bash
 # On acm, after TPA/RHDA is up:

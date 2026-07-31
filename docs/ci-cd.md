@@ -2,16 +2,33 @@
 
 ## Design
 
-Jenkins and BuildConfigs run on hub cluster **acm**. After an OpenShift image build, pipelines push to **Red Hat Quay**, generate an **SBOM**, create a **cosign attestation**, and **sign** with **Red Hat Trusted Artifact Signer** (Rekor/Fulcio). GitOps then bumps image tags on **both** regional cluster overlays.
+Jenkins and BuildConfigs run on hub cluster **acm**. Builds resolve Maven dependencies through **Nexus** (`maven-public` = Maven Central + Red Hat GA). After the image build, pipelines push to **Red Hat Quay**, generate an **SBOM**, **sign/attest** with **RHTAS**, then run an **ACS** (`roxctl image check`) gate before GitOps promotion.
 
 | Stage | Tool | Responsibility |
 | --- | --- | --- |
 | Detect change | Jenkins SCM poll (path-filtered) | Fire only the app pipeline whose paths changed |
 | Checkout | Jenkins on acm | Fetch source from Git |
-| Image build | OpenShift BuildConfig on acm | Binary Docker build into acm `banking-apps` ImageStream |
+| Image build | OpenShift BuildConfig on acm | Docker build uses `settings.xml` → Nexus; ImageStream tag |
 | Mirror + supply chain | `ci/scripts/sign-and-attest.sh` | Push to Quay; Syft SBOM; cosign attach/attest/sign (RHTAS) |
+| ACS policy gate | `ci/scripts/acs-image-check.sh` | `roxctl image check` against Quay image (fail on policy) |
 | GitOps update | Jenkins | Commit `newTag` (+ Quay `newName`) in east **and** west overlays |
 | Deploy | OpenShift GitOps on managed clusters | Sync Applications → Deployments |
+
+### Maven / Nexus
+
+| Consumer | How |
+| --- | --- |
+| OpenShift builds | `apps/*/settings.xml` (+ `ci/maven/settings.xml`) → `http://nexus.nexus.svc.cluster.local:8081/repository/maven-public/` |
+| Dev Spaces | `devfile.yaml` runs `mvn -s ci/maven/settings.xml …` |
+| Laptop | `./scripts/generate-maven-settings.sh > ~/.m2/settings.xml` (uses the Nexus Route) |
+
+Bootstrap repos after Nexus is Ready: `./scripts/bootstrap-nexus.sh`.
+
+### ACS CI token
+
+```bash
+./scripts/bootstrap-acs-ci.sh   # creates banking-ci/acs-ci Secret for Jenkins
+```
 
 Jenkins does **not** `oc apply` app manifests. GitOps owns cluster state.
 
@@ -21,19 +38,24 @@ sequenceDiagram
   participant Git as Git repo
   participant J as Jenkins on acm
   participant BC as BuildConfig
+  participant Nexus as Nexus on acm
   participant Quay as Quay on acm
   participant TAS as RHTAS
+  participant ACS as ACS Central
   participant ArgoE as GitOps east
   participant ArgoW as GitOps west
 
   Dev->>Git: push apps/banking-service/**
   J->>Git: SCM poll
   J->>BC: oc start-build --from-dir
+  BC->>Nexus: mvn deps (maven-public)
   BC-->>J: ImageStream tag BUILD_NUMBER
   J->>Quay: mirror image
   J->>J: syft SBOM
   J->>TAS: cosign sign + attest (Rekor)
   Quay-->>Quay: image + sbom + .sig + .att
+  J->>ACS: roxctl image check
+  ACS-->>J: pass / fail
   J->>Git: commit newTag/newName on east+west
   ArgoE->>Git: refresh
   ArgoW->>Git: refresh

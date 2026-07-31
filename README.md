@@ -55,10 +55,12 @@ Detail and component table: [docs/architecture.md](docs/architecture.md).
 | Database | `registry.redhat.io/rhel10/postgresql-16` (per cluster) |
 | Object storage | OpenShift Data Foundation (MCG) on acm |
 | Registry | Red Hat Quay on acm |
+| Maven cache | Sonatype Nexus on acm (Central + Red Hat GA) |
 | Signing | Red Hat Trusted Artifact Signer (Securesign) |
 | SCA / SBOM analytics | Red Hat Trusted Profile Analyzer + RHDA |
+| Policy / image check | Red Hat Advanced Cluster Security (ACS) on acm |
 | Inner loop | OpenShift Dev Spaces (acm) |
-| CI | Jenkins on acm + BuildConfig → Quay sign/attest |
+| CI | Jenkins → Nexus/Maven → BuildConfig → Quay/RHTAS → ACS → GitOps |
 
 ## Repository layout
 

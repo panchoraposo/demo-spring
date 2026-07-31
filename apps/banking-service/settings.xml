@@ -1,0 +1,47 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  Maven settings for the banking demo.
+
+  Default mirror is the in-cluster Nexus Service (BuildConfig + Dev Spaces on acm).
+  For a laptop, generate a Route-based copy:
+
+    ./scripts/generate-maven-settings.sh > ~/.m2/settings.xml
+
+  Or: mvn -s <(./scripts/generate-maven-settings.sh) …
+-->
+<settings xmlns="http://maven.apache.org/SETTINGS/1.2.0"
+          xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+          xsi:schemaLocation="http://maven.apache.org/SETTINGS/1.2.0 https://maven.apache.org/xsd/settings-1.2.0.xsd">
+  <mirrors>
+    <mirror>
+      <id>nexus-maven-public</id>
+      <name>Nexus maven-public (central + Red Hat GA)</name>
+      <url>http://nexus.nexus.svc.cluster.local:8081/repository/maven-public/</url>
+      <mirrorOf>*</mirrorOf>
+    </mirror>
+  </mirrors>
+  <profiles>
+    <profile>
+      <id>nexus</id>
+      <repositories>
+        <repository>
+          <id>nexus-maven-public</id>
+          <url>http://nexus.nexus.svc.cluster.local:8081/repository/maven-public/</url>
+          <releases><enabled>true</enabled></releases>
+          <snapshots><enabled>true</enabled></snapshots>
+        </repository>
+      </repositories>
+      <pluginRepositories>
+        <pluginRepository>
+          <id>nexus-maven-public</id>
+          <url>http://nexus.nexus.svc.cluster.local:8081/repository/maven-public/</url>
+          <releases><enabled>true</enabled></releases>
+          <snapshots><enabled>true</enabled></snapshots>
+        </pluginRepository>
+      </pluginRepositories>
+    </profile>
+  </profiles>
+  <activeProfiles>
+    <activeProfile>nexus</activeProfile>
+  </activeProfiles>
+</settings>

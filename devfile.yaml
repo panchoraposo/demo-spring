@@ -34,12 +34,15 @@ components:
           value: /usr/lib/jvm/java-21-openjdk
         - name: MAVEN_OPTS
           value: "-Xmx2g"
+        # In-cluster Nexus on acm (maven-central + Red Hat GA group).
+        - name: MAVEN_SETTINGS
+          value: ${PROJECT_SOURCE}/ci/maven/settings.xml
 commands:
   - id: build-banking-service
     exec:
       component: tools
       workingDir: ${PROJECT_SOURCE}/apps/banking-service
-      commandLine: mvn -B -DskipTests package
+      commandLine: mvn -B -s ${PROJECT_SOURCE}/ci/maven/settings.xml -DskipTests package
       group:
         kind: build
         isDefault: true
@@ -47,14 +50,14 @@ commands:
     exec:
       component: tools
       workingDir: ${PROJECT_SOURCE}/apps/api-gateway
-      commandLine: mvn -B -DskipTests package
+      commandLine: mvn -B -s ${PROJECT_SOURCE}/ci/maven/settings.xml -DskipTests package
       group:
         kind: build
   - id: run-banking-service
     exec:
       component: tools
       workingDir: ${PROJECT_SOURCE}/apps/banking-service
-      commandLine: mvn -B spring-boot:run
+      commandLine: mvn -B -s ${PROJECT_SOURCE}/ci/maven/settings.xml spring-boot:run
       group:
         kind: run
         isDefault: true
@@ -62,6 +65,6 @@ commands:
     exec:
       component: tools
       workingDir: ${PROJECT_SOURCE}/apps/api-gateway
-      commandLine: mvn -B spring-boot:run -Dspring-boot.run.arguments=--server.port=8081
+      commandLine: mvn -B -s ${PROJECT_SOURCE}/ci/maven/settings.xml spring-boot:run -Dspring-boot.run.arguments=--server.port=8081
       group:
         kind: run
