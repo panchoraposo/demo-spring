@@ -15,7 +15,9 @@ need oc; need curl; need jq
 GITEA_HOST="$(oc --context "${ACM_CONTEXT}" -n "${GITEA_NS}" get route gitea -o jsonpath='{.spec.host}')"
 JENKINS_HOST="$(oc --context "${ACM_CONTEXT}" -n "${CI_NS}" get route jenkins -o jsonpath='{.spec.host}')"
 REPO_URL="https://${GITEA_HOST}/${ORG}/${REPO}.git"
-NOTIFY_URL="https://${JENKINS_HOST}/git/notifyCommit?url=${REPO_URL}"
+# Must match controller.javaOpts NOTIFY_COMMIT_ACCESS_TOKEN in jenkins helm-values.
+NOTIFY_TOKEN="${JENKINS_NOTIFY_TOKEN:-banking-demo-notify}"
+NOTIFY_URL="https://${JENKINS_HOST}/git/notifyCommit?url=${REPO_URL}&token=${NOTIFY_TOKEN}"
 
 ADMIN_USER="${ADMIN_USER:-gitea_admin}"
 ADMIN_PASSWORD="${ADMIN_PASSWORD:-BankingGiteaChangeMe!}"

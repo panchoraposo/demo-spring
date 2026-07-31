@@ -21,6 +21,10 @@ controller:
   # Builds run on the controller (no separate agents).
   numExecutors: 2
   jenkinsUrl: https://jenkins-banking-ci.apps.cluster-k7kqp.k7kqp.sandbox3321.opentlc.com/
+  # Required by Git plugin ≥4.11 for /git/notifyCommit (Gitea push webhook).
+  javaOpts: >-
+    -Dhudson.plugins.git.GitStatus.NOTIFY_COMMIT_ACCESS_TOKEN=banking-demo-notify
+    -Dhudson.plugins.git.GitStatus.accessToken=banking-demo-notify
   # Chart maps proxyCompatability → excludeClientIPFromCrumb, removed in current LTS CasC schema.
   csrf:
     defaultCrumbIssuer:
