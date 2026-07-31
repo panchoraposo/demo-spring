@@ -3,6 +3,9 @@ kind: Kustomization
 resources:
   - deployment.yaml
   - configmap.yaml
+  - podmonitor.yaml
+  - trigger-authentication.yaml
+  - scaledobject.yaml
   # Service is created by the Skupper Listener (host: banking-service).
   # Credentials: ExternalSecret banking-service-db
 commonLabels:

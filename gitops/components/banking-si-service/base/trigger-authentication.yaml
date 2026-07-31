@@ -1,0 +1,48 @@
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: keda-prometheus
+  labels:
+    app.kubernetes.io/part-of: banking-si-demo
+    app.kubernetes.io/component: custom-metrics-autoscaler
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: keda-operator-token-creator
+  labels:
+    app.kubernetes.io/part-of: banking-si-demo
+    app.kubernetes.io/component: custom-metrics-autoscaler
+rules:
+  - apiGroups: [""]
+    resources: ["serviceaccounts/token"]
+    verbs: ["create"]
+    resourceNames: ["keda-prometheus"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: keda-operator-token-creator
+  labels:
+    app.kubernetes.io/part-of: banking-si-demo
+    app.kubernetes.io/component: custom-metrics-autoscaler
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: keda-operator-token-creator
+subjects:
+  - kind: ServiceAccount
+    name: keda-operator
+    namespace: openshift-keda
+---
+apiVersion: keda.sh/v1alpha1
+kind: TriggerAuthentication
+metadata:
+  name: keda-prom-auth
+  labels:
+    app.kubernetes.io/part-of: banking-si-demo
+    app.kubernetes.io/component: custom-metrics-autoscaler
+spec:
+  boundServiceAccountToken:
+    - parameter: bearerToken
+      serviceAccountName: keda-prometheus

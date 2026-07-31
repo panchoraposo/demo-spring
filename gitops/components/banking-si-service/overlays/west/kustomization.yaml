@@ -19,7 +19,7 @@ resources:
 images:
   - name: image-registry.openshift-image-registry.svc:5000/banking-si-apps/banking-service
     newName: banking-quay-quay-quay-enterprise.apps.cluster-k7kqp.k7kqp.sandbox3321.opentlc.com/banking/banking-service
-    newTag: "29"
+    newTag: "32"
 
 labels:
   - pairs:

@@ -1,0 +1,17 @@
+# PodMonitor: Skupper owns the banking-service Service in this namespace.
+apiVersion: monitoring.coreos.com/v1
+kind: PodMonitor
+metadata:
+  name: banking-service
+  labels:
+    app.kubernetes.io/name: banking-service
+    app.kubernetes.io/part-of: banking-si-demo
+spec:
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: banking-service
+  podMetricsEndpoints:
+    - port: http
+      path: /actuator/prometheus
+      interval: 15s
+      scheme: http

@@ -5,6 +5,9 @@ resources:
   - deployment.yaml
   - service.yaml
   - configmap.yaml
+  - servicemonitor.yaml
+  - trigger-authentication.yaml
+  - scaledobject.yaml
   # Credentials: ExternalSecret banking-service-db
 
 commonLabels:

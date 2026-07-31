@@ -1,7 +1,7 @@
 apiVersion: kustomize.config.k8s.io/v1beta1
 kind: Kustomization
 
-# Spokes (east/west): ESO, Sail/OSSM 3, GitOps, RHSI, RHACS Sensor.
+# Spokes (east/west): ESO, Sail/OSSM 3, GitOps, RHSI, RHACS Sensor, CMA (KEDA).
 resources:
   - namespace-eso.yaml
   - subscription-eso.yaml
@@ -9,3 +9,5 @@ resources:
   - subscription-sail.yaml
   - subscription-skupper.yaml
   - namespace-rhacs.yaml
+  - namespace-keda.yaml
+  - subscription-cma.yaml

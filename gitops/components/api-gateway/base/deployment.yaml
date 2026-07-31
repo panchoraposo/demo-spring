@@ -9,7 +9,7 @@ spec:
   selector:
     matchLabels:
       app.kubernetes.io/name: api-gateway
-    template:
+  template:
     metadata:
       labels:
         app: api-gateway
@@ -27,22 +27,27 @@ spec:
           envFrom:
             - configMapRef:
                 name: api-gateway-config
+          startupProbe:
+            httpGet:
+              path: /actuator/health/liveness
+              port: http
+            periodSeconds: 10
+            timeoutSeconds: 5
+            failureThreshold: 30
           readinessProbe:
             httpGet:
               path: /actuator/health/readiness
               port: http
-            initialDelaySeconds: 20
-            periodSeconds: 10
+            periodSeconds: 5
             timeoutSeconds: 5
-            failureThreshold: 6
+            failureThreshold: 3
           livenessProbe:
             httpGet:
               path: /actuator/health/liveness
               port: http
-            initialDelaySeconds: 40
-            periodSeconds: 20
+            periodSeconds: 15
             timeoutSeconds: 5
-            failureThreshold: 6
+            failureThreshold: 3
           resources:
             requests:
               cpu: 100m

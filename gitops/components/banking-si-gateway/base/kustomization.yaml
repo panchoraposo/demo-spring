@@ -7,6 +7,8 @@ resources:
   - configmap.yaml
   - route.yaml
   - image-puller-rb.yaml
+  - servicemonitor.yaml
+  - scaledobject.yaml
 
 commonLabels:
   app.kubernetes.io/name: api-gateway

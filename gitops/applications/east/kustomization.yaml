@@ -16,6 +16,7 @@ resources:
   # wave 1
   - eso-operand.yaml
   - user-workload-monitoring.yaml
+  - keda.yaml
   # wave 2
   - mesh.yaml
   - rhacs-secured.yaml

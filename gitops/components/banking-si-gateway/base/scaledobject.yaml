@@ -1,0 +1,32 @@
+apiVersion: keda.sh/v1alpha1
+kind: ScaledObject
+metadata:
+  name: api-gateway
+  labels:
+    app.kubernetes.io/name: api-gateway
+    app.kubernetes.io/part-of: banking-si-demo
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: api-gateway
+  minReplicaCount: 1
+  maxReplicaCount: 10
+  pollingInterval: 15
+  cooldownPeriod: 60
+  triggers:
+    - type: cpu
+      metricType: Utilization
+      metadata:
+        value: "60"
+    - type: prometheus
+      metadata:
+        serverAddress: https://thanos-querier.openshift-monitoring.svc.cluster.local:9091
+        metricName: http_request_rate
+        query: sum(rate(http_server_requests_seconds_count{namespace="banking-si-apps",container="api-gateway"}[1m]))
+        threshold: "10"
+        authModes: bearer
+        unsafeSsl: "true"
+      authenticationRef:
+        name: keda-prom-auth
+        kind: TriggerAuthentication
