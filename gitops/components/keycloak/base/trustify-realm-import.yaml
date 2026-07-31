@@ -89,5 +89,5 @@ spec:
         requiredActions: []
         credentials:
           - type: password
-            value: replace-me-tpaadmin
+            value: tpaadmin-change-me
             temporary: false

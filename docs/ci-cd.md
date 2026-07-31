@@ -70,6 +70,8 @@ Warm once after Nexus is Ready (or after big POM changes):
 ./scripts/bootstrap-acs-secured-clusters.sh
 
 # API token → banking-ci/acs-ci (Jenkins JCasC credentials acs-ci-token / acs-central-url)
+# Cosign public key → ACS Signature Integration (Verified badge in the portal)
+./scripts/bootstrap-acs-signature-integration.sh
 ./scripts/bootstrap-acs-ci.sh
 oc --context acm -n banking-ci delete pod jenkins-0   # reload env into JCasC
 ```
