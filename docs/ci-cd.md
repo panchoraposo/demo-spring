@@ -10,9 +10,8 @@ Jenkins and BuildConfigs run on hub cluster **acm**. Builds resolve Maven depend
 | Checkout | Jenkins on acm | Fetch source from Git |
 | Image build | OpenShift BuildConfig on acm | Docker build uses `settings.xml` → Nexus; ImageStream tag |
 | Mirror + supply chain | `ci/scripts/sign-and-attest.sh` | Push to Quay; Syft SBOM; cosign attach/attest/sign (RHTAS) |
-| ACS vulnerabilities | `ci/scripts/acs-image-scan.sh` | `roxctl image scan` — CVE table (first) |
-| ACS policies | `ci/scripts/acs-image-check.sh` | `roxctl image check` — policy gate (after CVEs) |
-| GitOps update | Jenkins | Commit `newTag` (+ Quay `newName`) in east **and** west overlays |
+| ACS | `acs-image-scan.sh` then `acs-image-check.sh` | CVEs first; Critical CVE aborts before policies / GitOps |
+| GitOps | Jenkins | Commit `newTag` (+ Quay `newName`) in east **and** west overlays |
 | Deploy | OpenShift GitOps on managed clusters | Sync Applications → Deployments |
 
 ### Maven / Nexus
@@ -49,12 +48,13 @@ Warm once after Nexus is Ready (or after big POM changes):
 oc --context acm -n banking-ci delete pod jenkins-0   # reload env into JCasC
 ```
 
-ACS runs **two sequential stages** after sign/attest (CVEs first):
+ACS is one Jenkins stage with two sequential steps (CVEs first). A Critical CVE
+fails the stage immediately so policies and GitOps do not run:
 
-| Stage | CLI | What it shows | Gate |
-| --- | --- | --- | --- |
-| ACS vulnerabilities | `roxctl image scan` | CVE table (CRITICAL/IMPORTANT/…) | `ACS_SCAN_FAIL_ON` (default `Critical`) |
-| ACS policies | `roxctl image check` | Policy violations (BREAKS BUILD, …) | `ACS_FAIL_ON` (default `Critical`) |
+| Step | CLI | Gate |
+| --- | --- | --- |
+| 1. Vulnerabilities | `roxctl image scan` | `ACS_SCAN_FAIL_ON` (default `Critical`) |
+| 2. Policies | `roxctl image check` | `ACS_FAIL_ON` (default `Critical`) |
 
 Both require Central (`ACS_REQUIRED=true`). Scripts: `ci/scripts/acs-image-scan.sh`, `ci/scripts/acs-image-check.sh`.
 

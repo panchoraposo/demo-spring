@@ -135,7 +135,9 @@ pipeline {
           }
         }
 
-        stage('ACS vulnerabilities') {
+        // One stage so Stage View shows a single failure stop (CVE gate aborts before policies).
+        // Sequential: vulnerabilities first, then policies (set -e).
+        stage('ACS') {
           steps {
             withCredentials([
               string(credentialsId: 'acs-ci-token', variable: 'ACS_API_TOKEN', optional: true),
@@ -153,54 +155,27 @@ pipeline {
                   QUAY_HOST="$(oc -n quay-enterprise get route -l quay-component=quay-app-route -o jsonpath='{.items[0].spec.host}' 2>/dev/null || true)"
                 fi
                 if [ -z "${QUAY_HOST:-}" ]; then
-                  echo "WARN: Quay host unknown; ACS vulnerability scan skipped"
+                  echo "WARN: Quay host unknown; ACS skipped"
                   exit 0
                 fi
                 export IMAGE="${QUAY_HOST}/${QUAY_ORG}/${APP}:${IMAGE_TAG}"
                 export TOOLS_DIR ACS_API_TOKEN ACS_CENTRAL_URL
                 export ACS_REQUIRED=true
-                # Fail the build when ACS reports Critical CVEs (demo gate).
                 export ACS_SCAN_FAIL_ON="${ACS_SCAN_FAIL_ON:-Critical}"
-                export ACS_SCAN_OUT="${WORKSPACE}/.acs-image-scan.out"
-                ci/scripts/acs-image-scan.sh
-              '''
-            }
-          }
-        }
-
-        stage('ACS policies') {
-          steps {
-            withCredentials([
-              string(credentialsId: 'acs-ci-token', variable: 'ACS_API_TOKEN', optional: true),
-              string(credentialsId: 'acs-central-url', variable: 'ACS_CENTRAL_URL', optional: true)
-            ]) {
-              sh '''
-                set -euo pipefail
-                export PATH="${TOOLS_DIR}:${PATH}"
-                chmod +x ci/scripts/acs-image-scan.sh ci/scripts/acs-image-check.sh
-                if [ -z "${QUAY_HOST:-}" ] && [ -f .ci-quay.env ]; then
-                  # shellcheck disable=SC1091
-                  . ./.ci-quay.env
-                fi
-                if [ -z "${QUAY_HOST:-}" ]; then
-                  QUAY_HOST="$(oc -n quay-enterprise get route -l quay-component=quay-app-route -o jsonpath='{.items[0].spec.host}' 2>/dev/null || true)"
-                fi
-                if [ -z "${QUAY_HOST:-}" ]; then
-                  echo "WARN: Quay host unknown; ACS policy check skipped"
-                  exit 0
-                fi
-                export IMAGE="${QUAY_HOST}/${QUAY_ORG}/${APP}:${IMAGE_TAG}"
-                export TOOLS_DIR ACS_API_TOKEN ACS_CENTRAL_URL
-                export ACS_REQUIRED=true
                 export ACS_FAIL_ON="${ACS_FAIL_ON:-Critical}"
+                export ACS_SCAN_OUT="${WORKSPACE}/.acs-image-scan.out"
                 export ACS_CHECK_OUT="${WORKSPACE}/.acs-image-check.out"
+
+                echo "======== ACS 1/2: vulnerabilities (CVEs) ========"
+                ci/scripts/acs-image-scan.sh
+                echo "======== ACS 2/2: policies ========"
                 ci/scripts/acs-image-check.sh
               '''
             }
           }
         }
 
-        stage('GitOps update') {
+        stage('GitOps') {
           steps {
             withCredentials([usernamePassword(
               credentialsId: 'github-ci',
@@ -209,6 +184,7 @@ pipeline {
             )]) {
               sh '''
                 set -euo pipefail
+                export PATH="${TOOLS_DIR}:${PATH}"
                 OVERLAY_EAST="gitops/components/${APP}/overlays/east/kustomization.yaml"
                 OVERLAY_WEST="gitops/components/${APP}/overlays/west/kustomization.yaml"
                 # SI demo path shares the same Quay image; keep tags in lockstep.
@@ -243,47 +219,38 @@ pipeline {
                   echo "WARN: github-ci token not configured; skipping git push of newTag=${IMAGE_TAG}."
                   echo "Set Conjur banking/github-ci/token (GitHub PAT, repo scope) for GitOps promotion."
                   echo "SKIP_GIT_PUSH=1" > .ci-gitops-status
-                  exit 0
+                else
+                  git config user.email "jenkins@banking-demo.local"
+                  git config user.name "Jenkins CI"
+                  git add ${OVERLAYS}
+                  if git diff --staged --quiet; then
+                    echo "No GitOps changes to commit"
+                    echo "SKIP_GIT_PUSH=0" > .ci-gitops-status
+                  else
+                    git commit -m "ci(${APP}): promote signed image ${IMAGE_TAG} on east+west (${GIT_COMMIT_SHORT})"
+                    AUTH_URL="https://${GIT_USERNAME}:${GIT_PASSWORD}@github.com/panchoraposo/demo-spring.git"
+                    if git push "${AUTH_URL}" "HEAD:${GITOPS_BRANCH}"; then
+                      echo "SKIP_GIT_PUSH=0" > .ci-gitops-status
+                    else
+                      echo "WARN: git push failed; image ${APP}:${IMAGE_TAG} may be in Quay/ImageStream."
+                      echo "SKIP_GIT_PUSH=1" > .ci-gitops-status
+                    fi
+                  fi
                 fi
 
-                git config user.email "jenkins@banking-demo.local"
-                git config user.name "Jenkins CI"
-                git add ${OVERLAYS}
-                if git diff --staged --quiet; then
-                  echo "No GitOps changes to commit"
-                  echo "SKIP_GIT_PUSH=0" > .ci-gitops-status
-                  exit 0
-                fi
-                git commit -m "ci(${APP}): promote signed image ${IMAGE_TAG} on east+west (${GIT_COMMIT_SHORT})"
-                AUTH_URL="https://${GIT_USERNAME}:${GIT_PASSWORD}@github.com/panchoraposo/demo-spring.git"
-                if git push "${AUTH_URL}" "HEAD:${GITOPS_BRANCH}"; then
-                  echo "SKIP_GIT_PUSH=0" > .ci-gitops-status
+                # Refresh Argo roots (same stage so a prior ACS failure skips all GitOps work).
+                for app in "banking-east-root" "banking-west-root"; do
+                  oc -n "${GITOPS_NS}" annotate applications.argoproj.io "${app}" \
+                    argocd.argoproj.io/refresh=hard --overwrite || true
+                done
+                if [ -f .ci-gitops-status ] && grep -q SKIP_GIT_PUSH=1 .ci-gitops-status; then
+                  echo "GitOps tag bump was skipped; rolling out Deployment on this cluster to pull :latest."
+                  oc -n "${APPS_NS}" rollout restart "deploy/${APP}" || true
                 else
-                  echo "WARN: git push failed; image ${APP}:${IMAGE_TAG} may be in Quay/ImageStream."
-                  echo "SKIP_GIT_PUSH=1" > .ci-gitops-status
+                  echo "OpenShift GitOps will deploy ${APP}:${IMAGE_TAG} on east+west from Git (Quay when signed)."
                 fi
               '''
             }
-          }
-        }
-
-        stage('GitOps refresh') {
-          steps {
-            sh '''
-              set -euo pipefail
-              export PATH="${TOOLS_DIR}:${PATH}"
-              # GitOps roots live on hub ArgoCD (ApplicationSet banking-spoke-roots).
-              for app in "banking-east-root" "banking-west-root"; do
-                oc -n "${GITOPS_NS}" annotate applications.argoproj.io "${app}" \
-                  argocd.argoproj.io/refresh=hard --overwrite || true
-              done
-              if [ -f .ci-gitops-status ] && grep -q SKIP_GIT_PUSH=1 .ci-gitops-status; then
-                echo "GitOps tag bump was skipped; rolling out Deployment on this cluster to pull :latest."
-                oc -n "${APPS_NS}" rollout restart "deploy/${APP}" || true
-              else
-                echo "OpenShift GitOps will deploy ${APP}:${IMAGE_TAG} on east+west from Git (Quay when signed)."
-              fi
-            '''
           }
         }
       }
@@ -295,7 +262,7 @@ pipeline {
       echo "CI OK for ${env.APP}: tag=${env.IMAGE_TAG} (build → sign → ACS → GitOps)."
     }
     unsuccessful {
-      echo "CI finished with status ${currentBuild.currentResult} for ${env.APP}."
+      echo "CI stopped with ${currentBuild.currentResult} for ${env.APP} (later stages were not executed)."
     }
   }
 }
