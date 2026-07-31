@@ -6,9 +6,8 @@
 # Optional:
 #   TOOLS_DIR
 #   ACS_REQUIRED              fail if Central/token missing (default false)
-#   ACS_SCAN_FAIL_ON          Critical|Important|Moderate|Low|None (default: None)
-#                             RHACS CVE severities. Default None = report CVEs without
-#                             failing the build (policy stage is the usual gate).
+#   ACS_SCAN_FAIL_ON          Critical|Important|Moderate|Low|None (default: Critical)
+#                             RHACS CVE severities.
 #   ACS_FORCE_SCAN            if true, --force
 #   ACS_SCAN_SEVERITIES       comma list (default CRITICAL,IMPORTANT,MODERATE,LOW)
 set -euo pipefail
@@ -19,7 +18,7 @@ source "${ROOT}/ci/scripts/lib/acs-common.sh"
 
 TOOLS_DIR="${TOOLS_DIR:-${WORKSPACE:-.}/.tools}"
 ACS_REQUIRED="${ACS_REQUIRED:-false}"
-ACS_SCAN_FAIL_ON="${ACS_SCAN_FAIL_ON:-None}"
+ACS_SCAN_FAIL_ON="${ACS_SCAN_FAIL_ON:-Critical}"
 ACS_FORCE_SCAN="${ACS_FORCE_SCAN:-false}"
 ACS_SCAN_SEVERITIES="${ACS_SCAN_SEVERITIES:-CRITICAL,IMPORTANT,MODERATE,LOW}"
 OUT="${ACS_SCAN_OUT:-/tmp/acs-image-scan.out}"

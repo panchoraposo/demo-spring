@@ -53,7 +53,7 @@ ACS runs **two parallel stages** after sign/attest:
 
 | Stage | CLI | What it shows | Gate |
 | --- | --- | --- | --- |
-| ACS vulnerabilities | `roxctl image scan` | CVE table (CRITICAL/IMPORTANT/…) | `ACS_SCAN_FAIL_ON` (default `None` = report-only) |
+| ACS vulnerabilities | `roxctl image scan` | CVE table (CRITICAL/IMPORTANT/…) | `ACS_SCAN_FAIL_ON` (default `Critical`) |
 | ACS policies | `roxctl image check` | Policy violations (BREAKS BUILD, …) | `ACS_FAIL_ON` (default `Critical`) |
 
 Both require Central (`ACS_REQUIRED=true`). Scripts: `ci/scripts/acs-image-scan.sh`, `ci/scripts/acs-image-check.sh`.

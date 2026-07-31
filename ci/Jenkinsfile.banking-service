@@ -161,8 +161,8 @@ pipeline {
                     export IMAGE="${QUAY_HOST}/${QUAY_ORG}/${APP}:${IMAGE_TAG}"
                     export TOOLS_DIR ACS_API_TOKEN ACS_CENTRAL_URL
                     export ACS_REQUIRED=true
-                    # Report CVEs by default; set ACS_SCAN_FAIL_ON=Critical to gate on CVEs.
-                    export ACS_SCAN_FAIL_ON="${ACS_SCAN_FAIL_ON:-None}"
+                    # Fail the build when ACS reports Critical CVEs (demo gate).
+                    export ACS_SCAN_FAIL_ON="${ACS_SCAN_FAIL_ON:-Critical}"
                     export ACS_SCAN_OUT="${WORKSPACE}/.acs-image-scan.out"
                     ci/scripts/acs-image-scan.sh
                   '''
