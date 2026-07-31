@@ -1,90 +1,49 @@
 #!/usr/bin/env bash
-# RHACS (StackRox) image policy check for Jenkins.
-# Soft-fails (exit 0 + WARN) when Central/token/roxctl are unavailable so the
-# demo pipeline still works before bootstrap-acs-ci.sh has been run.
+# RHACS policy check via `roxctl image check` (build-time policies).
 #
-# Required env (when enforcing):
-#   ACS_CENTRAL_URL   e.g. https://central-stackrox.apps…
-#   ACS_API_TOKEN     Central API token
-#   IMAGE             full image ref (Quay)
+# Required env:
+#   ACS_CENTRAL_URL, ACS_API_TOKEN, IMAGE
 # Optional:
-#   TOOLS_DIR         where to cache roxctl
+#   TOOLS_DIR
 #   ACS_FAIL_ON       Critical|High|Medium|Low|None  (default: Critical)
-#                     Compares against the TOTAL line from roxctl (policies with
-#                     BREAKS BUILD still print; we gate the build on severity).
+#                     Policy severities from the TOTAL line.
 #   ACS_REQUIRED      if "true", missing Central/token fails the build
-#   ACS_FORCE_SCAN    if "true", pass --force (bypass Central image cache)
+#   ACS_FORCE_SCAN    if "true", pass --force
 set -euo pipefail
+
+ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
+# shellcheck disable=SC1091
+source "${ROOT}/ci/scripts/lib/acs-common.sh"
 
 TOOLS_DIR="${TOOLS_DIR:-${WORKSPACE:-.}/.tools}"
 ACS_FAIL_ON="${ACS_FAIL_ON:-Critical}"
 ACS_REQUIRED="${ACS_REQUIRED:-false}"
 ACS_FORCE_SCAN="${ACS_FORCE_SCAN:-false}"
-mkdir -p "${TOOLS_DIR}"
+OUT="${ACS_CHECK_OUT:-/tmp/acs-image-check.out}"
 
-warn_skip() {
-  echo "WARN: $*"
-  if [[ "${ACS_REQUIRED}" == "true" ]]; then
-    exit 1
-  fi
-  exit 0
-}
-
-[[ -n "${IMAGE:-}" ]] || warn_skip "IMAGE not set; skipping ACS check"
-[[ -n "${ACS_CENTRAL_URL:-}" ]] || {
-  ACS_CENTRAL_URL="$(oc -n stackrox get route central -o jsonpath='https://{.spec.host}' 2>/dev/null || true)"
-}
-[[ -n "${ACS_CENTRAL_URL:-}" ]] || warn_skip "ACS Central URL not found; run scripts/bootstrap-acs-ci.sh"
-[[ -n "${ACS_API_TOKEN:-}" ]] || warn_skip "ACS_API_TOKEN empty; run scripts/bootstrap-acs-ci.sh"
-
-ROXCTL_OS=Linux
-case "$(uname -s)" in Darwin) ROXCTL_OS=Darwin ;; esac
-
-if [[ ! -x "${TOOLS_DIR}/roxctl" ]]; then
-  echo "==> installing roxctl (${ROXCTL_OS})"
-  VER="$(curl -sk -H "Authorization: Bearer ${ACS_API_TOKEN}" \
-    "${ACS_CENTRAL_URL}/v1/metadata" 2>/dev/null \
-    | sed -n 's/.*"version"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p' | head -1 || true)"
-  if [[ -n "${VER}" ]]; then
-    curl -fsSL -o "${TOOLS_DIR}/roxctl" \
-      "https://mirror.openshift.com/pub/rhacs/assets/${VER}/bin/${ROXCTL_OS}/roxctl" \
-      || curl -fsSL -o "${TOOLS_DIR}/roxctl" \
-      "https://mirror.openshift.com/pub/rhacs/assets/latest/bin/${ROXCTL_OS}/roxctl"
-  else
-    curl -fsSL -o "${TOOLS_DIR}/roxctl" \
-      "https://mirror.openshift.com/pub/rhacs/assets/latest/bin/${ROXCTL_OS}/roxctl"
-  fi
-  chmod +x "${TOOLS_DIR}/roxctl"
-fi
-
-HOSTPORT="$(echo "${ACS_CENTRAL_URL}" | sed -E 's|^https?://||; s|/$||')"
-case "${HOSTPORT}" in
-  *:*) ;;
-  *) HOSTPORT="${HOSTPORT}:443" ;;
-esac
-
-export ROX_API_TOKEN="${ACS_API_TOKEN}"
-export ROX_ENDPOINT="${HOSTPORT}"
-export ROX_CENTRAL_ADDRESS="${HOSTPORT}"
+[[ -n "${IMAGE:-}" ]] || acs_warn_skip "IMAGE not set; skipping ACS policy check"
+acs_resolve_central
+acs_ensure_roxctl
+acs_export_rox_env
 
 FORCE_ARGS=()
 if [[ "${ACS_FORCE_SCAN}" == "true" ]]; then
   FORCE_ARGS+=(--force)
 fi
 
-echo "==> roxctl image check ${IMAGE} (fail on >= ${ACS_FAIL_ON}) @ ${HOSTPORT}"
+echo "==> roxctl image check ${IMAGE} (policies; fail on >= ${ACS_FAIL_ON}) @ ${ACS_HOSTPORT}"
 set +e
 "${TOOLS_DIR}/roxctl" image check \
   --image="${IMAGE}" \
-  -e "${HOSTPORT}" \
+  -e "${ACS_HOSTPORT}" \
   --insecure-skip-tls-verify \
   "${FORCE_ARGS[@]}" \
-  2>&1 | tee /tmp/acs-image-check.out
+  2>&1 | tee "${OUT}"
 rc=${PIPESTATUS[0]}
 set -e
 
 # Example: (TOTAL: 2, LOW: 1, MEDIUM: 0, HIGH: 1, CRITICAL: 0)
-totals="$(grep -Eo '\(TOTAL:[[:space:]]*[0-9]+,[[:space:]]*LOW:[[:space:]]*[0-9]+,[[:space:]]*MEDIUM:[[:space:]]*[0-9]+,[[:space:]]*HIGH:[[:space:]]*[0-9]+,[[:space:]]*CRITICAL:[[:space:]]*[0-9]+\)' /tmp/acs-image-check.out | tail -1 || true)"
+totals="$(grep -Eo '\(TOTAL:[[:space:]]*[0-9]+,[[:space:]]*LOW:[[:space:]]*[0-9]+,[[:space:]]*MEDIUM:[[:space:]]*[0-9]+,[[:space:]]*HIGH:[[:space:]]*[0-9]+,[[:space:]]*CRITICAL:[[:space:]]*[0-9]+\)' "${OUT}" | tail -1 || true)"
 if [[ -n "${totals}" ]]; then
   echo "ACS policy summary: ${totals}"
 fi
@@ -119,22 +78,21 @@ if [[ "${threshold}" -le 0 && "${low}" -gt 0 ]]; then fail=1; fi
 
 if [[ -n "${totals}" ]]; then
   if [[ "${fail}" -eq 0 ]]; then
-    echo "ACS image check PASSED (evaluated; fail-on=${ACS_FAIL_ON})"
+    echo "ACS policy check PASSED (evaluated; fail-on=${ACS_FAIL_ON})"
     exit 0
   fi
-  echo "ACS image check FAILED (severity >= ${ACS_FAIL_ON}) for ${IMAGE}"
+  echo "ACS policy check FAILED (severity >= ${ACS_FAIL_ON}) for ${IMAGE}"
   exit 1
 fi
 
-# No TOTAL line — fall back to roxctl exit code / transport errors.
 if [[ ${rc} -eq 0 ]]; then
-  echo "ACS image check PASSED"
+  echo "ACS policy check PASSED"
   exit 0
 fi
 
-if grep -qiE 'connection refused|matcher is not initialized|Unavailable|FailedPrecondition|authentication handshake' /tmp/acs-image-check.out; then
-  warn_skip "ACS image check exited ${rc} (scanner/Central not ready); see output above"
+if grep -qiE 'connection refused|matcher is not initialized|Unavailable|FailedPrecondition|authentication handshake' "${OUT}"; then
+  acs_warn_skip "ACS policy check exited ${rc} (scanner/Central not ready); see output above"
 fi
 
-echo "ACS image check FAILED for ${IMAGE} (roxctl exit ${rc})"
+echo "ACS policy check FAILED for ${IMAGE} (roxctl exit ${rc})"
 exit 1

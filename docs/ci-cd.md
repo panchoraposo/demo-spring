@@ -2,7 +2,7 @@
 
 ## Design
 
-Jenkins and BuildConfigs run on hub cluster **acm**. Builds resolve Maven dependencies through **Nexus** (`maven-public` = Maven Central + Red Hat GA). After the image build, pipelines push to **Red Hat Quay**, generate an **SBOM**, **sign/attest** with **RHTAS**, then run an **ACS** (`roxctl image check`) gate before GitOps promotion.
+Jenkins and BuildConfigs run on hub cluster **acm**. Builds resolve Maven dependencies through **Nexus** (`maven-public` = Maven Central + Red Hat GA). After the image build, pipelines push to **Red Hat Quay**, generate an **SBOM**, **sign/attest** with **RHTAS**, then run **ACS in parallel** (`image scan` CVEs + `image check` policies) before GitOps promotion.
 
 | Stage | Tool | Responsibility |
 | --- | --- | --- |
@@ -10,7 +10,8 @@ Jenkins and BuildConfigs run on hub cluster **acm**. Builds resolve Maven depend
 | Checkout | Jenkins on acm | Fetch source from Git |
 | Image build | OpenShift BuildConfig on acm | Docker build uses `settings.xml` → Nexus; ImageStream tag |
 | Mirror + supply chain | `ci/scripts/sign-and-attest.sh` | Push to Quay; Syft SBOM; cosign attach/attest/sign (RHTAS) |
-| ACS policy gate | `ci/scripts/acs-image-check.sh` | `roxctl image check` against Quay image (fail on policy) |
+| ACS vulnerabilities | `ci/scripts/acs-image-scan.sh` | `roxctl image scan` — CVE table (parallel) |
+| ACS policies | `ci/scripts/acs-image-check.sh` | `roxctl image check` — policy gate (parallel) |
 | GitOps update | Jenkins | Commit `newTag` (+ Quay `newName`) in east **and** west overlays |
 | Deploy | OpenShift GitOps on managed clusters | Sync Applications → Deployments |
 
@@ -48,8 +49,14 @@ Warm once after Nexus is Ready (or after big POM changes):
 oc --context acm -n banking-ci delete pod jenkins-0   # reload env into JCasC
 ```
 
-ACS stage sets `ACS_REQUIRED=true` and `ACS_FAIL_ON=Critical` (HIGH findings are
-still printed; Critical+ fails the build).
+ACS runs **two parallel stages** after sign/attest:
+
+| Stage | CLI | What it shows | Gate |
+| --- | --- | --- | --- |
+| ACS vulnerabilities | `roxctl image scan` | CVE table (CRITICAL/IMPORTANT/…) | `ACS_SCAN_FAIL_ON` (default `None` = report-only) |
+| ACS policies | `roxctl image check` | Policy violations (BREAKS BUILD, …) | `ACS_FAIL_ON` (default `Critical`) |
+
+Both require Central (`ACS_REQUIRED=true`). Scripts: `ci/scripts/acs-image-scan.sh`, `ci/scripts/acs-image-check.sh`.
 
 Jenkins does **not** `oc apply` app manifests. GitOps owns cluster state.
 
@@ -75,7 +82,10 @@ sequenceDiagram
   J->>J: syft SBOM
   J->>TAS: cosign sign + attest (Rekor)
   Quay-->>Quay: image + sbom + .sig + .att
-  J->>ACS: roxctl image check
+  par ACS parallel
+    J->>ACS: roxctl image scan (CVEs)
+    J->>ACS: roxctl image check (policies)
+  end
   ACS-->>J: pass / fail
   J->>Git: commit newTag/newName on east+west
   ArgoE->>Git: refresh

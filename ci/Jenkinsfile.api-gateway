@@ -57,6 +57,8 @@ pipeline {
           changeset "ci/Jenkinsfile.api-gateway"
           changeset "ci/scripts/sign-and-attest.sh"
           changeset "ci/scripts/acs-image-check.sh"
+          changeset "ci/scripts/acs-image-scan.sh"
+          changeset "ci/scripts/lib/acs-common.sh"
           changeset "ci/maven/**"
         }
       }
@@ -129,33 +131,70 @@ pipeline {
           }
         }
 
-        stage('ACS image check') {
-          steps {
-            withCredentials([
-              string(credentialsId: 'acs-ci-token', variable: 'ACS_API_TOKEN', optional: true),
-              string(credentialsId: 'acs-central-url', variable: 'ACS_CENTRAL_URL', optional: true)
-            ]) {
-              sh '''
-                set -euo pipefail
-                export PATH="${TOOLS_DIR}:${PATH}"
-                chmod +x ci/scripts/acs-image-check.sh
-                if [ -z "${QUAY_HOST:-}" ] && [ -f .ci-quay.env ]; then
-                  # shellcheck disable=SC1091
-                  . ./.ci-quay.env
-                fi
-                if [ -z "${QUAY_HOST:-}" ]; then
-                  QUAY_HOST="$(oc -n quay-enterprise get route -l quay-component=quay-app-route -o jsonpath='{.items[0].spec.host}' 2>/dev/null || true)"
-                fi
-                if [ -z "${QUAY_HOST:-}" ]; then
-                  echo "WARN: Quay host unknown; ACS check skipped"
-                  exit 0
-                fi
-                export IMAGE="${QUAY_HOST}/${QUAY_ORG}/${APP}:${IMAGE_TAG}"
-                export TOOLS_DIR ACS_API_TOKEN ACS_CENTRAL_URL
-                export ACS_REQUIRED=true
-                export ACS_FAIL_ON="${ACS_FAIL_ON:-Critical}"
-                ci/scripts/acs-image-check.sh
-              '''
+        stage('ACS') {
+          parallel {
+            stage('ACS vulnerabilities') {
+              steps {
+                withCredentials([
+                  string(credentialsId: 'acs-ci-token', variable: 'ACS_API_TOKEN', optional: true),
+                  string(credentialsId: 'acs-central-url', variable: 'ACS_CENTRAL_URL', optional: true)
+                ]) {
+                  sh '''
+                    set -euo pipefail
+                    export PATH="${TOOLS_DIR}:${PATH}"
+                    chmod +x ci/scripts/acs-image-scan.sh ci/scripts/acs-image-check.sh
+                    if [ -z "${QUAY_HOST:-}" ] && [ -f .ci-quay.env ]; then
+                      # shellcheck disable=SC1091
+                      . ./.ci-quay.env
+                    fi
+                    if [ -z "${QUAY_HOST:-}" ]; then
+                      QUAY_HOST="$(oc -n quay-enterprise get route -l quay-component=quay-app-route -o jsonpath='{.items[0].spec.host}' 2>/dev/null || true)"
+                    fi
+                    if [ -z "${QUAY_HOST:-}" ]; then
+                      echo "WARN: Quay host unknown; ACS vulnerability scan skipped"
+                      exit 0
+                    fi
+                    export IMAGE="${QUAY_HOST}/${QUAY_ORG}/${APP}:${IMAGE_TAG}"
+                    export TOOLS_DIR ACS_API_TOKEN ACS_CENTRAL_URL
+                    export ACS_REQUIRED=true
+                    # Report CVEs by default; set ACS_SCAN_FAIL_ON=Critical to gate on CVEs.
+                    export ACS_SCAN_FAIL_ON="${ACS_SCAN_FAIL_ON:-None}"
+                    export ACS_SCAN_OUT="${WORKSPACE}/.acs-image-scan.out"
+                    ci/scripts/acs-image-scan.sh
+                  '''
+                }
+              }
+            }
+            stage('ACS policies') {
+              steps {
+                withCredentials([
+                  string(credentialsId: 'acs-ci-token', variable: 'ACS_API_TOKEN', optional: true),
+                  string(credentialsId: 'acs-central-url', variable: 'ACS_CENTRAL_URL', optional: true)
+                ]) {
+                  sh '''
+                    set -euo pipefail
+                    export PATH="${TOOLS_DIR}:${PATH}"
+                    chmod +x ci/scripts/acs-image-scan.sh ci/scripts/acs-image-check.sh
+                    if [ -z "${QUAY_HOST:-}" ] && [ -f .ci-quay.env ]; then
+                      # shellcheck disable=SC1091
+                      . ./.ci-quay.env
+                    fi
+                    if [ -z "${QUAY_HOST:-}" ]; then
+                      QUAY_HOST="$(oc -n quay-enterprise get route -l quay-component=quay-app-route -o jsonpath='{.items[0].spec.host}' 2>/dev/null || true)"
+                    fi
+                    if [ -z "${QUAY_HOST:-}" ]; then
+                      echo "WARN: Quay host unknown; ACS policy check skipped"
+                      exit 0
+                    fi
+                    export IMAGE="${QUAY_HOST}/${QUAY_ORG}/${APP}:${IMAGE_TAG}"
+                    export TOOLS_DIR ACS_API_TOKEN ACS_CENTRAL_URL
+                    export ACS_REQUIRED=true
+                    export ACS_FAIL_ON="${ACS_FAIL_ON:-Critical}"
+                    export ACS_CHECK_OUT="${WORKSPACE}/.acs-image-check.out"
+                    ci/scripts/acs-image-check.sh
+                  '''
+                }
+              }
             }
           }
         }
