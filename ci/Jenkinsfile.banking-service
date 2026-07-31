@@ -195,7 +195,8 @@ pipeline {
                   test -f "${f}"
                 done
                 for f in ${OVERLAYS}; do
-                  sed -i.bak -E "s/newTag:.*/newTag: ${IMAGE_TAG}/" "${f}"
+                  # Quote tag: YAML would parse bare numbers as int and break kustomize/Argo.
+                  sed -i.bak -E "s/newTag:.*/newTag: \"${IMAGE_TAG}\"/" "${f}"
                 done
 
                 if [ -f .ci-quay.env ]; then

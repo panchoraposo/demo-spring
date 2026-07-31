@@ -100,7 +100,8 @@ pipeline {
                 OVERLAY_WEST="gitops/components/${APP}/overlays/west/kustomization.yaml"
                 test -f "${OVERLAY_EAST}"
                 test -f "${OVERLAY_WEST}"
-                sed -i.bak -E "s/newTag:.*/newTag: ${IMAGE_TAG}/" "${OVERLAY_EAST}" "${OVERLAY_WEST}"
+                # Quote tag: YAML would parse bare numbers as int and break kustomize/Argo.
+                sed -i.bak -E "s/newTag:.*/newTag: \"${IMAGE_TAG}\"/" "${OVERLAY_EAST}" "${OVERLAY_WEST}"
                 rm -f "${OVERLAY_EAST}.bak" "${OVERLAY_WEST}.bak"
 
                 if [ "${GIT_PASSWORD}" = "replace-me" ] || [ -z "${GIT_PASSWORD}" ]; then
