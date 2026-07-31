@@ -7,6 +7,8 @@ metadata:
     # Per-cluster OpenShift Route entry for the SI demo (east / west).
     route-type: si-cluster
 spec:
+  # Patched per overlay (si-gateway.<apps-domain>).
+  host: si-gateway.apps.example.com
   to:
     kind: Service
     name: api-gateway
@@ -15,3 +17,4 @@ spec:
   tls:
     termination: edge
     insecureEdgeTerminationPolicy: Redirect
+

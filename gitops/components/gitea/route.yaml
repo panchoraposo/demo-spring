@@ -1,5 +1,5 @@
 # Public OpenShift Route for the Gitea UI and HTTPS git clone.
-# Host is assigned by the cluster apps domain (gitea-banking-git.<domain>).
+# Short host: gitea.<apps-domain> (must match helm DOMAIN / ROOT_URL).
 apiVersion: route.openshift.io/v1
 kind: Route
 metadata:
@@ -10,6 +10,7 @@ metadata:
     app.kubernetes.io/name: gitea
     cluster: acm
 spec:
+  host: gitea.apps.cluster-k7kqp.k7kqp.sandbox3321.opentlc.com
   to:
     kind: Service
     name: gitea-http

@@ -30,8 +30,11 @@ gitea_install() {
 
   APPS_DOMAIN="$(oc --context "${CTX}" get ingresses.config.openshift.io cluster -o jsonpath='{.spec.domain}' 2>/dev/null || true)"
   ROUTE_HOST="$(oc --context "${CTX}" -n "${NS}" get route gitea -o jsonpath='{.spec.host}' 2>/dev/null || true)"
-  if [[ -z "${ROUTE_HOST}" && -n "${APPS_DOMAIN}" ]]; then
-    ROUTE_HOST="gitea-${NS}.${APPS_DOMAIN}"
+  DESIRED_HOST=""
+  [[ -n "${APPS_DOMAIN}" ]] && DESIRED_HOST="gitea.${APPS_DOMAIN}"
+  # Prefer short demo host gitea.<domain> (migrate legacy gitea-<ns>.<domain>).
+  if [[ -n "${DESIRED_HOST}" && "${ROUTE_HOST}" != "${DESIRED_HOST}" ]]; then
+    ROUTE_HOST="${DESIRED_HOST}"
     echo "==> Patching Route host to ${ROUTE_HOST}"
     oc --context "${CTX}" -n "${NS}" patch route gitea --type merge \
       -p "{\"spec\":{\"host\":\"${ROUTE_HOST}\"}}" >/dev/null

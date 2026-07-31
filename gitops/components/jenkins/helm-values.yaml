@@ -20,7 +20,7 @@ controller:
     enabled: false
   # Builds run on the controller (no separate agents).
   numExecutors: 2
-  jenkinsUrl: https://jenkins-banking-ci.apps.cluster-k7kqp.k7kqp.sandbox3321.opentlc.com/
+  jenkinsUrl: https://jenkins.apps.cluster-k7kqp.k7kqp.sandbox3321.opentlc.com/
   # Required by Git plugin ≥4.11 for /git/notifyCommit (Gitea push webhook).
   javaOpts: >-
     -Dhudson.plugins.git.GitStatus.NOTIFY_COMMIT_ACCESS_TOKEN=banking-demo-notify
@@ -185,7 +185,7 @@ controller:
                       git {
                         remote {
                           // Gitea on acm (override via GIT_REPO_URL / gitea-repo ConfigMap).
-                          url('${GIT_REPO_URL:-https://gitea-banking-git.apps.cluster-k7kqp.k7kqp.sandbox3321.opentlc.com/banking/demo-spring.git}')
+                          url('${GIT_REPO_URL:-https://gitea.apps.cluster-k7kqp.k7kqp.sandbox3321.opentlc.com/banking/demo-spring.git}')
                           credentials('github-ci')
                         }
                         branches('*/main')
@@ -218,7 +218,7 @@ controller:
                     scm {
                       git {
                         remote {
-                          url('${GIT_REPO_URL:-https://gitea-banking-git.apps.cluster-k7kqp.k7kqp.sandbox3321.opentlc.com/banking/demo-spring.git}')
+                          url('${GIT_REPO_URL:-https://gitea.apps.cluster-k7kqp.k7kqp.sandbox3321.opentlc.com/banking/demo-spring.git}')
                           credentials('github-ci')
                         }
                         branches('*/main')

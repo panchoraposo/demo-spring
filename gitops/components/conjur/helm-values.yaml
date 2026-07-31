@@ -62,6 +62,7 @@ ssl:
     - conjur-oss
     - conjur-oss.banking-conjur
     - conjur-oss.banking-conjur.svc.cluster.local
+    - conjur.apps.cluster-k7kqp.k7kqp.sandbox3321.opentlc.com
     - conjur-banking-conjur.apps.cluster-k7kqp.k7kqp.sandbox3321.opentlc.com
   expiration: 365
 

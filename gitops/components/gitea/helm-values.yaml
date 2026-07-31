@@ -67,11 +67,11 @@ gitea:
   config:
     server:
       # bootstrap-gitea.sh install overrides these with the real Route URL
-      # (https://gitea-banking-git.<apps-domain>/). Placeholders keep the chart valid
+      # (https://gitea.<apps-domain>/). Must match route.yaml; values keep the chart valid
       # until that step runs.
-      DOMAIN: gitea-banking-git.apps.cluster-k7kqp.k7kqp.sandbox3321.opentlc.com
-      SSH_DOMAIN: gitea-banking-git.apps.cluster-k7kqp.k7kqp.sandbox3321.opentlc.com
-      ROOT_URL: https://gitea-banking-git.apps.cluster-k7kqp.k7kqp.sandbox3321.opentlc.com/
+      DOMAIN: gitea.apps.cluster-k7kqp.k7kqp.sandbox3321.opentlc.com
+      SSH_DOMAIN: gitea.apps.cluster-k7kqp.k7kqp.sandbox3321.opentlc.com
+      ROOT_URL: https://gitea.apps.cluster-k7kqp.k7kqp.sandbox3321.opentlc.com/
       # OpenShift Route terminates TLS; Gitea listens HTTP in-cluster.
       PROTOCOL: http
     service:

@@ -218,7 +218,7 @@ pipeline {
                       REPO_URL="$(git remote get-url origin 2>/dev/null || true)"
                     fi
                     if [ -z "${REPO_URL}" ]; then
-                      REPO_URL="https://gitea-banking-git.apps.cluster-k7kqp.k7kqp.sandbox3321.opentlc.com/banking/demo-spring.git"
+                      REPO_URL="https://gitea.apps.cluster-k7kqp.k7kqp.sandbox3321.opentlc.com/banking/demo-spring.git"
                     fi
                     REPO_HOSTPATH="$(echo "${REPO_URL}" | sed -E 's|^https?://||; s|^git@||; s|:|/|')"
                     AUTH_URL="https://${GIT_USERNAME}:${GIT_PASSWORD}@${REPO_HOSTPATH}"

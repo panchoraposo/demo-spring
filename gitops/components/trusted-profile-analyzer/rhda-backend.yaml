@@ -94,6 +94,7 @@ metadata:
   labels:
     app.kubernetes.io/name: rhda-backend
 spec:
+  host: rhda.apps.cluster-k7kqp.k7kqp.sandbox3321.opentlc.com
   to:
     kind: Service
     name: rhda-backend
@@ -102,3 +103,4 @@ spec:
   tls:
     termination: edge
     insecureEdgeTerminationPolicy: Redirect
+

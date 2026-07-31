@@ -7,6 +7,7 @@ metadata:
     app.kubernetes.io/name: conjur
     app.kubernetes.io/part-of: banking-demo
 spec:
+  host: conjur.apps.cluster-k7kqp.k7kqp.sandbox3321.opentlc.com
   to:
     kind: Service
     name: conjur-oss

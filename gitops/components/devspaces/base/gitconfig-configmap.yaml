@@ -1,0 +1,20 @@
+# Mounted into every Dev Spaces workspace so git commit works without manual setup.
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: workspace-gitconfig
+  namespace: openshift-devspaces
+  labels:
+    app.kubernetes.io/part-of: banking-demo
+    controller.devfile.io/mount-to-devworkspace: "true"
+    controller.devfile.io/watch-configmap: "true"
+  annotations:
+    controller.devfile.io/mount-as: subpath
+    controller.devfile.io/mount-path: /etc/
+data:
+  gitconfig: |
+    [user]
+            name = Demo Developer
+            email = demo@banking.local
+    [init]
+            defaultBranch = main

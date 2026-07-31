@@ -50,6 +50,9 @@ spec:
       openShiftSecurityContextConstraint: container-build
     storage:
       pvcStrategy: per-user
+    # Created by scripts/bootstrap-devspaces-gitea-raw.sh (SAN cert for raw.<gitea-host>).
+    trustedCerts:
+      gitTrustedCertsConfigMapName: gitea-raw-ca
     defaultEditor: che-incubator/che-code/latest
     # Repo-level defaults: ./devfile.yaml + .vscode/extensions.json (Spring + RHDA).
     # Patched per environment via overlay env files.

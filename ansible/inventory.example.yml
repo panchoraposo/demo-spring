@@ -25,7 +25,7 @@ all:
     reset_image_tags: false
 
     # Optional overrides (configure_environment discovers these from live Routes)
-    # conjur_url_spoke: https://conjur-banking-conjur.apps.example.com
+    # conjur_url_spoke: https://conjur.apps.example.com
     # east_thanos_host: thanos-querier-openshift-monitoring.apps.east.example.com
     # west_thanos_host: thanos-querier-openshift-monitoring.apps.west.example.com
 

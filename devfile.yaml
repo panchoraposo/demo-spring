@@ -38,6 +38,16 @@ components:
         - name: MAVEN_SETTINGS
           value: ${PROJECT_SOURCE}/ci/maven/settings.xml
 commands:
+  - id: configure-git-identity
+    exec:
+      component: tools
+      commandLine: |
+        git config --global user.name "${GIT_AUTHOR_NAME:-Demo Developer}"
+        git config --global user.email "${GIT_AUTHOR_EMAIL:-demo@banking.local}"
+        if git -C "${PROJECT_SOURCE}" rev-parse --is-inside-work-tree >/dev/null 2>&1; then
+          git -C "${PROJECT_SOURCE}" config user.name "${GIT_AUTHOR_NAME:-Demo Developer}"
+          git -C "${PROJECT_SOURCE}" config user.email "${GIT_AUTHOR_EMAIL:-demo@banking.local}"
+        fi
   - id: build-banking-service
     exec:
       component: tools
@@ -68,3 +78,6 @@ commands:
       commandLine: mvn -B -s ${PROJECT_SOURCE}/ci/maven/settings.xml spring-boot:run -Dspring-boot.run.arguments=--server.port=8081
       group:
         kind: run
+events:
+  postStart:
+    - configure-git-identity

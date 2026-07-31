@@ -19,6 +19,9 @@ Jenkins and BuildConfigs run on hub cluster **acm**. Builds resolve Maven depend
 SCM for CI is **Gitea on acm** (not GitHub). Inner-loop fix of Critical CVEs:
 
 ```bash
+# One-time on the hub: Route + cert so Dev Spaces can fetch via raw.<gitea-host>
+./scripts/bootstrap-devspaces-gitea-raw.sh
+
 # Factory URL (opens the Gitea repo in Dev Spaces)
 ./scripts/print-devspaces-gitea-factory.sh
 
@@ -27,6 +30,8 @@ SCM for CI is **Gitea on acm** (not GitHub). Inner-loop fix of Critical CVEs:
 ```
 
 1. Open the factory URL → workspace clones `https://gitea-…/banking/demo-spring.git`.
+   - If TLS fails on `raw.gitea-…`, re-run `bootstrap-devspaces-gitea-raw.sh`, or use the
+     script’s **Fallback (rawdevfile)** URL / “Continue with default devfile”.
 2. Edit `apps/banking-service/pom.xml` (e.g. `<tomcat.version>10.1.35</tomcat.version>`).
 3. Commit and push to `main` (Git credentials: Gitea user `git` / `BankingGitCiChangeMe!` or a PAT).
 4. Jenkins `banking-service-ci` runs (webhook, or SCM poll within ~1 minute).
