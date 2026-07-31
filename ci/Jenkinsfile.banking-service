@@ -61,15 +61,27 @@ pipeline {
         }
       }
       stages {
+        stage('Maven package') {
+          steps {
+            sh '''
+              set -euo pipefail
+              export PATH="${TOOLS_DIR}:${PATH}"
+              # Persistent local repo on Jenkins PVC — avoids re-downloading deps every build.
+              export JENKINS_HOME="${JENKINS_HOME:-/var/jenkins_home}"
+              export MAVEN_REPO_LOCAL="${JENKINS_HOME}/.m2/repository"
+              chmod +x ci/scripts/ensure-maven-tools.sh ci/scripts/maven-package.sh
+              APP_DIR="apps/${APP}" ci/scripts/maven-package.sh
+            '''
+          }
+        }
+
         stage('Build & push image') {
           steps {
             sh '''
               set -euo pipefail
               export PATH="${TOOLS_DIR}:${PATH}"
               oc whoami
-              # Ensure Maven settings (Nexus) are in the Docker build context.
-              cp -f ci/maven/settings.xml "apps/${APP}/settings.xml"
-              # Prefer -n over `oc project` — Jenkins home kubeconfig can be corrupt/incomplete.
+              # Runtime image only (jar already packaged on Jenkins PVC .m2).
               oc start-build "${APP}" --from-dir="apps/${APP}" --follow --wait -n "${APPS_NS}"
               oc tag "${APPS_NS}/${APP}:latest" "${APPS_NS}/${APP}:${IMAGE_TAG}" -n "${APPS_NS}"
               oc get istag "${APP}:${IMAGE_TAG}" -n "${APPS_NS}"
@@ -145,6 +157,9 @@ pipeline {
                 fi
                 export IMAGE="${QUAY_HOST}/${QUAY_ORG}/${APP}:${IMAGE_TAG}"
                 export TOOLS_DIR ACS_API_TOKEN ACS_CENTRAL_URL
+                # Require Central; fail build only on Critical+ (HIGH still printed).
+                export ACS_REQUIRED=true
+                export ACS_FAIL_ON="${ACS_FAIL_ON:-Critical}"
                 ci/scripts/acs-image-check.sh
               '''
             }

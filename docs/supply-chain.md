@@ -21,9 +21,11 @@ Operators: [`gitops/platform/operators-hub`](../gitops/platform/operators-hub) (
 2. ODF `StorageCluster` MCG-only — wait until `openshift-storage.noobaa.io` StorageClass exists.
 3. QuayRegistry + Securesign + RHACS Central.
 4. Nexus Deployment → `./scripts/bootstrap-nexus.sh` (repos + anonymous read).
-5. TPA PostgreSQL + `rhda-backend` + Keycloak SSO (GitOps managed; secrets via Conjur/ESO).
-6. ACS CI token: `./scripts/bootstrap-acs-ci.sh` → `banking-ci/acs-ci` for Jenkins.
-7. Optional values:
+5. Warm Maven cache: `./scripts/warm-nexus-maven.sh` (Nexus blobs + Jenkins `~/.m2`).
+6. TPA PostgreSQL + `rhda-backend` + Keycloak SSO (GitOps managed; secrets via Conjur/ESO).
+7. ACS Sensors on east/west: `./scripts/bootstrap-acs-secured-clusters.sh`
+8. ACS CI token: `./scripts/bootstrap-acs-ci.sh` → `banking-ci/acs-ci` for Jenkins (restart `jenkins-0`).
+9. Optional values:
    - Fulcio OIDC issuer for RHTAS (`gitops/components/trusted-artifact-signer/env/rhtas.env`)
    - RHDA/TPA URLs for Dev Spaces (`devfile.yaml` / CheCluster overlays)
 

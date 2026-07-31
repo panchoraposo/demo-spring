@@ -1,0 +1,7 @@
+# CI Dockerfile only needs target/*.jar
+src
+.git
+*.md
+settings.xml
+pom.xml
+Dockerfile.full

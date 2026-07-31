@@ -50,13 +50,14 @@ controller:
   podSecurityContext:
     runAsUser: 1000
     fsGroup: 1000
+  # Maven package runs on the controller with a persistent ~/.m2 on the PVC.
   resources:
     requests:
-      cpu: 100m
-      memory: 1Gi
+      cpu: 500m
+      memory: 2Gi
     limits:
       cpu: "2"
-      memory: 2Gi
+      memory: 4Gi
   # Inject GitHub PAT + optional Quay robot / cosign key for supply-chain stage.
   containerEnv:
     - name: GITHUB_CI_USERNAME

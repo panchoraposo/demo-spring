@@ -24,11 +24,32 @@ Jenkins and BuildConfigs run on hub cluster **acm**. Builds resolve Maven depend
 
 Bootstrap repos after Nexus is Ready: `./scripts/bootstrap-nexus.sh`.
 
-### ACS CI token
+### Maven cache (fast CI)
+
+Jenkins runs **`Maven package`** on the controller with a persistent
+`${JENKINS_HOME}/.m2/repository` (PVC). The OpenShift Build only copies the jar
+(`Dockerfile`) — no Maven download inside the build pod. Use `Dockerfile.full`
+for a self-contained local/image build.
+
+Warm once after Nexus is Ready (or after big POM changes):
 
 ```bash
-./scripts/bootstrap-acs-ci.sh   # creates banking-ci/acs-ci Secret for Jenkins
+./scripts/warm-nexus-maven.sh
 ```
+
+### ACS (Central + east/west Sensors + CI gate)
+
+```bash
+# Sensors on managed clusters → Central on acm
+./scripts/bootstrap-acs-secured-clusters.sh
+
+# API token → banking-ci/acs-ci (Jenkins JCasC credentials acs-ci-token / acs-central-url)
+./scripts/bootstrap-acs-ci.sh
+oc --context acm -n banking-ci delete pod jenkins-0   # reload env into JCasC
+```
+
+ACS stage sets `ACS_REQUIRED=true` and `ACS_FAIL_ON=Critical` (HIGH findings are
+still printed; Critical+ fails the build).
 
 Jenkins does **not** `oc apply` app manifests. GitOps owns cluster state.
 

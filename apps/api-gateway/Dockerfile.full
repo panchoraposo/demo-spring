@@ -1,0 +1,21 @@
+# Local / Dev Spaces full build (Maven inside the image). CI uses Dockerfile + Jenkins .m2.
+# Maven deps resolve via Nexus on acm (settings.xml in build context).
+FROM registry.access.redhat.com/ubi9/openjdk-21:1.21 AS build
+USER root
+WORKDIR /workspace
+COPY --chown=185:0 settings.xml ./
+COPY --chown=185:0 pom.xml .
+USER 185
+# Cache deps when pom.xml unchanged (Buildah layer cache).
+RUN mvn -B -s settings.xml -DskipTests dependency:go-offline || \
+    mvn -B -s settings.xml -DskipTests dependency:resolve
+USER root
+COPY --chown=185:0 src ./src
+USER 185
+RUN mvn -B -s settings.xml -DskipTests package
+
+FROM registry.access.redhat.com/ubi9/openjdk-21-runtime:1.21
+COPY --from=build --chown=185:0 /workspace/target/api-gateway-*.jar /deployments/app.jar
+EXPOSE 8080
+USER 185
+ENTRYPOINT ["java", "-jar", "/deployments/app.jar"]

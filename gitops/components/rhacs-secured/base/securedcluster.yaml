@@ -1,0 +1,21 @@
+# SecuredCluster for managed clusters (east/west).
+# Requires init-bundle / CRS secrets in this namespace first:
+#   ./scripts/bootstrap-acs-secured-clusters.sh
+#
+# CENTRAL_ENDPOINT is patched per overlay to the acm Central Route.
+apiVersion: platform.stackrox.io/v1alpha1
+kind: SecuredCluster
+metadata:
+  name: stackrox-secured-cluster-services
+  namespace: stackrox
+  labels:
+    app.kubernetes.io/part-of: banking-demo
+  annotations:
+    argocd.argoproj.io/sync-options: SkipDryRunOnMissingResource=true
+spec:
+  clusterName: CLUSTER_NAME
+  centralEndpoint: CENTRAL_ENDPOINT
+  admissionControl:
+    listenOnCreates: true
+    listenOnUpdates: true
+    listenOnEvents: true

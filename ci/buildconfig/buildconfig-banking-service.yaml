@@ -15,6 +15,7 @@ spec:
   strategy:
     type: Docker
     dockerStrategy:
+      # Jar is pre-built on Jenkins (persistent .m2); Dockerfile only packages the runtime image.
       dockerfilePath: Dockerfile
   runPolicy: Serial
   # Keep Kiali Workloads clean — do not retain every completed build pod.

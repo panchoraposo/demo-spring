@@ -18,6 +18,7 @@ resources:
   - user-workload-monitoring.yaml
   # wave 2
   - mesh.yaml
+  - rhacs-secured.yaml
   # wave 3
   - external-secrets-config.yaml
   # wave 4+ mesh demo stack
