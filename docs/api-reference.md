@@ -83,3 +83,16 @@ Transaction history (optional account filter). Types: `DEPOSIT`, `WITHDRAWAL`, `
   "path": "/api/v1/accounts/99"
 }
 ```
+
+## Actuator (not under `/api`)
+
+Unauthenticated endpoints used by kubelet probes and user-workload scrape:
+
+| Path | Purpose |
+| --- | --- |
+| `GET /actuator/health/liveness` | Liveness / startup probes |
+| `GET /actuator/health/readiness` | Readiness (`banking-service` includes DB) |
+| `GET /actuator/info` | Build/info |
+| `GET /actuator/prometheus` | Micrometer metrics for CMA Prometheus trigger |
+
+Autoscaling: [keda-autoscaling.md](keda-autoscaling.md).

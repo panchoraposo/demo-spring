@@ -51,4 +51,4 @@ Remote secrets / peering must be exchanged once both clusters exist:
 scripts/mesh/exchange-remote-secrets.sh
 ```
 
-See [docs/multi-cluster.md](../../../docs/multi-cluster.md).
+See [docs/mesh-failover.md](../../../docs/mesh-failover.md) (live demo) and [docs/multi-cluster.md](../../../docs/multi-cluster.md) (install/peering).

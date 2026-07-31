@@ -91,7 +91,7 @@ run_load() {
 
   banner "LOAD — ${CONCURRENCY} concurrent for ${LOAD_SECONDS}s"
   say "Target: ${target}"
-  say "Watch: oc --context ${CLUSTER} -n ${BANKING_NS} get scaledobject,hpa,pods -w"
+  say "Watch (one type with -w): oc --context ${CLUSTER} -n ${BANKING_NS} get hpa -w"
   echo
 
   if command -v hey >/dev/null 2>&1; then
@@ -110,10 +110,8 @@ run_load() {
 }
 
 watch_scale() {
-  banner "WATCH — ScaledObject / HPA / pods (Ctrl-C to stop)"
-  oc --context "${CLUSTER}" -n "${BANKING_NS}" get scaledobject,hpa,pods \
-    -l 'app.kubernetes.io/name in (api-gateway,banking-service)' \
-    -w
+  banner "WATCH — HPA (Ctrl-C to stop; use get pods / get scaledobject separately)"
+  oc --context "${CLUSTER}" -n "${BANKING_NS}" get hpa -w
 }
 
 demo() {

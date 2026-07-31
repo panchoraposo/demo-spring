@@ -1,6 +1,6 @@
 # Service Interconnect failover (OpenShift Routes)
 
-Parallel demo path to [mesh failover](multi-cluster.md). It proves the banking API stays available when a regional cluster loses its **backend**, using:
+Parallel demo path to [mesh failover](mesh-failover.md). It proves the banking API stays available when a regional cluster loses its **backend**, using:
 
 | Layer | Product | Role |
 | --- | --- | --- |
@@ -14,10 +14,10 @@ This stack is intentionally **isolated** from OpenShift Service Mesh ambient nam
 
 | Namespace | Clusters | Contents |
 | --- | --- | --- |
-| `banking-si-apps` | east, west | api-gateway, banking-service, Skupper Site / Connector / Listener, Network Observer (west) |
+| `banking-si-apps` | east, west | api-gateway, banking-service, Skupper Site / Connector / Listener, Network Observer (west), CMA ScaledObjects |
 | `banking-si-db` | east, west | Local PostgreSQL (no data HA — same constraint as the mesh demo) |
 
-No `istio.io/dataplane-mode=ambient` labels on these namespaces.
+No `istio.io/dataplane-mode=ambient` labels on these namespaces. The same Custom Metrics Autoscaler policy as the mesh stack applies here (`BANKING_NS=banking-si-apps ./scripts/demo-keda-scale.sh`) — see [keda-autoscaling.md](keda-autoscaling.md).
 
 ## Architecture
 
@@ -98,7 +98,7 @@ Network Observer **2.x** sidebar: **Topology · Services · Sites · Components 
 
 Pair with the terminal cards: curl target URL, `★ EAST/WEST ★`, pretty customer JSON.
 
-Optional third screen on **acm**: Perses **Banking failover compare** (`./scripts/perses-url.sh`) with namespace `banking-si-apps` — HTTP rate and ready replicas by `cluster=east|west` via hub promxy.
+Optional third screen on **acm**: Perses **Banking failover compare** (`./scripts/perses-url.sh`) with `apps_ns=banking-si-apps` — HTTP rate and ready replicas by `cluster=east|west` via hub promxy. Setup and dashboards: [observability-perses.md](observability-perses.md).
 
 ### What the terminal shows
 
@@ -161,6 +161,9 @@ scripts/
 
 ## Related docs
 
-- [Multi-cluster (mesh path)](multi-cluster.md)
+- [Mesh failover (OSSM ambient)](mesh-failover.md)
+- [Observability (Perses + promxy)](observability-perses.md)
+- [KEDA / Custom Metrics Autoscaler](keda-autoscaling.md) — same CMA ScaledObjects apply in `banking-si-apps`
+- [Multi-cluster install](multi-cluster.md)
 - [Architecture](architecture.md)
 - [Getting started](getting-started.md)

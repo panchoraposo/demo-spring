@@ -84,6 +84,36 @@ The hub credentials dashboard (`namespace/dashboard`) lists live Routes and defa
 
 Prefer Jenkins jobs (see [ci-cd.md](ci-cd.md)): `banking-service-ci` and `api-gateway-ci`. Configure Conjur/GitHub PAT so the GitOps commit stage can push (`scripts/set-conjur-github-pat.sh`).
 
+## Mesh failover and Perses (optional)
+
+```bash
+# Ambient mesh failover (Kiali on acm + Perses)
+./scripts/demo-mesh-failover.sh
+./scripts/perses-url.sh   # Observe → Dashboards (Perses)
+
+# Docs
+#   docs/mesh-failover.md
+#   docs/observability-perses.md
+```
+
+## Autoscaling (optional)
+
+Custom Metrics Autoscaler (CMA / KEDA) is installed on east/west. Apps stay at 1 replica until you generate load:
+
+```bash
+# Verify operator + ScaledObjects
+oc --context east -n openshift-keda get csv,pods
+oc --context east -n banking-apps get scaledobject,hpa
+
+# Interactive scale-out demo (needs hey or ab)
+./scripts/demo-keda-scale.sh
+
+# Watch desired replicas (only one resource type with -w)
+oc --context east -n banking-apps get hpa -w
+```
+
+Details: [keda-autoscaling.md](keda-autoscaling.md).
+
 ## Local development (optional)
 
 ```bash

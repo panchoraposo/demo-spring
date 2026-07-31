@@ -15,15 +15,15 @@ Three clusters. Hub owns platform services; east/west run the banking apps with 
 ```mermaid
 flowchart LR
   subgraph acm ["acm hub"]
-    HubSvc["RHACM · GitOps · Conjur · Keycloak<br/>Jenkins · ODF · Quay · RHTAS · TPA<br/>Dev Spaces · Kiali"]
+    HubSvc["RHACM · GitOps · Conjur · Keycloak<br/>Jenkins · ODF · Quay · RHTAS · TPA<br/>Dev Spaces · Kiali · Perses"]
   end
   subgraph east ["east"]
-    EastSvc["GitOps · ESO · OSSM ambient<br/>Route → api-gateway · banking-service · PostgreSQL"]
-    EastSI["SI stack: banking-si-* + RHSI + Route"]
+    EastSvc["GitOps · ESO · OSSM · CMA/KEDA<br/>Route → api-gateway · banking-service · PostgreSQL"]
+    EastSI["SI stack: banking-si-* + RHSI + Route + CMA"]
   end
   subgraph west ["west"]
-    WestSvc["GitOps · ESO · OSSM ambient<br/>Route → api-gateway · banking-service · PostgreSQL"]
-    WestSI["SI stack + Network Observer console"]
+    WestSvc["GitOps · ESO · OSSM · CMA/KEDA<br/>Route → api-gateway · banking-service · PostgreSQL"]
+    WestSI["SI stack + Network Observer + CMA"]
   end
   HubSvc -->|ApplicationSets| EastSvc
   HubSvc -->|ApplicationSets| WestSvc
@@ -37,7 +37,8 @@ flowchart LR
 | API call (SI) | Client → east/west OpenShift Route → `api-gateway` → SI logical `banking-service` → local PostgreSQL |
 | Secrets | Conjur on acm → ESO on acm/east/west → Kubernetes Secrets |
 | Supply chain | Dev Spaces / Jenkins on acm → BuildConfig → Quay + RHTAS → Git tag bump → GitOps sync |
-| Observability | Hub Kiali (mesh) · west Network Observer (SI) · promxy · Perses (hub dashboards) |
+| Observability | Hub Kiali (mesh) · west Network Observer (SI) · promxy → Perses dashboards on acm |
+| Mesh failover | Scale east backend → 0; ambient serves west via east Route — [docs](docs/mesh-failover.md) |
 | Autoscaling | Custom Metrics Autoscaler (KEDA) — CPU + Prometheus HTTP RPS, max 10 |
 
 Detail and component table: [docs/architecture.md](docs/architecture.md).
@@ -62,6 +63,7 @@ Detail and component table: [docs/architecture.md](docs/architecture.md).
 | Policy / image check | Red Hat Advanced Cluster Security (ACS) on acm |
 | Inner loop | OpenShift Dev Spaces (acm) ← **Gitea** `banking/demo-spring` |
 | Autoscaling | Custom Metrics Autoscaler Operator (CMA / KEDA) on east / west |
+| Observability UI | Perses (COO) + promxy on acm · Kiali / OSSMC · Network Observer (SI) |
 | CI | Jenkins ← Gitea → Nexus/Maven → BuildConfig → Quay/RHTAS → ACS → GitOps |
 
 Dev Spaces factory (Gitea): `./scripts/print-devspaces-gitea-factory.sh`
@@ -95,7 +97,7 @@ scripts/                   bootstrap-acm, conjur sync, mesh, banners
 | `POST` | `/api/v1/transfers` | Fund transfer between accounts |
 | `GET` | `/api/v1/transactions` | Transaction history |
 
-All routes are exposed through the gateway and require a valid JWT from Keycloak (except actuator health).
+All routes are exposed through the gateway and require a valid JWT from Keycloak (except actuator `health` / `prometheus` for probes and UWM scrape).
 
 ## Quick start (multi-cluster)
 
@@ -105,8 +107,9 @@ All routes are exposed through the gateway and require a valid JWT from Keycloak
    Use `-e auto_push_env=true` if Argo must read the rewritten env hosts from Git.
 4. Optional: `scripts/bootstrap-gitea.sh`, `scripts/apply-console-banners.sh`, `scripts/apply-console-links.sh`.
 5. Open the hub credentials dashboard Route in `namespace/dashboard`, get a JWT from hub Keycloak realm `banking`, call either cluster gateway.
-6. Optional SI path: `./scripts/si/link-sites.sh` → `./scripts/demo-si-failover.sh` ([docs](docs/service-interconnect-failover.md)).
-7. Optional autoscaling demo: `./scripts/demo-keda-scale.sh` ([docs](docs/keda-autoscaling.md)).
+6. Mesh failover demo: `./scripts/demo-mesh-failover.sh` ([docs](docs/mesh-failover.md)) — watch Kiali + Perses (`./scripts/perses-url.sh`).
+7. Optional SI path: `./scripts/si/link-sites.sh` → `./scripts/demo-si-failover.sh` ([docs](docs/service-interconnect-failover.md)).
+8. Optional autoscaling demo: `./scripts/demo-keda-scale.sh` ([docs](docs/keda-autoscaling.md)).
 
 See [ansible/README.md](ansible/README.md), [docs/multi-cluster.md](docs/multi-cluster.md), and [docs/getting-started.md](docs/getting-started.md).
 
@@ -114,7 +117,9 @@ See [ansible/README.md](ansible/README.md), [docs/multi-cluster.md](docs/multi-c
 
 - [Architecture](docs/architecture.md)
 - [Multi-cluster](docs/multi-cluster.md)
+- [Mesh failover (OSSM ambient)](docs/mesh-failover.md)
 - [Service Interconnect failover](docs/service-interconnect-failover.md)
+- [Observability (Perses + promxy)](docs/observability-perses.md)
 - [KEDA / Custom Metrics Autoscaler](docs/keda-autoscaling.md)
 - [Ansible installer](ansible/README.md)
 - [Supply chain (ODF, Quay, RHTAS, TPA, Dev Spaces)](docs/supply-chain.md)

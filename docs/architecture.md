@@ -7,13 +7,15 @@ This demo targets three OpenShift clusters:
 | Cluster | Role |
 | --- | --- |
 | **acm** | RHACM hub, Conjur, Keycloak, Jenkins, ODF, Quay, Nexus, RHTAS, TPA, ACS, Dev Spaces, Kiali/promxy/Perses |
-| **east** / **west** | Managed clusters with GitOps, ESO, OSSM 3.4 ambient, PostgreSQL, Spring apps |
+| **east** / **west** | Managed clusters with GitOps, ESO, OSSM 3.4 ambient, CMA (KEDA), PostgreSQL, Spring apps |
 
 Credentials are sourced from **CyberArk Conjur** on the hub via the **External Secrets Operator** on each cluster. Spring apps never talk to Conjur; they only mount Kubernetes Secrets that ESO materializes.
 
 **Traffic failover ≠ data failover.** Mesh locality can send `banking-service` traffic to the peer cluster; each cluster keeps its own PostgreSQL.
 
-A parallel demo path uses **Service Interconnect** in `banking-si-*` namespaces (no ambient mesh labels), entered via OpenShift Routes. Details: [service-interconnect-failover.md](service-interconnect-failover.md).
+Mesh failover demo (scale backend → 0, ambient serves peer): [mesh-failover.md](mesh-failover.md).  
+A parallel path uses **Service Interconnect** in `banking-si-*` namespaces: [service-interconnect-failover.md](service-interconnect-failover.md).  
+Hub metrics UI: [observability-perses.md](observability-perses.md) (Perses + promxy).
 
 **OIDC is centralized on the hub.** A single Keycloak instance on **acm** provides:
 
@@ -28,10 +30,10 @@ flowchart LR
     HubSvc["RHACM · GitOps · Conjur · Keycloak<br/>Jenkins · ODF · Quay · Nexus · ACS<br/>RHTAS · TPA · Dev Spaces · Kiali · Perses"]
   end
   subgraph east ["east"]
-    EastSvc["GitOps · ESO · OSSM ambient<br/>api-gateway · banking-service · PostgreSQL"]
+    EastSvc["GitOps · ESO · OSSM ambient · CMA/KEDA<br/>api-gateway · banking-service · PostgreSQL"]
   end
   subgraph west ["west"]
-    WestSvc["GitOps · ESO · OSSM ambient<br/>api-gateway · banking-service · PostgreSQL"]
+    WestSvc["GitOps · ESO · OSSM ambient · CMA/KEDA<br/>api-gateway · banking-service · PostgreSQL"]
   end
   HubSvc -->|ApplicationSets| EastSvc
   HubSvc -->|ApplicationSets| WestSvc
@@ -50,7 +52,47 @@ flowchart LR
   BS -. failover .-> BS2[banking-service peer]
 ```
 
-PostgreSQL stays local to each managed cluster. Mesh can shift `banking-service` traffic east ↔ west; data does not follow.
+PostgreSQL stays local to each managed cluster. Mesh can shift `banking-service` traffic east ↔ west; data does not follow. Live storyboard: [mesh-failover.md](mesh-failover.md).
+
+### Observability (Perses + promxy)
+
+```mermaid
+flowchart LR
+  EastThanos["east Thanos"] --> Promxy["promxy on acm"]
+  WestThanos["west Thanos"] --> Promxy
+  Promxy --> Perses["Perses dashboards"]
+  Promxy --> Kiali["Kiali multi-cluster"]
+```
+
+| UI | Cluster | Purpose |
+| --- | --- | --- |
+| Kiali + OSSMC | acm | Ambient mesh graph (`banking-apps`) |
+| Perses (Observe → Dashboards) | acm | **Banking HTTP** · **Banking failover compare** |
+| Network Observer | west | SI topology (`banking-si-apps`) |
+
+Detail: [observability-perses.md](observability-perses.md).
+
+### Autoscaling (CMA / KEDA)
+
+On each spoke, Custom Metrics Autoscaler scales mesh and SI Spring Deployments (1→~10) from CPU and Prometheus HTTP RPS. Load is required to see scale-out.
+
+```mermaid
+flowchart LR
+  Client -->|JWT + HTTP load| Route[OpenShift Route]
+  Route --> GW[api-gateway]
+  GW --> BS[banking-service]
+  BS --> PG[PostgreSQL]
+  GW --> Prom["/actuator/prometheus"]
+  BS --> Prom
+  Prom --> UWM[User Workload Monitoring]
+  UWM --> Thanos["thanos-querier :9091"]
+  Thanos --> CMA[Custom Metrics Autoscaler]
+  CMA --> HPA[HPA]
+  HPA -->|replicas 1 to 10| GW
+  HPA -->|replicas 1 to 10| BS
+```
+
+Detail and demo commands: [keda-autoscaling.md](keda-autoscaling.md).
 
 ### Secrets
 
@@ -105,6 +147,9 @@ flowchart LR
 | CI | Jenkins → Nexus → BuildConfig → Quay/RHTAS → ACS → GitOps |
 | CI | Jenkins on acm + OpenShift BuildConfig → Quay sign/attest |
 | Autoscaling | Custom Metrics Autoscaler Operator (CMA / KEDA) on east / west — CPU + Prometheus HTTP RPS, max 10 |
+| Multi-cluster metrics | promxy on acm → east/west Thanos Querier |
+| Metrics UI | Red Hat build of Perses (Cluster Observability Operator) on acm |
+| Mesh console | Kiali multi-cluster + OSSMC on acm |
 
 ## GitOps ownership
 
@@ -130,12 +175,10 @@ Details: [secrets-management.md](secrets-management.md), [multi-cluster.md](mult
 - **banking-service** readiness includes the DB health indicator; Deployments use startup/readiness/liveness probes tuned for JVM + PostgreSQL.
 - Database and admin passwords are not stored in Git; Conjur on acm is the source of truth.
 
-Autoscaling detail: [keda-autoscaling.md](keda-autoscaling.md).
-
 ## Mesh failover
 
 - `banking-service` Service: `istio.io/global=true` + waypoint
 - DestinationRule: `outlierDetection` + `localityLbSetting.failoverPriority: topology.istio.io/cluster`
 - PostgreSQL Services stay local (no global label); Keycloak is hub-only
 
-See [multi-cluster.md](multi-cluster.md) for the scale-to-zero demo.
+Live demo (Kiali + Perses): [mesh-failover.md](mesh-failover.md). Install/peering: [multi-cluster.md](multi-cluster.md).

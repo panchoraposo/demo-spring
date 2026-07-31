@@ -55,5 +55,9 @@ ansible-playbook -i inventory.example.yml playbooks/dashboard.yml
 - `scripts/apply-console-banners.sh` / `scripts/apply-console-links.sh`
 - First Jenkins builds (images) if Quay tags are not yet present
 - GitHub/Gitea PAT in Conjur for Jenkins GitOps commits (`scripts/set-conjur-github-pat.sh`)
+- Mesh failover: `scripts/demo-mesh-failover.sh` ([docs/mesh-failover.md](../docs/mesh-failover.md))
+- Perses dashboards: `scripts/perses-url.sh` ([docs/observability-perses.md](../docs/observability-perses.md))
+- SI failover: `scripts/demo-si-failover.sh` ([docs/service-interconnect-failover.md](../docs/service-interconnect-failover.md))
+- Autoscaling: `scripts/demo-keda-scale.sh` ([docs/keda-autoscaling.md](../docs/keda-autoscaling.md))
 
 See [docs/multi-cluster.md](../docs/multi-cluster.md).

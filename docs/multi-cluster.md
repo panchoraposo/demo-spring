@@ -6,8 +6,8 @@ Layout for RHACM ApplicationSets plus per-cluster regional data. Prefer the Ansi
 
 | Cluster | Role | Workloads |
 | --- | --- | --- |
-| **acm** | Hub | RHACM, GitOps, Conjur, Keycloak, Jenkins, ODF, Quay, RHTAS, TPA, Dev Spaces, hub Kiali MC + OSSMC |
-| **east** | Managed cluster | GitOps, ESO, OSSM 3.4 ambient, PostgreSQL, Spring apps |
+| **acm** | Hub | RHACM, GitOps, Conjur, Keycloak, Jenkins, ODF, Quay, RHTAS, TPA, Dev Spaces, hub Kiali MC + OSSMC, promxy + Perses |
+| **east** | Managed cluster | GitOps, ESO, OSSM 3.4 ambient, CMA (KEDA), PostgreSQL, Spring apps |
 | **west** | Managed cluster | Same as east (independent DB) |
 
 **Mesh failover is traffic only.** Scaling east `banking-service` to 0 lets ambient locality send traffic to west endpoints. PostgreSQL is **not** shared.
@@ -79,10 +79,12 @@ oc --context acm apply -k gitops/acm
     - Banners: [`scripts/apply-console-banners.sh`](../scripts/apply-console-banners.sh)
     - ApplicationMenu links: [`scripts/apply-console-links.sh`](../scripts/apply-console-links.sh) (includes Perses)
 14. Credentials dashboard (Ansible): `ansible-playbook -i ansible/inventory.example.yml ansible/playbooks/dashboard.yml`
-15. Live mesh failover demo: [`scripts/demo-mesh-failover.sh`](../scripts/demo-mesh-failover.sh) (Kiali + Perses on ACM; OpenShift Routes)
-16. Optional SI failover: [`scripts/si/link-sites.sh`](../scripts/si/link-sites.sh) → [`scripts/demo-si-failover.sh`](../scripts/demo-si-failover.sh) (Network Observer on west; Perses for HTTP/pod compare) — [docs](service-interconnect-failover.md)
+15. Live mesh failover: [`scripts/demo-mesh-failover.sh`](../scripts/demo-mesh-failover.sh) — [mesh-failover.md](mesh-failover.md) (Kiali + Perses)
+16. Optional SI failover: [`scripts/si/link-sites.sh`](../scripts/si/link-sites.sh) → [`scripts/demo-si-failover.sh`](../scripts/demo-si-failover.sh) — [service-interconnect-failover.md](service-interconnect-failover.md)
+17. Perses dashboards: [`scripts/perses-url.sh`](../scripts/perses-url.sh) — [observability-perses.md](observability-perses.md)
+18. Optional autoscaling (CMA / KEDA): [`scripts/demo-keda-scale.sh`](../scripts/demo-keda-scale.sh) — [keda-autoscaling.md](keda-autoscaling.md)
 
-Managed cluster GitOps prerequisite: Subscription in `gitops/platform/operators-managed` (synced once Applications start).
+Managed cluster GitOps prerequisite: Subscription in `gitops/platform/operators-spoke` (ESO, Sail, GitOps, RHSI, CMA) once Applications start.
 
 ## Mesh peering checklist
 
@@ -98,18 +100,33 @@ Managed cluster GitOps prerequisite: Subscription in `gitops/platform/operators-
 - [ ] EW Gateway `gatewayClassName: istio-east-west` + `AMBIENT_ENABLE_MULTI_NETWORK=true`
 - [ ] Hub Kiali Ready with remote secrets for east/west
 
-## Failover demo (Kiali + mesh + OpenShift Routes)
+## Failover and observability demos
 
-Both demos enter via **per-cluster OpenShift Routes** (no shared global DNS):
+Both failover demos enter via **per-cluster OpenShift Routes** (no shared global DNS):
 
 ```bash
-./scripts/demo-mesh-failover.sh   # east Route → mesh failover; then peer Route if ingress dies
-./scripts/demo-si-failover.sh     # east Route → SI failover; then west Route if ingress dies
+./scripts/demo-mesh-failover.sh   # ambient mesh — see mesh-failover.md
+./scripts/demo-si-failover.sh     # Service Interconnect — see service-interconnect-failover.md
+./scripts/perses-url.sh           # Perses dashboards on acm console
 ```
 
-Kiali on ACM: `https://$(oc --context acm -n istio-system get route kiali -o jsonpath='{.spec.host}')`
+| Demo | Doc |
+| --- | --- |
+| Mesh failover (Kiali + Perses) | [mesh-failover.md](mesh-failover.md) |
+| SI failover (Network Observer + Perses) | [service-interconnect-failover.md](service-interconnect-failover.md) |
+| Perses / promxy setup and dashboards | [observability-perses.md](observability-perses.md) |
 
-Perses on ACM (Observe → Dashboards): `./scripts/perses-url.sh` — multi-cluster panels via promxy (`cluster=east|west`). During failover, open **Banking failover compare** while traffic runs.
+## Autoscaling demo (CMA / KEDA)
+
+Spring apps on east/west scale on CPU + Prometheus HTTP RPS (max 10). Idle stays at 1 replica — generate load to observe scale-out:
+
+```bash
+./scripts/demo-keda-scale.sh
+# watch (one resource type with -w):
+oc --context east -n banking-apps get hpa -w
+```
+
+Details: [keda-autoscaling.md](keda-autoscaling.md).
 
 ## CI images / supply chain
 
@@ -129,3 +146,7 @@ Console UX on acm:
 | [`gitops/applications/east`](../gitops/applications/east) / [`west`](../gitops/applications/west) | Managed-cluster Applications |
 | [`gitops/acm`](../gitops/acm) | Placement + ApplicationSets |
 | [`gitops/components/mesh`](../gitops/components/mesh) | OSSM ambient + failover |
+| [`gitops/components/perses`](../gitops/components/perses) | Perses UIPlugin + dashboards on acm |
+| [`gitops/components/promxy`](../gitops/components/promxy) | Multi-cluster PromQL federation |
+| [`gitops/components/keda`](../gitops/components/keda) | CMA `KedaController` + Thanos RBAC |
+| [`gitops/platform/operators-spoke`](../gitops/platform/operators-spoke) | Spoke operators including CMA Subscription |
