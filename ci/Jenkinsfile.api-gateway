@@ -213,7 +213,15 @@ pipeline {
                     echo "SKIP_GIT_PUSH=0" > .ci-gitops-status
                   else
                     git commit -m "ci(${APP}): promote signed image ${IMAGE_TAG} on east+west (${GIT_COMMIT_SHORT})"
-                    AUTH_URL="https://${GIT_USERNAME}:${GIT_PASSWORD}@github.com/panchoraposo/demo-spring.git"
+                    REPO_URL="${GIT_REPO_URL:-}"
+                    if [ -z "${REPO_URL}" ]; then
+                      REPO_URL="$(git remote get-url origin 2>/dev/null || true)"
+                    fi
+                    if [ -z "${REPO_URL}" ]; then
+                      REPO_URL="https://gitea-banking-git.apps.cluster-k7kqp.k7kqp.sandbox3321.opentlc.com/banking/demo-spring.git"
+                    fi
+                    REPO_HOSTPATH="$(echo "${REPO_URL}" | sed -E 's|^https?://||; s|^git@||; s|:|/|')"
+                    AUTH_URL="https://${GIT_USERNAME}:${GIT_PASSWORD}@${REPO_HOSTPATH}"
                     if git push "${AUTH_URL}" "HEAD:${GITOPS_BRANCH}"; then
                       echo "SKIP_GIT_PUSH=0" > .ci-gitops-status
                     else

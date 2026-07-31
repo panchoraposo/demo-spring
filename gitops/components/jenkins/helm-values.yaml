@@ -116,6 +116,13 @@ controller:
           optional: true
     - name: NEXUS_MAVEN_URL
       value: http://nexus.nexus.svc.cluster.local:8081/repository/maven-public/
+    # Demo SCM / GitOps push target (Gitea on acm). Seeded by bootstrap-gitea.sh.
+    - name: GIT_REPO_URL
+      valueFrom:
+        configMapKeyRef:
+          name: gitea-repo
+          key: publicUrl
+          optional: true
   sidecars:
     configAutoReload:
       enabled: false
@@ -163,7 +170,7 @@ controller:
         jobs:
           - script: |
               pipelineJob('banking-service-ci') {
-                description('CI for apps/banking-service → Nexus/Maven → Quay/RHTAS → ACS → GitOps')
+                description('CI for apps/banking-service → Nexus/Maven → Quay/RHTAS → ACS → GitOps (SCM: Gitea)')
                 parameters {
                   booleanParam('FORCE_BUILD', true, 'Build even without path changes')
                   stringParam('GITOPS_BRANCH', 'main', 'Branch for GitOps commits')
@@ -173,12 +180,14 @@ controller:
                     scm {
                       git {
                         remote {
-                          url('https://github.com/panchoraposo/demo-spring.git')
+                          // Gitea on acm (override via GIT_REPO_URL / gitea-repo ConfigMap).
+                          url('${GIT_REPO_URL:-https://gitea-banking-git.apps.cluster-k7kqp.k7kqp.sandbox3321.opentlc.com/banking/demo-spring.git}')
+                          credentials('github-ci')
                         }
                         branches('*/main')
                         extensions {
                           pathRestriction {
-                            includedRegions('apps/banking-service/.*\nci/Jenkinsfile.banking-service')
+                            includedRegions('apps/banking-service/.*\nci/Jenkinsfile.banking-service\nci/scripts/.*')
                             excludedRegions('')
                           }
                         }
@@ -189,12 +198,13 @@ controller:
                   }
                 }
                 triggers {
-                  scm('H/3 * * * *')
+                  // Gitea webhook → /git/notifyCommit; poll as fallback for the demo.
+                  scm('H/1 * * * *')
                 }
               }
           - script: |
               pipelineJob('api-gateway-ci') {
-                description('CI for apps/api-gateway → Nexus/Maven → Quay/RHTAS → ACS → GitOps')
+                description('CI for apps/api-gateway → Nexus/Maven → Quay/RHTAS → ACS → GitOps (SCM: Gitea)')
                 parameters {
                   booleanParam('FORCE_BUILD', true, 'Build even without path changes')
                   stringParam('GITOPS_BRANCH', 'main', 'Branch for GitOps commits')
@@ -204,12 +214,13 @@ controller:
                     scm {
                       git {
                         remote {
-                          url('https://github.com/panchoraposo/demo-spring.git')
+                          url('${GIT_REPO_URL:-https://gitea-banking-git.apps.cluster-k7kqp.k7kqp.sandbox3321.opentlc.com/banking/demo-spring.git}')
+                          credentials('github-ci')
                         }
                         branches('*/main')
                         extensions {
                           pathRestriction {
-                            includedRegions('apps/api-gateway/.*\nci/Jenkinsfile.api-gateway')
+                            includedRegions('apps/api-gateway/.*\nci/Jenkinsfile.api-gateway\nci/scripts/.*')
                             excludedRegions('')
                           }
                         }
@@ -220,7 +231,7 @@ controller:
                   }
                 }
                 triggers {
-                  scm('H/3 * * * *')
+                  scm('H/1 * * * *')
                 }
               }
 

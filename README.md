@@ -59,8 +59,10 @@ Detail and component table: [docs/architecture.md](docs/architecture.md).
 | Signing | Red Hat Trusted Artifact Signer (Securesign) |
 | SCA / SBOM analytics | Red Hat Trusted Profile Analyzer + RHDA |
 | Policy / image check | Red Hat Advanced Cluster Security (ACS) on acm |
-| Inner loop | OpenShift Dev Spaces (acm) |
-| CI | Jenkins → Nexus/Maven → BuildConfig → Quay/RHTAS → ACS → GitOps |
+| Inner loop | OpenShift Dev Spaces (acm) ← **Gitea** `banking/demo-spring` |
+| CI | Jenkins ← Gitea → Nexus/Maven → BuildConfig → Quay/RHTAS → ACS → GitOps |
+
+Dev Spaces factory (Gitea): `./scripts/print-devspaces-gitea-factory.sh`
 
 ## Repository layout
 

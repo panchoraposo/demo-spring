@@ -6,13 +6,30 @@ Jenkins and BuildConfigs run on hub cluster **acm**. Builds resolve Maven depend
 
 | Stage | Tool | Responsibility |
 | --- | --- | --- |
-| Detect change | Jenkins SCM poll (path-filtered) | Fire only the app pipeline whose paths changed |
-| Checkout | Jenkins on acm | Fetch source from Git |
+| Detect change | Gitea push webhook + SCM poll (path-filtered) | Fire only the app pipeline whose paths changed |
+| Checkout | Jenkins on acm | Fetch source from **Gitea** (`banking/demo-spring`) |
 | Image build | OpenShift BuildConfig on acm | Docker build uses `settings.xml` → Nexus; ImageStream tag |
 | Mirror + supply chain | `ci/scripts/sign-and-attest.sh` | Push to Quay; Syft SBOM; cosign attach/attest/sign (RHTAS) |
 | ACS | `acs-image-scan.sh` then `acs-image-check.sh` | CVEs first; Critical CVE aborts before policies / GitOps |
 | GitOps | Jenkins | Commit `newTag` (+ Quay `newName`) in east **and** west overlays |
 | Deploy | OpenShift GitOps on managed clusters | Sync Applications → Deployments |
+
+### Dev Spaces ← Gitea → Jenkins (CVE demo)
+
+SCM for CI is **Gitea on acm** (not GitHub). Inner-loop fix of Critical CVEs:
+
+```bash
+# Factory URL (opens the Gitea repo in Dev Spaces)
+./scripts/print-devspaces-gitea-factory.sh
+
+# One-time: Gitea push → Jenkins notifyCommit
+./scripts/bootstrap-gitea-jenkins-webhook.sh
+```
+
+1. Open the factory URL → workspace clones `https://gitea-…/banking/demo-spring.git`.
+2. Edit `apps/banking-service/pom.xml` (e.g. `<tomcat.version>10.1.35</tomcat.version>`).
+3. Commit and push to `main` (Git credentials: Gitea user `git` / `BankingGitCiChangeMe!` or a PAT).
+4. Jenkins `banking-service-ci` runs (webhook, or SCM poll within ~1 minute).
 
 ### Maven / Nexus
 
