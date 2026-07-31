@@ -86,7 +86,7 @@ spec:
                           rate(http_server_requests_seconds_count{
                             namespace=~"$namespace",
                             cluster=~"$cluster",
-                            uri=~"/api/.*"
+                            uri!~"/actuator.*"
                           }[5m])
                         )
                       )

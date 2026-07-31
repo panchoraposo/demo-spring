@@ -13,7 +13,7 @@ spec:
     display:
       name: "Banking failover compare (east vs west)"
       description: >-
-        Side-by-side east/west request rate and banking-service ready replicas.
+        Side-by-side east/west ready replicas and HTTP request rate.
         Use during mesh or SI failover demos while traffic hits the entry Route.
     duration: 30m
     refreshInterval: 15s
@@ -33,72 +33,6 @@ spec:
                   value: banking-si-apps
           defaultValue: banking-apps
     panels:
-      eastRequestRate:
-        kind: Panel
-        spec:
-          display:
-            name: "EAST — HTTP request rate"
-          plugin:
-            kind: TimeSeriesChart
-            spec: {}
-          queries:
-            - kind: TimeSeriesQuery
-              spec:
-                plugin:
-                  kind: PrometheusTimeSeriesQuery
-                  spec:
-                    query: >-
-                      sum(
-                        rate(http_server_requests_seconds_count{
-                          namespace="$apps_ns",
-                          cluster="east",
-                          uri=~"/api/.*"
-                        }[1m])
-                      )
-      westRequestRate:
-        kind: Panel
-        spec:
-          display:
-            name: "WEST — HTTP request rate"
-          plugin:
-            kind: TimeSeriesChart
-            spec: {}
-          queries:
-            - kind: TimeSeriesQuery
-              spec:
-                plugin:
-                  kind: PrometheusTimeSeriesQuery
-                  spec:
-                    query: >-
-                      sum(
-                        rate(http_server_requests_seconds_count{
-                          namespace="$apps_ns",
-                          cluster="west",
-                          uri=~"/api/.*"
-                        }[1m])
-                      )
-      bothRequestRate:
-        kind: Panel
-        spec:
-          display:
-            name: "HTTP request rate — east vs west"
-          plugin:
-            kind: TimeSeriesChart
-            spec: {}
-          queries:
-            - kind: TimeSeriesQuery
-              spec:
-                plugin:
-                  kind: PrometheusTimeSeriesQuery
-                  spec:
-                    query: >-
-                      sum by (cluster) (
-                        rate(http_server_requests_seconds_count{
-                          namespace="$apps_ns",
-                          cluster=~"east|west",
-                          uri=~"/api/.*"
-                        }[1m])
-                      )
       bankingReadyReplicas:
         kind: Panel
         spec:
@@ -143,6 +77,73 @@ spec:
                           cluster=~"east|west"
                         }
                       )
+      eastRequestRate:
+        kind: Panel
+        spec:
+          display:
+            name: "EAST — HTTP request rate"
+          plugin:
+            kind: TimeSeriesChart
+            spec: {}
+          queries:
+            - kind: TimeSeriesQuery
+              spec:
+                plugin:
+                  kind: PrometheusTimeSeriesQuery
+                  spec:
+                    # Exclude actuator scrape noise; Spring uri templates look like /api/v1/...
+                    query: >-
+                      sum(
+                        rate(http_server_requests_seconds_count{
+                          namespace="$apps_ns",
+                          cluster="east",
+                          uri!~"/actuator.*"
+                        }[5m])
+                      ) or vector(0)
+      westRequestRate:
+        kind: Panel
+        spec:
+          display:
+            name: "WEST — HTTP request rate"
+          plugin:
+            kind: TimeSeriesChart
+            spec: {}
+          queries:
+            - kind: TimeSeriesQuery
+              spec:
+                plugin:
+                  kind: PrometheusTimeSeriesQuery
+                  spec:
+                    query: >-
+                      sum(
+                        rate(http_server_requests_seconds_count{
+                          namespace="$apps_ns",
+                          cluster="west",
+                          uri!~"/actuator.*"
+                        }[5m])
+                      ) or vector(0)
+      bothRequestRate:
+        kind: Panel
+        spec:
+          display:
+            name: "HTTP request rate — east vs west"
+          plugin:
+            kind: TimeSeriesChart
+            spec: {}
+          queries:
+            - kind: TimeSeriesQuery
+              spec:
+                plugin:
+                  kind: PrometheusTimeSeriesQuery
+                  spec:
+                    query: >-
+                      sum by (cluster) (
+                        rate(http_server_requests_seconds_count{
+                          namespace="$apps_ns",
+                          cluster=~"east|west",
+                          uri!~"/actuator.*"
+                        }[5m])
+                      )
     layouts:
       - kind: Grid
         spec:
@@ -151,33 +152,34 @@ spec:
             collapse:
               open: true
           items:
+            # Ready replicas first — always populated from kube-state-metrics via promxy.
             - x: 0
               y: 0
-              width: 12
-              height: 7
-              content:
-                $ref: "#/spec/panels/eastRequestRate"
-            - x: 12
-              y: 0
-              width: 12
-              height: 7
-              content:
-                $ref: "#/spec/panels/westRequestRate"
-            - x: 0
-              y: 7
-              width: 24
-              height: 7
-              content:
-                $ref: "#/spec/panels/bothRequestRate"
-            - x: 0
-              y: 14
               width: 12
               height: 7
               content:
                 $ref: "#/spec/panels/bankingReadyReplicas"
             - x: 12
-              y: 14
+              y: 0
               width: 12
               height: 7
               content:
                 $ref: "#/spec/panels/gatewayReadyReplicas"
+            - x: 0
+              y: 7
+              width: 12
+              height: 7
+              content:
+                $ref: "#/spec/panels/eastRequestRate"
+            - x: 12
+              y: 7
+              width: 12
+              height: 7
+              content:
+                $ref: "#/spec/panels/westRequestRate"
+            - x: 0
+              y: 14
+              width: 24
+              height: 7
+              content:
+                $ref: "#/spec/panels/bothRequestRate"
