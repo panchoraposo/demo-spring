@@ -30,50 +30,17 @@ INTERVAL="${INTERVAL:-1}"
 BANKING_NS="${BANKING_NS:-banking-apps}"
 DB_NS="${DB_NS:-banking-db}"
 CLIENT_ID="${BANKING_CLIENT_ID:-banking-cli}"
-USER="${BANKING_USER:-teller}"
-PASS="${BANKING_PASSWORD:-teller-change-me}"
+BANKING_USER="${BANKING_USER:-teller}"
+BANKING_PASSWORD="${BANKING_PASSWORD:-teller-change-me}"
 DETAIL_LOG="${DETAIL_LOG:-$(pwd)/.demo-failover.log}"
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+
+# shellcheck source=lib/failover-demo.sh
+source "${SCRIPT_DIR}/lib/failover-demo.sh"
 
 if [[ -z "${PEER_CLUSTER}" ]]; then
-  if [[ "${FAIL_CLUSTER}" == "east" ]]; then PEER_CLUSTER=west; else PEER_CLUSTER=east; fi
+  PEER_CLUSTER="$(failover_peer_of "${FAIL_CLUSTER}")"
 fi
-
-need() { command -v "$1" >/dev/null || { echo "missing: $1" >&2; exit 1; }; }
-need oc; need curl; need jq
-
-say() { printf '  %s\n' "$*"; }
-
-pause() {
-  if [[ -t 0 && "${NONINTERACTIVE:-0}" != "1" ]]; then
-    echo
-    read -r -p "▶  Press Enter for next step… " _
-  fi
-}
-
-banner() {
-  echo
-  echo "┏━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┓"
-  printf '┃ %-58s ┃\n' "$*"
-  echo "┗━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┛"
-}
-
-step() {
-  echo
-  echo "┌─ STEP $1 ─────────────────────────────────────────────────"
-  echo "│  $2"
-  echo "└──────────────────────────────────────────────────────────"
-}
-
-detail() { printf '%s\n' "$*" >> "${DETAIL_LOG}"; }
-
-legend() {
-  echo
-  say "Status line legend:"
-  say "  HTTP        → client still gets 200 (good) or error (bad)"
-  say "  serving=…   → which cluster handled banking-service (X-Banking-Cluster)"
-  say "  east/west   → readyReplicas of banking-service on each cluster"
-  echo
-}
 
 kiali_url() {
   local host
@@ -81,34 +48,7 @@ kiali_url() {
   [[ -n "${host}" ]] && echo "https://${host}"
 }
 
-cluster_route_url() {
-  local ctx="$1"
-  echo "https://$(oc --context "${ctx}" -n "${BANKING_NS}" get route api-gateway -o jsonpath='{.spec.host}')"
-}
-
-entry_url() { cluster_route_url "${ENTRY_CLUSTER}"; }
-
-keycloak_url() {
-  if [[ -n "${KEYCLOAK_URL:-}" ]]; then
-    echo "${KEYCLOAK_URL}"
-    return
-  fi
-  local host
-  host="$(oc --context "${HUB_CONTEXT}" -n banking-idp get route sso -o jsonpath='{.spec.host}' 2>/dev/null || true)"
-  if [[ -z "${host}" ]]; then
-    host="$(oc --context "${ENTRY_CLUSTER}" -n "${BANKING_NS}" get cm api-gateway-config \
-      -o jsonpath='{.data.SPRING_SECURITY_OAUTH2_RESOURCESERVER_JWT_ISSUER_URI}' 2>/dev/null \
-      | sed -E 's|^https?://||; s|/realms/.*||')"
-  fi
-  echo "https://${host}"
-}
-
-replicas() {
-  local ctx="$1" deploy="${2:-banking-service}" r
-  r="$(oc --context "${ctx}" -n "${BANKING_NS}" get deploy "${deploy}" \
-    -o jsonpath='{.status.readyReplicas}' 2>/dev/null || true)"
-  echo "${r:-0}"
-}
+entry_url() { failover_route_url "${ENTRY_CLUSTER}" "${BANKING_NS}"; }
 
 ns_mesh_label() {
   local ctx="$1" ns="$2"
@@ -116,311 +56,255 @@ ns_mesh_label() {
     -o jsonpath='{.metadata.labels.istio\.io/dataplane-mode}' 2>/dev/null || true
 }
 
-get_token() {
-  local kc="$1"
-  curl -sk -X POST "${kc}/realms/banking/protocol/openid-connect/token" \
-    -d "client_id=${CLIENT_ID}" \
-    -d "username=${USER}" \
-    -d "password=${PASS}" \
-    -d "grant_type=password" | jq -r '.access_token // empty'
-}
-
-# Returns: code|cluster|customers|snippet
-call_customers() {
-  local gw="$1" token="$2"
-  local hdrs body code cluster bytes snippet count
-  hdrs="$(mktemp)"
-  body="$(mktemp)"
-  code="$(curl -sk -D "${hdrs}" -o "${body}" -w '%{http_code}' \
-    -H "Authorization: Bearer ${token}" \
-    -H "Accept: application/json" \
-    "${gw}/api/v1/customers" || echo 000)"
-  cluster="$(awk 'BEGIN{IGNORECASE=1} /^X-Banking-Cluster:/{gsub(/\r/,""); sub(/^[^:]+:[[:space:]]*/,""); print; exit}' "${hdrs}")"
-  [[ -n "${cluster}" ]] || cluster="?"
-  bytes="$(wc -c < "${body}" | tr -d ' ')"
-  snippet="$(head -c 120 "${body}" | tr '\n' ' ')"
-  count="$(jq -r 'if type=="array" then length else "?" end' "${body}" 2>/dev/null || echo "?")"
-  detail "---- $(date -u +%Y-%m-%dT%H:%M:%SZ) GET ${gw}/api/v1/customers"
-  detail "HTTP ${code}  serving=${cluster}  customers=${count}  bytes=${bytes}"
-  detail "body: ${snippet}"
-  rm -f "${hdrs}" "${body}"
-  printf '%s|%s|%s|%s\n' "${code}" "${cluster}" "${count}" "${snippet}"
-}
-
-show_line() {
-  local code="$1" serving="$2" customers="$3" phase="$4"
-  local east_r west_r mark
-  east_r="$(replicas east)"
-  west_r="$(replicas west)"
-  if [[ "${code}" =~ ^2 ]]; then mark="OK "; else mark="ERR"; fi
-  printf '\r\033[K  %s │ %-18s │ HTTP %s │ serving=%-5s │ customers=%-3s │ east pods=%s  west pods=%s' \
-    "$(date +%H:%M:%S)" "${phase}" "${mark} ${code}" "${serving}" "${customers}" \
-    "${east_r:-0}" "${west_r:-0}"
-}
-
-pause_argo() {
-  local ctx="$1" app="$2"
-  oc --context "${ctx}" -n openshift-gitops patch applications.argoproj.io "${app}" \
-    --type merge -p '{"spec":{"syncPolicy":null}}' >/dev/null 2>&1 || true
-}
-
-resume_argo() {
-  local ctx="$1" app="$2"
-  oc --context "${ctx}" -n openshift-gitops patch applications.argoproj.io "${app}" \
-    --type merge -p '{"spec":{"syncPolicy":{"automated":{"prune":true,"selfHeal":true}}}}' >/dev/null 2>&1 || true
-}
-
-init_log() {
-  mkdir -p "$(dirname "${DETAIL_LOG}")"
-  : > "${DETAIL_LOG}"
-  detail "demo-mesh-failover $(date -u +%Y-%m-%dT%H:%M:%SZ) fail=${FAIL_CLUSTER} peer=${PEER_CLUSTER}"
-}
-
 storyboard() {
-  banner "DEMO STORYBOARD — what we will prove"
-  say "Client calls the OpenShift Route on ${ENTRY_CLUSTER}:"
-  say "    $(entry_url)"
+  failover_banner "DEMO STORYBOARD — what we will prove"
+  failover_say "Client calls the OpenShift Route on ${ENTRY_CLUSTER}:"
+  failover_say "    $(entry_url)"
   echo
-  say "Each cluster (east/west) has its own Route → api-gateway → banking-service → Postgres."
+  failover_say "Each cluster (east/west) has its own Route → api-gateway → banking-service → Postgres."
   echo
-  say "Layer A — MESH failover"
-  say "    Scale banking-service on ${FAIL_CLUSTER} → 0."
-  say "    Keep calling the ${ENTRY_CLUSTER} Route; ambient mesh serves ${PEER_CLUSTER}."
+  failover_say "Layer A — MESH failover"
+  failover_say "    Scale banking-service on ${FAIL_CLUSTER} → 0."
+  failover_say "    Keep calling the ${ENTRY_CLUSTER} Route; ambient mesh serves ${PEER_CLUSTER}."
   echo
-  say "Layer B — INGRESS (manual)"
-  say "    Scale api-gateway on ${FAIL_CLUSTER} → 0."
-  say "    ${FAIL_CLUSTER} Route fails; ${PEER_CLUSTER} Route still works (no shared DNS)."
+  failover_say "Layer B — INGRESS (manual)"
+  failover_say "    Scale api-gateway on ${FAIL_CLUSTER} → 0."
+  failover_say "    ${FAIL_CLUSTER} Route fails; ${PEER_CLUSTER} Route still works (no shared DNS)."
   echo
-  say "Watch in parallel: Kiali graph (banking-apps) on the hub."
-  say "    $(kiali_url || echo '(Kiali URL unavailable)')"
+  failover_say "Watch in parallel: Kiali graph (banking-apps) on the hub."
+  failover_say "    $(kiali_url || echo '(Kiali URL unavailable)')"
+  failover_legend
 }
 
 cmd_preflight() {
-  init_log
-  banner "CHECK — is the demo ready?"
+  failover_init_log "demo-mesh-failover"
+  failover_banner "CHECK — is the demo ready?"
   local kiali ok=1
   kiali="$(kiali_url)"
 
-  say "Entry Route (${ENTRY_CLUSTER}):  $(entry_url)"
-  say "Peer Route (${PEER_CLUSTER}):    $(cluster_route_url "${PEER_CLUSTER}")"
-  say "Kiali (second screen):           ${kiali:-MISSING}"
+  failover_say "Entry Route (${ENTRY_CLUSTER}):  $(entry_url)"
+  failover_say "Peer Route (${PEER_CLUSTER}):    $(failover_route_url "${PEER_CLUSTER}" "${BANKING_NS}")"
+  failover_say "Kiali (second screen):           ${kiali:-MISSING}"
   echo
 
   local ctx mode
   for ctx in east west; do
     mode="$(ns_mesh_label "${ctx}" "${BANKING_NS}")"
-    printf '  %-5s  mesh=%-8s  banking-service=%s  api-gateway=%s  route=%s\n' \
-      "${ctx}" "${mode:-unset}" "$(replicas "${ctx}")" "$(replicas "${ctx}" api-gateway)" \
-      "$(cluster_route_url "${ctx}")"
+    printf '  %-5s  mesh=%-8s  banking-service=%s  api-gateway=%s\n' \
+      "${ctx}" "${mode:-unset}" \
+      "$(failover_replicas "${ctx}" "${BANKING_NS}" banking-service)" \
+      "$(failover_replicas "${ctx}" "${BANKING_NS}" api-gateway)"
     [[ "${mode}" == "ambient" ]] || ok=0
   done
 
   echo
-  local tok result code serving
-  say "Calling the API once (JWT from hub Keycloak)…"
-  tok="$(get_token "$(keycloak_url)")"
+  local tok result code serving rows
+  failover_say "Calling the API once (JWT from hub Keycloak)…"
+  tok="$(failover_get_token "$(failover_keycloak_url)")"
   [[ -n "${tok}" ]] || { echo "  FAIL: cannot get JWT" >&2; exit 1; }
-  result="$(call_customers "$(entry_url)" "${tok}")"
+  result="$(failover_call_customers "$(entry_url)" "${tok}")"
   code="${result%%|*}"
   serving="$(echo "${result}" | cut -d'|' -f2)"
-  say "Result: HTTP ${code}   served by cluster: ${serving}"
+  rows="$(echo "${result}" | cut -d'|' -f3)"
+  failover_print_route_check "${ENTRY_CLUSTER}" "${result}"
   [[ "${code}" =~ ^2 ]] || { echo "  FAIL: API not healthy — see ${DETAIL_LOG}" >&2; exit 1; }
 
   if [[ "${serving}" == "?" ]]; then
-    echo
-    say "Note: 'serving=?' means the image does not yet return X-Banking-Cluster."
-    say "      For the story, watch east/west pod counts + Kiali instead."
+    failover_say "WARN: no X-Banking-Cluster header — watch svc e/w counts + Kiali."
+  else
+    failover_say "Serving cluster header is working (serving=${serving}, rows=${rows})."
   fi
 
   echo
   if [[ "${ok}" -eq 1 ]]; then
-    say "Ready for the live demo."
+    failover_say "Ready for the live demo."
   else
-    say "WARN: ambient label missing on some namespaces — investigate after."
+    failover_say "WARN: ambient label missing on some namespaces — investigate after."
   fi
-  say "Detail log: ${DETAIL_LOG}"
+  failover_say "Detail log: ${DETAIL_LOG}"
 }
 
 cmd_status() {
-  banner "STATUS snapshot"
-  say "Entry: $(entry_url)"
-  say "Kiali: $(kiali_url)"
+  failover_banner "STATUS snapshot"
+  failover_say "Entry: $(entry_url)"
+  failover_say "Kiali: $(kiali_url)"
+  local ctx
   for ctx in east west; do
     printf '  %-5s  banking-service=%s  api-gateway=%s  mesh=%s\n' "${ctx}" \
-      "$(replicas "${ctx}" banking-service)" \
-      "$(replicas "${ctx}" api-gateway)" \
+      "$(failover_replicas "${ctx}" "${BANKING_NS}" banking-service)" \
+      "$(failover_replicas "${ctx}" "${BANKING_NS}" api-gateway)" \
       "$(ns_mesh_label "${ctx}" "${BANKING_NS}")"
   done
   local tok result
-  tok="$(get_token "$(keycloak_url)")"
-  result="$(call_customers "$(entry_url)" "${tok}")"
-  say "API: HTTP ${result%%|*}  serving=$(echo "${result}" | cut -d'|' -f2)"
-}
-
-traffic_loop() {
-  local phase="$1" gw="$2" kc="$3"
-  local tok result code serving customers ok=0 fail=0
-  tok="$(get_token "${kc}")"
-  [[ -n "${tok}" ]] || { say "no token"; return 1; }
-  say "Sending GET ${gw}/api/v1/customers every ${INTERVAL}s  (CTRL+C to stop)"
-  legend
-  while true; do
-    result="$(call_customers "${gw}" "${tok}")"
-    code="${result%%|*}"
-    serving="$(echo "${result}" | cut -d'|' -f2)"
-    customers="$(echo "${result}" | cut -d'|' -f3)"
-    if [[ "${code}" =~ ^2 ]]; then
-      ok=$((ok + 1))
-      show_line "${code}" "${serving}" "${customers}" "${phase} #${ok}"
-    else
-      fail=$((fail + 1))
-      show_line "${code}" "${serving}" "${customers}" "${phase} FAIL#${fail}"
-      [[ "${code}" == "401" || "${code}" == "403" ]] && tok="$(get_token "${kc}")"
-    fi
-    sleep "${INTERVAL}"
-  done
+  tok="$(failover_get_token "$(failover_keycloak_url)")"
+  result="$(failover_call_customers "$(entry_url)" "${tok}")"
+  failover_print_route_check entry "${result}"
 }
 
 cmd_traffic() {
-  init_log
-  banner "TRAFFIC — client calls the ${ENTRY_CLUSTER} OpenShift Route"
-  say "Open Kiali. Watch edges light up between api-gateway ↔ banking-service."
-  echo
-  traffic_loop "traffic" "$(entry_url)" "$(keycloak_url)"
-}
-
-sample_window() {
-  local phase="$1" gw="$2" n="${3:-25}"
-  local kc tok result code serving customers ok=0 fail=0 i last="?"
-  kc="$(keycloak_url)"
-  tok="$(get_token "${kc}")"
-  legend
-  for i in $(seq 1 "${n}"); do
-    result="$(call_customers "${gw}" "${tok}")"
-    code="${result%%|*}"
-    serving="$(echo "${result}" | cut -d'|' -f2)"
-    customers="$(echo "${result}" | cut -d'|' -f3)"
-    last="${serving}"
-    if [[ "${code}" =~ ^2 ]]; then ok=$((ok + 1)); else fail=$((fail + 1)); fi
-    show_line "${code}" "${serving}" "${customers}" "${phase} ${i}/${n}"
-    sleep 1
-  done
-  echo
-  echo
-  say "Window result: ${ok} OK / ${fail} errors   last serving=${last}"
+  failover_init_log "demo-mesh-failover"
+  failover_banner "TRAFFIC — client calls the ${ENTRY_CLUSTER} OpenShift Route"
+  failover_say "Open Kiali. Watch edges light up between api-gateway ↔ banking-service."
+  failover_legend
+  failover_traffic_loop "traffic" "$(entry_url)" "${BANKING_NS}" "$(failover_keycloak_url)"
 }
 
 cmd_fail() {
-  init_log
-  banner "LAYER A — MESH FAILOVER"
-  say "Action:  scale banking-service on ${FAIL_CLUSTER} → 0 pods"
-  say "Expect:  ${ENTRY_CLUSTER} Route still HTTP 200 (mesh routes to ${PEER_CLUSTER})"
-  say "Watch:   Kiali — ${FAIL_CLUSTER} banking-service empty; traffic crosses to ${PEER_CLUSTER}"
+  failover_init_log "demo-mesh-failover"
+  failover_banner "LAYER A — MESH FAILOVER"
+  failover_say "Action:  scale banking-service on ${FAIL_CLUSTER} → 0 pods"
+  failover_say "Expect:  ${ENTRY_CLUSTER} Route still API OK; serving→${PEER_CLUSTER}"
+  failover_say "Watch:   Kiali — ${FAIL_CLUSTER} empty; traffic crosses to ${PEER_CLUSTER}"
   echo
-  say "Pausing ArgoCD self-heal on ${FAIL_CLUSTER}/banking-service…"
-  pause_argo "${FAIL_CLUSTER}" banking-service
+  failover_say "Pausing ArgoCD self-heal on ${FAIL_CLUSTER}/banking-service…"
+  failover_pause_argo "${FAIL_CLUSTER}" banking-service
   oc --context "${FAIL_CLUSTER}" -n "${BANKING_NS}" scale deploy/banking-service --replicas=0
   echo
-  say "Sampling ${ENTRY_CLUSTER} Route for ~25s…"
-  sample_window "mesh-failover" "$(entry_url)" 25
+  failover_legend
+  failover_say "Sampling ${ENTRY_CLUSTER} Route for ~25s…"
   echo
-  if [[ "$(replicas "${FAIL_CLUSTER}")" == "0" || "$(replicas "${FAIL_CLUSTER}")" == "" ]]; then
-    say "${FAIL_CLUSTER} banking-service pods = 0"
+  failover_sample_window "mesh-failover" "$(entry_url)" "${BANKING_NS}" 25
+  echo
+  local tok result code serving fail_r
+  tok="$(failover_get_token "$(failover_keycloak_url)")"
+  result="$(failover_call_customers "$(entry_url)" "${tok}")"
+  code="${result%%|*}"
+  serving="$(failover_infer_serving "$(echo "${result}" | cut -d'|' -f2)" "${code}" "${BANKING_NS}")"
+  fail_r="$(failover_replicas "${FAIL_CLUSTER}" "${BANKING_NS}" banking-service)"
+  if [[ "${code}" =~ ^2 ]] && [[ "${fail_r}" == "0" ]]; then
+    echo "✓ Mesh kept the API up: gateway on ${ENTRY_CLUSTER}, backend on ${serving} (want ${PEER_CLUSTER})"
+  else
+    echo "⚠ Expected API OK via ${ENTRY_CLUSTER} with ${FAIL_CLUSTER} banking-service=0 (got HTTP ${code}, serving=${serving})"
   fi
-  say "If HTTP stayed OK while ${FAIL_CLUSTER} pods hit 0 → that is ambient mesh failover."
 }
 
 cmd_fail_ingress() {
-  init_log
-  banner "LAYER B — INGRESS (OpenShift Routes, no shared DNS)"
-  say "Action:  scale api-gateway on ${FAIL_CLUSTER} → 0 pods"
-  say "Expect:  ${FAIL_CLUSTER} Route fails; ${PEER_CLUSTER} Route still HTTP 200"
+  failover_init_log "demo-mesh-failover"
+  failover_banner "LAYER B — INGRESS (OpenShift Routes, no shared DNS)"
+  failover_say "Action:  scale api-gateway on ${FAIL_CLUSTER} → 0 pods"
+  failover_say "Expect:  ${FAIL_CLUSTER} Route fails; ${PEER_CLUSTER} Route still API OK"
   echo
-  pause_argo "${FAIL_CLUSTER}" api-gateway
+  failover_pause_argo "${FAIL_CLUSTER}" api-gateway
   oc --context "${FAIL_CLUSTER}" -n "${BANKING_NS}" scale deploy/api-gateway --replicas=0
   echo
   local tok result_fail result_peer
-  tok="$(get_token "$(keycloak_url)")"
-  say "Calling ${FAIL_CLUSTER} Route (should fail)…"
-  result_fail="$(call_customers "$(cluster_route_url "${FAIL_CLUSTER}")" "${tok}")"
-  say "  ${FAIL_CLUSTER}: HTTP ${result_fail%%|*}"
-  say "Calling ${PEER_CLUSTER} Route (should work)…"
-  result_peer="$(call_customers "$(cluster_route_url "${PEER_CLUSTER}")" "${tok}")"
-  say "  ${PEER_CLUSTER}: HTTP ${result_peer%%|*}  serving=$(echo "${result_peer}" | cut -d'|' -f2)"
+  tok="$(failover_get_token "$(failover_keycloak_url)")"
+  failover_say "Calling both OpenShift Routes:"
+  result_fail="$(failover_call_customers "$(failover_route_url "${FAIL_CLUSTER}" "${BANKING_NS}")" "${tok}")"
+  failover_print_route_check "${FAIL_CLUSTER}" "${result_fail}"
+  result_peer="$(failover_call_customers "$(failover_route_url "${PEER_CLUSTER}" "${BANKING_NS}")" "${tok}")"
+  failover_print_route_check "${PEER_CLUSTER}" "${result_peer}"
   echo
   if [[ ! "${result_fail%%|*}" =~ ^2 ]] && [[ "${result_peer%%|*}" =~ ^2 ]]; then
-    say "✓ Clients switch to the peer cluster Route when ${FAIL_CLUSTER} ingress is down."
+    echo "✓ Clients switch to the peer cluster Route when ${FAIL_CLUSTER} ingress is down."
   else
-    say "⚠ Unexpected results — check Routes and api-gateway pods."
+    echo "⚠ Unexpected results — check Routes and api-gateway pods."
   fi
 }
 
 cmd_recover() {
-  banner "RECOVER — bring ${FAIL_CLUSTER} back"
-  say "Scaling banking-service and api-gateway back to 1…"
+  failover_banner "RECOVER — bring ${FAIL_CLUSTER} back"
+  failover_say "Scaling banking-service and api-gateway back to 1…"
   oc --context "${FAIL_CLUSTER}" -n "${BANKING_NS}" scale deploy/banking-service --replicas=1
   oc --context "${FAIL_CLUSTER}" -n "${BANKING_NS}" scale deploy/api-gateway --replicas=1
-  resume_argo "${FAIL_CLUSTER}" banking-service
-  resume_argo "${FAIL_CLUSTER}" api-gateway
-  oc --context "${FAIL_CLUSTER}" -n "${BANKING_NS}" rollout status deploy/banking-service --timeout=180s
-  oc --context "${FAIL_CLUSTER}" -n "${BANKING_NS}" rollout status deploy/api-gateway --timeout=180s
-  local tok result
-  tok="$(get_token "$(keycloak_url)")"
-  result="$(call_customers "$(entry_url)" "${tok}")"
+  failover_ensure_quay_image "${FAIL_CLUSTER}" "${BANKING_NS}" banking-service
+  failover_ensure_quay_image "${FAIL_CLUSTER}" "${BANKING_NS}" api-gateway
+
+  local ok=0
+  # Wait before re-enabling Argo so self-heal cannot race a bad image rewrite.
+  failover_wait_deploy "${FAIL_CLUSTER}" "${BANKING_NS}" banking-service 300 || true
+  failover_wait_deploy "${FAIL_CLUSTER}" "${BANKING_NS}" api-gateway 180 || true
+  failover_resume_argo "${FAIL_CLUSTER}" banking-service
+  failover_resume_argo "${FAIL_CLUSTER}" api-gateway
+  if [[ "$(failover_replicas "${FAIL_CLUSTER}" "${BANKING_NS}" banking-service)" != "0" \
+     && "$(failover_replicas "${FAIL_CLUSTER}" "${BANKING_NS}" api-gateway)" != "0" ]]; then
+    ok=1
+  fi
+
+  local tok result code
+  tok="$(failover_get_token "$(failover_keycloak_url)")"
+  result="$(failover_call_customers "$(entry_url)" "${tok}")"
+  code="${result%%|*}"
   echo
-  say "API after recover: HTTP ${result%%|*}  serving=$(echo "${result}" | cut -d'|' -f2)"
-  say "Both clusters should look healthy again in Kiali."
+  failover_print_route_check entry "${result}"
+  printf '  %-5s svc=%s gw=%s\n' east \
+    "$(failover_replicas east "${BANKING_NS}" banking-service)" \
+    "$(failover_replicas east "${BANKING_NS}" api-gateway)"
+  printf '  %-5s svc=%s gw=%s\n' west \
+    "$(failover_replicas west "${BANKING_NS}" banking-service)" \
+    "$(failover_replicas west "${BANKING_NS}" api-gateway)"
+  if [[ "${ok}" -eq 1 && "${code}" =~ ^2 ]]; then
+    echo "✓ Restored. Both clusters should look healthy again in Kiali."
+  else
+    echo "⚠ Recover incomplete — check pods / pull secrets (see messages above)."
+    return 1
+  fi
 }
 
 cmd_demo() {
   storyboard
-  pause
+  failover_pause
 
-  step "1/5" "Preflight — confirm Routes, mesh, and API are healthy"
+  echo
+  echo "┌─ STEP 1/5 ─────────────────────────────────────────────────"
+  echo "│  Preflight — confirm Routes, mesh, and API are healthy"
+  echo "└──────────────────────────────────────────────────────────"
   NONINTERACTIVE=1 cmd_preflight
-  pause
+  failover_pause
 
-  step "2/5" "Open Kiali (second screen) — graph for banking-apps, clusters east+west"
-  say "URL: $(kiali_url)"
-  say "Tip: add banking-db to see mTLS edges to Postgres."
-  pause
+  echo
+  echo "┌─ STEP 2/5 ─────────────────────────────────────────────────"
+  echo "│  Open Kiali (second screen) — graph for banking-apps"
+  echo "└──────────────────────────────────────────────────────────"
+  failover_say "URL: $(kiali_url)"
+  failover_say "Tip: add banking-db to see mTLS edges to Postgres."
+  failover_pause
 
-  step "3/5" "Generate live traffic against the ${ENTRY_CLUSTER} Route"
-  say "Audience talking point: mesh can move backend work across clusters."
-  legend
+  echo
+  echo "┌─ STEP 3/5 ─────────────────────────────────────────────────"
+  echo "│  Generate live traffic against the ${ENTRY_CLUSTER} Route"
+  echo "└──────────────────────────────────────────────────────────"
+  failover_say "Audience talking point: mesh can move backend work across clusters."
+  failover_legend
   local gw kc tid
   gw="$(entry_url)"
-  kc="$(keycloak_url)"
-  traffic_loop "baseline" "${gw}" "${kc}" &
+  kc="$(failover_keycloak_url)"
+  failover_traffic_loop "baseline" "${gw}" "${BANKING_NS}" "${kc}" &
   tid=$!
   trap 'kill ${tid} 2>/dev/null || true; echo' EXIT
   sleep 10
   echo
   echo
-  say "Baseline traffic is running. Next we break ${FAIL_CLUSTER}."
-  pause
+  failover_say "Baseline traffic is running. Next we break ${FAIL_CLUSTER}."
+  failover_pause
 
-  step "4/5" "MESH failover — kill banking-service on ${FAIL_CLUSTER}"
+  echo
+  echo "┌─ STEP 4/5 ─────────────────────────────────────────────────"
+  echo "│  MESH failover — kill banking-service on ${FAIL_CLUSTER}"
+  echo "└──────────────────────────────────────────────────────────"
   kill "${tid}" 2>/dev/null || true
   wait "${tid}" 2>/dev/null || true
   trap - EXIT
   echo
   NONINTERACTIVE=1 cmd_fail
-  pause
+  failover_pause
 
-  step "5/5" "INGRESS — kill api-gateway on ${FAIL_CLUSTER}; use ${PEER_CLUSTER} Route"
-  NONINTERACTIVE=1 cmd_fail_ingress
-  pause
-
-  banner "WRAP-UP"
-  NONINTERACTIVE=1 cmd_recover
   echo
-  say "Recap for the audience:"
-  say "  • Entry via OpenShift Route on ${ENTRY_CLUSTER}: $(entry_url)"
-  say "  • Mesh kept the API up when ${FAIL_CLUSTER} banking-service died"
-  say "  • When ${FAIL_CLUSTER} ingress died, clients use the ${PEER_CLUSTER} Route"
-  say "  • Kiali: $(kiali_url)"
-  say "  • Log:   ${DETAIL_LOG}"
+  echo "┌─ STEP 5/5 ─────────────────────────────────────────────────"
+  echo "│  INGRESS — kill api-gateway; use ${PEER_CLUSTER} Route"
+  echo "└──────────────────────────────────────────────────────────"
+  NONINTERACTIVE=1 cmd_fail_ingress
+  failover_pause
+
+  failover_banner "WRAP-UP"
+  NONINTERACTIVE=1 cmd_recover || true
+  echo
+  failover_say "Recap for the audience:"
+  failover_say "  • Entry via OpenShift Route on ${ENTRY_CLUSTER}: $(entry_url)"
+  failover_say "  • Mesh kept the API up when ${FAIL_CLUSTER} banking-service died"
+  failover_say "  • When ${FAIL_CLUSTER} ingress died, clients use the ${PEER_CLUSTER} Route"
+  failover_say "  • Kiali: $(kiali_url)"
+  failover_say "  • Log:   ${DETAIL_LOG}"
 }
 
 case "${1:-demo}" in

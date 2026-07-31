@@ -55,7 +55,7 @@ After operators install, Argo apps on east/west sync:
 # syncs banking-apps and banking-si-apps by default
 ```
 
-`api-gateway` reuses the per-cluster ImageStream in `banking-apps` (RoleBinding `banking-si-apps-image-puller`). `banking-service` pulls from Quay (or a local ImageStream after a binary build).
+Both `api-gateway` and `banking-service` in `banking-si-apps` pull from Quay (`quay-pull`). SI ImageStreams keep `lookupPolicy.local: false` so OpenShift does not rewrite Quay tags to missing local tags after recover.
 
 ### 3. Link Skupper sites
 
@@ -96,12 +96,15 @@ Cross-site SI traffic is clearest when you drain east `banking-service`: east `a
 
 | Field | Meaning |
 | --- | --- |
-| `HTTP` | API success (`200`) or failure |
-| `svc=` | `X-Banking-Cluster` (`east`/`west`). `?` means the running image predates that filter |
-| `east_svc` / `west_svc` | `banking-service` readyReplicas (SI proof) |
-| `east_gw` / `west_gw` | `api-gateway` readyReplicas (ingress proof) |
+| `API OK/FAIL` | Client still got a successful response (`200`) or an error |
+| `serving=` | `X-Banking-Cluster` (`east`/`west`). `~west` = header missing, inferred from pod counts |
+| `rows=` | Customer records returned (`0` is OK if that cluster DB is empty) |
+| `svc e/w` | `banking-service` readyReplicas on east / west (SI proof) |
+| `gw e/w` | `api-gateway` readyReplicas on east / west (ingress proof) |
 
 Full request bodies go to `.demo-si-failover.log`, not the status line.
+
+Both this script and `demo-mesh-failover.sh` share `scripts/lib/failover-demo.sh` so the status line and recover behavior match.
 
 ### Step cheat sheet
 
@@ -149,8 +152,8 @@ scripts/
 | No `banking-service` Service | Listener Ready? `oc -n banking-si-apps get listener,connector,site` |
 | SI failover does not flip cluster | Sites linked? `./scripts/si/link-sites.sh status` |
 | Network Observer Route missing | CSV Succeeded for network-observer operator; NetworkObserver CR Ready |
-| ImagePullBackOff | Quay pull secret in `banking-si-apps` (and default dockercfg if using local ImageStream) |
-| `svc=?` / no `X-Banking-Cluster` | Image lacks `ClusterIdentityFilter` or `BANKING_CLUSTER` unset |
+| ImagePullBackOff on recover | SI `ImageStream` must keep `lookupPolicy.local: false` so Quay refs are not rewritten to a missing local tag. Recover also rewrites the Deployment back to Quay. Check `quay-pull` in `banking-si-apps`. |
+| `serving=?` / no `X-Banking-Cluster` | Image lacks `ClusterIdentityFilter` or `BANKING_CLUSTER` unset; script may show `~west`/`~east` from pod counts |
 
 ## Related docs
 

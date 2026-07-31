@@ -4,5 +4,7 @@ metadata:
   name: banking-service
   namespace: banking-si-apps
 spec:
+  # Keep local lookup OFF so Quay image refs in the Deployment are not rewritten
+  # to this ImageStream (tag :29 is not imported here — pulls use quay-pull).
   lookupPolicy:
-    local: true
+    local: false

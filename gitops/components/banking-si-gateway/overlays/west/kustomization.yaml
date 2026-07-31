@@ -15,11 +15,12 @@ resources:
   - ../../base
   - imagestream.yaml
 
-# Reuse the per-cluster ImageStream built into banking-apps (same as mesh api-gateway).
+# Pull from Quay (same tags as mesh). Avoid banking-apps ImageStream cross-ns pulls
+# that fail with "authentication required" after scale-to-zero.
 images:
   - name: image-registry.openshift-image-registry.svc:5000/banking-si-apps/api-gateway
-    newName: image-registry.openshift-image-registry.svc:5000/banking-apps/api-gateway
-    newTag: latest
+    newName: banking-quay-quay-quay-enterprise.apps.cluster-k7kqp.k7kqp.sandbox3321.opentlc.com/banking/api-gateway
+    newTag: "29"
 
 commonLabels:
   cluster: west

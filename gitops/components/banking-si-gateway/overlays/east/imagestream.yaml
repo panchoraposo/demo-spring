@@ -4,5 +4,6 @@ metadata:
   name: api-gateway
   namespace: banking-si-apps
 spec:
+  # Off: Deployment pulls Quay via quay-pull; local lookup rewrites break recover.
   lookupPolicy:
-    local: true
+    local: false
