@@ -19,7 +19,7 @@ resources:
 images:
   - name: image-registry.openshift-image-registry.svc:5000/banking-apps/banking-service
     newName: banking-quay-quay-quay-enterprise.apps.cluster-k7kqp.k7kqp.sandbox3321.opentlc.com/banking/banking-service
-    newTag: "11"
+    newTag: 29
 
 # Do not put cluster into selectors — multi-cluster service sameness needs
 # matching selectors across east/west for clean endpoint merge.
