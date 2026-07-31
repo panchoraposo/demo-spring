@@ -13,6 +13,8 @@ Credentials are sourced from **CyberArk Conjur** on the hub via the **External S
 
 **Traffic failover ≠ data failover.** Mesh locality can send `banking-service` traffic to the peer cluster; each cluster keeps its own PostgreSQL.
 
+A parallel demo path uses **Service Interconnect** in `banking-si-*` namespaces (no ambient mesh labels), entered via OpenShift Routes. Details: [service-interconnect-failover.md](service-interconnect-failover.md).
+
 **OIDC is centralized on the hub.** A single Keycloak instance on **acm** provides:
 
 - Realm `banking` for Spring apps
@@ -84,6 +86,8 @@ flowchart LR
 | Multi-cluster | Red Hat Advanced Cluster Management (RHACM) |
 | GitOps | OpenShift GitOps Operator (Argo CD) |
 | Service mesh | OpenShift Service Mesh 3.4 (Sail, ambient, Istio ~1.30) |
+| App interconnect (parallel demo) | Red Hat Service Interconnect 2.x + Network Observer |
+| Ingress (mesh + SI demos) | OpenShift Routes on east / west (`api-gateway`) |
 | Secrets sync | External Secrets Operator for Red Hat OpenShift |
 | Secrets backend | CyberArk Conjur OSS (Helm chart, GitOps Application on acm) |
 | Identity (OIDC) | Red Hat build of Keycloak (`rhbk-operator`) — **hub (acm)** |
@@ -105,7 +109,9 @@ flowchart LR
    - `1` ESO operand
    - `2` mesh (Istio / CNI / ZTunnel / east-west GW / DestinationRule)
    - `3` `ClusterSecretStore` + app `ExternalSecret`s (Conjur URL → acm)
-  - `4+` PostgreSQL, banking-service, api-gateway
+  - `4+` PostgreSQL, banking-service, api-gateway (mesh demo; OpenShift Routes)
+  - `4–8` banking-si-* stack (SI demo; isolated namespaces + OpenShift Routes)
+
 
 Details: [secrets-management.md](secrets-management.md), [multi-cluster.md](multi-cluster.md).
 

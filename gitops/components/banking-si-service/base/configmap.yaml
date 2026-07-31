@@ -1,0 +1,11 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: banking-service-config
+data:
+  SPRING_DATASOURCE_URL: jdbc:postgresql://postgresql.banking-si-db.svc.cluster.local:5432/banking
+  SPRING_SECURITY_OAUTH2_RESOURCESERVER_JWT_ISSUER_URI: https://sso.apps.example.com/realms/banking
+  SPRING_SECURITY_OAUTH2_RESOURCESERVER_JWT_JWK_SET_URI: https://sso.apps.example.com/realms/banking/protocol/openid-connect/certs
+  OIDC_TRUSTED_ISSUERS: https://sso.apps.example.com/realms/banking
+  # Surfaced as X-Banking-Cluster by ClusterIdentityFilter (east|west).
+  BANKING_CLUSTER: unknown

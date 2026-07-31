@@ -1,0 +1,12 @@
+# Creates Service banking-service used by api-gateway.
+# With Connectors on both sites, Skupper fails over when local pods are down.
+apiVersion: skupper.io/v2alpha1
+kind: Listener
+metadata:
+  name: banking-service
+  labels:
+    app.kubernetes.io/part-of: banking-si-demo
+spec:
+  routingKey: banking-service
+  host: banking-service
+  port: 8080

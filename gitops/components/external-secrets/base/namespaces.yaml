@@ -17,4 +17,20 @@ metadata:
     istio.io/dataplane-mode: ambient
     istio-discovery: enabled
     openshift.io/user-monitoring: "true"
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: banking-si-db
+  labels:
+    app.kubernetes.io/part-of: banking-si-demo
+    openshift.io/user-monitoring: "true"
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: banking-si-apps
+  labels:
+    app.kubernetes.io/part-of: banking-si-demo
+    openshift.io/user-monitoring: "true"
 

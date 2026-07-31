@@ -4,6 +4,8 @@ Demonstration of a banking Spring application on **OpenShift**, consuming **Post
 
 Multi-cluster layout: **acm** (RHACM hub — Conjur, Jenkins, ODF, Quay, Trusted Artifact Signer, Trusted Profile Analyzer) manages **east** / **west** as regional managed clusters via ApplicationSets. East/west run OpenShift GitOps, ESO, OSSM 3.4 ambient, independent PostgreSQL, and the Spring apps. Mesh traffic can fail over; data does not.
 
+A second, isolated path demonstrates **Red Hat Service Interconnect** failover under namespaces `banking-si-*`, entered via per-cluster **OpenShift Routes** — see [docs/service-interconnect-failover.md](docs/service-interconnect-failover.md).
+
 > **Install:** join acm/east/west, then run the Ansible installer — see [ansible/README.md](ansible/README.md) and [docs/multi-cluster.md](docs/multi-cluster.md).
 
 ## Architecture
@@ -16,22 +18,26 @@ flowchart LR
     HubSvc["RHACM · GitOps · Conjur · Keycloak<br/>Jenkins · ODF · Quay · RHTAS · TPA<br/>Dev Spaces · Kiali"]
   end
   subgraph east ["east"]
-    EastSvc["GitOps · ESO · OSSM ambient<br/>api-gateway · banking-service · PostgreSQL"]
+    EastSvc["GitOps · ESO · OSSM ambient<br/>Route → api-gateway · banking-service · PostgreSQL"]
+    EastSI["SI stack: banking-si-* + RHSI + Route"]
   end
   subgraph west ["west"]
-    WestSvc["GitOps · ESO · OSSM ambient<br/>api-gateway · banking-service · PostgreSQL"]
+    WestSvc["GitOps · ESO · OSSM ambient<br/>Route → api-gateway · banking-service · PostgreSQL"]
+    WestSI["SI stack + Network Observer console"]
   end
   HubSvc -->|ApplicationSets| EastSvc
   HubSvc -->|ApplicationSets| WestSvc
   EastSvc <-.->|mesh failover| WestSvc
+  EastSI <-.->|SI failover| WestSI
 ```
 
 | Flow | Path |
 | --- | --- |
-| API call | Client → hub Keycloak JWT → east/west `api-gateway` → `banking-service` → local PostgreSQL |
+| API call (mesh) | Client → hub Keycloak JWT → east/west OpenShift Route → `api-gateway` → `banking-service` → local PostgreSQL |
+| API call (SI) | Client → east/west OpenShift Route → `api-gateway` → SI logical `banking-service` → local PostgreSQL |
 | Secrets | Conjur on acm → ESO on acm/east/west → Kubernetes Secrets |
 | Supply chain | Dev Spaces / Jenkins on acm → BuildConfig → Quay + RHTAS → Git tag bump → GitOps sync |
-| Observability | Hub Kiali + promxy → east/west mesh metrics |
+| Observability | Hub Kiali (mesh) · west Network Observer (SI) · promxy |
 
 Detail and component table: [docs/architecture.md](docs/architecture.md).
 
@@ -41,6 +47,8 @@ Detail and component table: [docs/architecture.md](docs/architecture.md).
 | Multi-cluster | RHACM ApplicationSets / Placement |
 | GitOps | OpenShift GitOps (Argo CD) |
 | Mesh | OSSM 3.4 ambient (Sail / Istio ~1.30) |
+| App network (parallel demo) | Red Hat Service Interconnect 2.x + Network Observer |
+| Ingress (demos) | OpenShift Routes on east / west |
 | Secrets sync | External Secrets Operator for Red Hat OpenShift |
 | Secrets backend | CyberArk Conjur OSS on acm |
 | Identity | Red Hat build of Keycloak (hub realms `banking` + `trustify`) |
@@ -91,6 +99,7 @@ All routes are exposed through the gateway and require a valid JWT from Keycloak
    Use `-e auto_push_env=true` if Argo must read the rewritten env hosts from Git.
 4. Optional: `scripts/bootstrap-gitea.sh`, `scripts/apply-console-banners.sh`, `scripts/apply-console-links.sh`.
 5. Open the hub credentials dashboard Route in `namespace/dashboard`, get a JWT from hub Keycloak realm `banking`, call either cluster gateway.
+6. Optional SI path: `./scripts/si/link-sites.sh` → `./scripts/demo-si-failover.sh` ([docs](docs/service-interconnect-failover.md)).
 
 See [ansible/README.md](ansible/README.md), [docs/multi-cluster.md](docs/multi-cluster.md), and [docs/getting-started.md](docs/getting-started.md).
 
@@ -98,6 +107,7 @@ See [ansible/README.md](ansible/README.md), [docs/multi-cluster.md](docs/multi-c
 
 - [Architecture](docs/architecture.md)
 - [Multi-cluster](docs/multi-cluster.md)
+- [Service Interconnect failover](docs/service-interconnect-failover.md)
 - [Ansible installer](ansible/README.md)
 - [Supply chain (ODF, Quay, RHTAS, TPA, Dev Spaces)](docs/supply-chain.md)
 - [Getting started](docs/getting-started.md)

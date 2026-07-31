@@ -148,6 +148,19 @@ def main() -> int:
             root / f"gitops/components/api-gateway/overlays/{cluster}/env/api-gateway.env",
             [f"KEYCLOAK_ISSUER={keycloak_issuer}", f"KEYCLOAK_JWK_SET_URI={jwk}"],
         )
+        write_env(
+            root / f"gitops/components/banking-si-service/overlays/{cluster}/env/banking-service.env",
+            [
+                f"KEYCLOAK_ISSUER={keycloak_issuer}",
+                f"OIDC_TRUSTED_ISSUERS={keycloak_issuer}",
+                f"BANKING_CLUSTER={cluster}",
+                f"KEYCLOAK_JWK_SET_URI={jwk}",
+            ],
+        )
+        write_env(
+            root / f"gitops/components/banking-si-gateway/overlays/{cluster}/env/api-gateway.env",
+            [f"KEYCLOAK_ISSUER={keycloak_issuer}", f"KEYCLOAK_JWK_SET_URI={jwk}"],
+        )
 
     write_env(
         root / "gitops/environments/default/acm.env",
@@ -216,18 +229,26 @@ data:
         print(f"wrote {promxy}")
 
     for cluster in ("east", "west"):
-        p = root / f"gitops/components/banking-service/overlays/{cluster}/kustomization.yaml"
-        text = p.read_text()
-        text2 = re.sub(
-            r"newName:\s*.*/banking/banking-service",
-            f"newName: {quay_host}/banking/banking-service",
-            text,
-        )
-        if reset_tags:
-            text2 = re.sub(r'newTag:\s*["\']?[^"\'\n]+["\']?', 'newTag: "latest"', text2)
-        if text2 != text:
-            p.write_text(text2)
-            print(f"patched {p}")
+        for rel in (
+            f"gitops/components/banking-service/overlays/{cluster}/kustomization.yaml",
+            f"gitops/components/banking-si-service/overlays/{cluster}/kustomization.yaml",
+        ):
+            p = root / rel
+            if not p.exists():
+                continue
+            text = p.read_text()
+            text2 = re.sub(
+                r"newName:\s*.*/banking/banking-service",
+                f"newName: {quay_host}/banking/banking-service",
+                text,
+            )
+            if reset_tags:
+                text2 = re.sub(r'newTag:\s*["\']?[^"\'\n]+["\']?', 'newTag: "latest"', text2)
+            if text2 != text:
+                p.write_text(text2)
+                print(f"patched {p}")
+
+        # banking-si-gateway uses the local banking-apps ImageStream (not Quay).
 
     def patch_jenkins(text: str) -> str:
         text = sub_sandbox_domains(text, hub_apps)

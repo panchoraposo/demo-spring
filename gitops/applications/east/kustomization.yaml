@@ -20,10 +20,15 @@ resources:
   - mesh.yaml
   # wave 3
   - external-secrets-config.yaml
-  # wave 4+
+  # wave 4+ mesh demo stack
   - postgresql.yaml
   - banking-service.yaml
   - api-gateway.yaml
+  # wave 4+ Service Interconnect demo (isolated namespaces)
+  - banking-si-postgresql.yaml
+  - banking-si-service.yaml
+  - banking-si-interconnect.yaml
+  - banking-si-gateway.yaml
 
 replacements:
   - source:

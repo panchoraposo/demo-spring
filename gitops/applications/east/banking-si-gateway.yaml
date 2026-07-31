@@ -1,0 +1,25 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: banking-si-gateway
+  namespace: openshift-gitops
+  labels:
+    app.kubernetes.io/part-of: banking-si-demo
+    cluster: east
+  annotations:
+    argocd.argoproj.io/sync-wave: "8"
+spec:
+  project: default
+  source:
+    repoURL: https://github.com/panchoraposo/demo-spring.git
+    targetRevision: main
+    path: gitops/components/banking-si-gateway/overlays/east
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: banking-si-apps
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true

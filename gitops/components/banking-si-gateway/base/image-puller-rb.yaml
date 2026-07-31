@@ -1,0 +1,16 @@
+# Allow banking-si-apps to pull api-gateway from the mesh demo ImageStream in banking-apps.
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: banking-si-apps-image-puller
+  namespace: banking-apps
+  labels:
+    app.kubernetes.io/part-of: banking-si-demo
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: system:image-puller
+subjects:
+  - kind: ServiceAccount
+    name: default
+    namespace: banking-si-apps

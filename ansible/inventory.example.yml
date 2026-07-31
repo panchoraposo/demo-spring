@@ -37,3 +37,9 @@ all:
 
     # Optional postflight mesh failover check
     run_failover_test: false
+
+    # Failover demos use per-cluster OpenShift Routes (no shared global DNS):
+    # Mesh:  ./scripts/demo-mesh-failover.sh
+    # SI:    ./scripts/si/link-sites.sh && ./scripts/demo-si-failover.sh
+    # Docs:  docs/multi-cluster.md , docs/service-interconnect-failover.md
+

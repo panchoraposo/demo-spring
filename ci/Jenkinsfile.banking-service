@@ -128,15 +128,22 @@ pipeline {
                 set -euo pipefail
                 OVERLAY_EAST="gitops/components/${APP}/overlays/east/kustomization.yaml"
                 OVERLAY_WEST="gitops/components/${APP}/overlays/west/kustomization.yaml"
-                test -f "${OVERLAY_EAST}"
-                test -f "${OVERLAY_WEST}"
-                sed -i.bak -E "s/newTag:.*/newTag: ${IMAGE_TAG}/" "${OVERLAY_EAST}" "${OVERLAY_WEST}"
+                # SI demo path shares the same Quay image; keep tags in lockstep.
+                SI_OVERLAY_EAST="gitops/components/banking-si-service/overlays/east/kustomization.yaml"
+                SI_OVERLAY_WEST="gitops/components/banking-si-service/overlays/west/kustomization.yaml"
+                OVERLAYS="${OVERLAY_EAST} ${OVERLAY_WEST} ${SI_OVERLAY_EAST} ${SI_OVERLAY_WEST}"
+                for f in ${OVERLAYS}; do
+                  test -f "${f}"
+                done
+                for f in ${OVERLAYS}; do
+                  sed -i.bak -E "s/newTag:.*/newTag: ${IMAGE_TAG}/" "${f}"
+                done
 
                 if [ -f .ci-quay.env ]; then
                   # shellcheck disable=SC1091
                   . ./.ci-quay.env
                   QUAY_REF="${QUAY_HOST}/${QUAY_ORG}/${APP}"
-                  for f in "${OVERLAY_EAST}" "${OVERLAY_WEST}"; do
+                  for f in ${OVERLAYS}; do
                     if grep -q 'newName:' "${f}"; then
                       sed -i.bak -E "s|newName:.*|newName: ${QUAY_REF}|" "${f}"
                     else
@@ -145,7 +152,9 @@ pipeline {
                     fi
                   done
                 fi
-                rm -f "${OVERLAY_EAST}.bak" "${OVERLAY_WEST}.bak"
+                for f in ${OVERLAYS}; do
+                  rm -f "${f}.bak"
+                done
 
                 if [ "${GIT_PASSWORD}" = "replace-me" ] || [ -z "${GIT_PASSWORD}" ]; then
                   echo "WARN: github-ci token not configured; skipping git push of newTag=${IMAGE_TAG}."
@@ -156,7 +165,7 @@ pipeline {
 
                 git config user.email "jenkins@banking-demo.local"
                 git config user.name "Jenkins CI"
-                git add "${OVERLAY_EAST}" "${OVERLAY_WEST}"
+                git add ${OVERLAYS}
                 if git diff --staged --quiet; then
                   echo "No GitOps changes to commit"
                   echo "SKIP_GIT_PUSH=0" > .ci-gitops-status

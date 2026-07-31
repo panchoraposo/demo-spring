@@ -8,4 +8,6 @@ resources:
   - clustersecretstore-conjur.yaml
   - externalsecret-postgresql.yaml
   - externalsecret-banking-service.yaml
+  - externalsecret-si-postgresql.yaml
+  - externalsecret-si-banking-service.yaml
 

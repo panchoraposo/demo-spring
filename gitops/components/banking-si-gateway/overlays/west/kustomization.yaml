@@ -1,0 +1,47 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+namespace: banking-si-apps
+
+generatorOptions:
+  disableNameSuffixHash: true
+
+configMapGenerator:
+  - name: env-config-api-gateway
+    envs:
+      - env/api-gateway.env
+
+resources:
+  - ../../base
+  - imagestream.yaml
+
+# Reuse the per-cluster ImageStream built into banking-apps (same as mesh api-gateway).
+images:
+  - name: image-registry.openshift-image-registry.svc:5000/banking-si-apps/api-gateway
+    newName: image-registry.openshift-image-registry.svc:5000/banking-apps/api-gateway
+    newTag: latest
+
+commonLabels:
+  cluster: west
+
+replacements:
+  - source:
+      kind: ConfigMap
+      name: env-config-api-gateway
+      fieldPath: data.KEYCLOAK_ISSUER
+    targets:
+      - select:
+          kind: ConfigMap
+          name: api-gateway-config
+        fieldPaths:
+          - data.SPRING_SECURITY_OAUTH2_RESOURCESERVER_JWT_ISSUER_URI
+  - source:
+      kind: ConfigMap
+      name: env-config-api-gateway
+      fieldPath: data.KEYCLOAK_JWK_SET_URI
+    targets:
+      - select:
+          kind: ConfigMap
+          name: api-gateway-config
+        fieldPaths:
+          - data.SPRING_SECURITY_OAUTH2_RESOURCESERVER_JWT_JWK_SET_URI

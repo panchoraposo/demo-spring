@@ -1,0 +1,12 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+namespace: banking-si-apps
+
+resources:
+  - ../../base
+  - accessgrant.yaml
+  - networkobserver.yaml
+
+patches:
+  - path: site-patch.yaml

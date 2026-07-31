@@ -1,0 +1,27 @@
+apiVersion: operators.coreos.com/v1alpha1
+kind: Subscription
+metadata:
+  name: skupper-operator
+  namespace: openshift-operators
+  labels:
+    app.kubernetes.io/part-of: banking-si-demo
+spec:
+  channel: stable-2
+  installPlanApproval: Automatic
+  name: skupper-operator
+  source: redhat-operators
+  sourceNamespace: openshift-marketplace
+---
+apiVersion: operators.coreos.com/v1alpha1
+kind: Subscription
+metadata:
+  name: skupper-netobs-operator
+  namespace: openshift-operators
+  labels:
+    app.kubernetes.io/part-of: banking-si-demo
+spec:
+  channel: stable-2
+  installPlanApproval: Automatic
+  name: skupper-netobs-operator
+  source: redhat-operators
+  sourceNamespace: openshift-marketplace

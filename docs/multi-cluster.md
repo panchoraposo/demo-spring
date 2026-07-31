@@ -10,7 +10,9 @@ Layout for RHACM ApplicationSets plus per-cluster regional data. Prefer the Ansi
 | **east** | Managed cluster | GitOps, ESO, OSSM 3.4 ambient, PostgreSQL, Spring apps |
 | **west** | Managed cluster | Same as east (independent DB) |
 
-**Failover is mesh traffic only.** Scaling east `banking-service` to 0 lets ambient locality send traffic to west endpoints. PostgreSQL is **not** shared.
+**Mesh failover is traffic only.** Scaling east `banking-service` to 0 lets ambient locality send traffic to west endpoints. PostgreSQL is **not** shared.
+
+A **separate** failover path uses Red Hat Service Interconnect in namespaces `banking-si-apps` / `banking-si-db`, entered via per-cluster OpenShift Routes — see [service-interconnect-failover.md](service-interconnect-failover.md). Do not mix those namespaces with the ambient mesh demo.
 
 **OIDC is centralized on the hub**: a single Keycloak instance on **acm** (`banking-idp` Route `sso`) provides realms `banking` (Spring apps) and `trustify` (TPA).
 
@@ -76,7 +78,8 @@ oc --context acm apply -k gitops/acm
     - Banners: [`scripts/apply-console-banners.sh`](../scripts/apply-console-banners.sh)
     - ApplicationMenu links: [`scripts/apply-console-links.sh`](../scripts/apply-console-links.sh)
 13. Credentials dashboard (Ansible): `ansible-playbook -i ansible/inventory.example.yml ansible/playbooks/dashboard.yml`
-14. Live failover demo: [`scripts/demo-mesh-failover.sh`](../scripts/demo-mesh-failover.sh)
+14. Live mesh failover demo: [`scripts/demo-mesh-failover.sh`](../scripts/demo-mesh-failover.sh) (Kiali on ACM; OpenShift Routes)
+15. Optional SI failover: [`scripts/si/link-sites.sh`](../scripts/si/link-sites.sh) → [`scripts/demo-si-failover.sh`](../scripts/demo-si-failover.sh) (Network Observer on west) — [docs](service-interconnect-failover.md)
 
 Managed cluster GitOps prerequisite: Subscription in `gitops/platform/operators-managed` (synced once Applications start).
 
@@ -94,10 +97,13 @@ Managed cluster GitOps prerequisite: Subscription in `gitops/platform/operators-
 - [ ] EW Gateway `gatewayClassName: istio-east-west` + `AMBIENT_ENABLE_MULTI_NETWORK=true`
 - [ ] Hub Kiali Ready with remote secrets for east/west
 
-## Failover demo (Kiali + mesh)
+## Failover demo (Kiali + mesh + OpenShift Routes)
+
+Both demos enter via **per-cluster OpenShift Routes** (no shared global DNS):
 
 ```bash
-./scripts/demo-mesh-failover.sh
+./scripts/demo-mesh-failover.sh   # east Route → mesh failover; then peer Route if ingress dies
+./scripts/demo-si-failover.sh     # east Route → SI failover; then west Route if ingress dies
 ```
 
 Kiali on ACM: `https://$(oc --context acm -n istio-system get route kiali -o jsonpath='{.spec.host}')`

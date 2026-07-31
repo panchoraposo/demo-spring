@@ -1,0 +1,8 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: banking-si-db
+  labels:
+    app.kubernetes.io/part-of: banking-si-demo
+    # Intentionally NOT ambient — this stack must stay isolated from the mesh demo.
+    openshift.io/user-monitoring: "true"

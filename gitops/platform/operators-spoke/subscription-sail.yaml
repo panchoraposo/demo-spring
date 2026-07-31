@@ -1,6 +1,4 @@
-# When GatewayClass openshift-default is present (banking-si-dns), the Ingress
-# Operator owns this Subscription (Manual + startingCSV). Keep channel/version
-# aligned with that controller via GatewayClass override annotations.
+# Sail / OSSM 3 on spokes for the ambient mesh demo (banking-apps / banking-db).
 apiVersion: operators.coreos.com/v1alpha1
 kind: Subscription
 metadata:

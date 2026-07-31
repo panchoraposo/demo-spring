@@ -1,0 +1,14 @@
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: postgresql-data
+  namespace: banking-si-db
+  labels:
+    app.kubernetes.io/name: postgresql
+    app.kubernetes.io/part-of: banking-si-demo
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 10Gi

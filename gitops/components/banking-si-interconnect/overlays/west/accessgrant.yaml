@@ -1,0 +1,12 @@
+# West is the listening site for the demo link (east redeems an AccessToken).
+# Token exchange is performed by scripts/si/link-sites.sh (not GitOps — short-lived).
+apiVersion: skupper.io/v2alpha1
+kind: AccessGrant
+metadata:
+  name: grant-west
+  namespace: banking-si-apps
+  labels:
+    app.kubernetes.io/part-of: banking-si-demo
+spec:
+  redemptionsAllowed: 5
+  expirationWindow: 24h

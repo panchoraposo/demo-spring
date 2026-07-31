@@ -28,5 +28,12 @@ spec:
     - group: ""
       kind: Namespace
       jqPathExpressions:
-        - .metadata.labels
-        - .metadata.annotations
+        - .metadata.annotations["openshift.io/sa.scc.mcs"]
+        - .metadata.annotations["openshift.io/sa.scc.supplemental-groups"]
+        - .metadata.annotations["openshift.io/sa.scc.uid-range"]
+        - .metadata.annotations["security.openshift.io/MinimallySufficientPodSecurityStandard"]
+        - .metadata.labels["kubernetes.io/metadata.name"]
+        - .metadata.labels["pod-security.kubernetes.io/audit"]
+        - .metadata.labels["pod-security.kubernetes.io/audit-version"]
+        - .metadata.labels["pod-security.kubernetes.io/warn"]
+        - .metadata.labels["pod-security.kubernetes.io/warn-version"]

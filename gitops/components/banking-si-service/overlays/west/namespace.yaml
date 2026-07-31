@@ -1,0 +1,9 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: banking-si-apps
+  labels:
+    app.kubernetes.io/part-of: banking-si-demo
+    cluster: west
+    # No istio.io/dataplane-mode — keep this stack out of the mesh demo.
+    openshift.io/user-monitoring: "true"

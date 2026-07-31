@@ -1,0 +1,9 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: api-gateway-config
+data:
+  # Logical service created by the Skupper Listener (failover across east/west sites).
+  BANKING_SERVICE_URI: http://banking-service.banking-si-apps.svc.cluster.local:8080
+  SPRING_SECURITY_OAUTH2_RESOURCESERVER_JWT_ISSUER_URI: https://sso.apps.example.com/realms/banking
+  SPRING_SECURITY_OAUTH2_RESOURCESERVER_JWT_JWK_SET_URI: https://sso.apps.example.com/realms/banking/protocol/openid-connect/certs
