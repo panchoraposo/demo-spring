@@ -1,0 +1,21 @@
+# Multi-cluster Prometheus datasource via hub promxy (no TLS / no auth — same as Kiali).
+# Requires Cluster Observability Operator + UIPlugin/monitoring with Perses enabled.
+apiVersion: perses.dev/v1alpha2
+kind: PersesGlobalDatasource
+metadata:
+  name: promxy-multi-cluster
+  labels:
+    app.kubernetes.io/part-of: banking-demo
+    cluster: acm
+spec:
+  config:
+    display:
+      name: "Promxy (east + west)"
+    default: true
+    plugin:
+      kind: PrometheusDatasource
+      spec:
+        proxy:
+          kind: HTTPProxy
+          spec:
+            url: http://promxy.acm-observability.svc.cluster.local:8082

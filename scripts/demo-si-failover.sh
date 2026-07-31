@@ -16,13 +16,17 @@
 #   ./scripts/demo-si-failover.sh preflight|traffic|fail-backend|fail-ingress|recover|status|console
 #
 # Env: FAIL_CLUSTER=east ENTRY_CLUSTER=east HUB_CONTEXT=acm SI_NS=banking-si-apps
+#       SAMPLE_COUNT=8 SAMPLE_INTERVAL=0.4 BASELINE_SECONDS=5 INTERVAL=0.4
 set -euo pipefail
 
 HUB_CONTEXT="${HUB_CONTEXT:-acm}"
 FAIL_CLUSTER="${FAIL_CLUSTER:-east}"
 ENTRY_CLUSTER="${ENTRY_CLUSTER:-east}"
 PEER_CLUSTER="${PEER_CLUSTER:-}"
-INTERVAL="${INTERVAL:-1}"
+INTERVAL="${INTERVAL:-0.4}"
+SAMPLE_COUNT="${SAMPLE_COUNT:-8}"
+SAMPLE_INTERVAL="${SAMPLE_INTERVAL:-${INTERVAL}}"
+BASELINE_SECONDS="${BASELINE_SECONDS:-5}"
 SI_NS="${SI_NS:-banking-si-apps}"
 BANKING_NS="${SI_NS}"
 CLIENT_ID="${BANKING_CLIENT_ID:-banking-cli}"
@@ -49,18 +53,36 @@ network_observer_guide() {
   url="$(console_url || true)"
   cat <<EOF
 
-Network Observer (west cluster — login with OpenShift user for WEST):
-  ${url:-MISSING — run: ./scripts/si/console-url.sh}
+Network Observer = the multi-cluster console for Service Interconnect
+  (one console on west sees the whole application network — east + west).
+  URL: ${url:-MISSING — run: ./scripts/si/console-url.sh}
+  Login: OpenShift user on WEST (not ACM, not Kiali).
 
-  1) Browser opens the Route on west (not ACM / not Kiali).
-  2) Log in with an OpenShift account that can access west.
-  3) In the console, open in this order:
-       • Topology  → two sites linked (east ↔ west)
-       • Sites     → both Ready, sitesInNetwork = 2
-       • Components / Addresses → find routing key "banking-service"
-  4) SI failover (step 3) is when cross-site traffic is most visible:
-       east api-gateway keeps answering, but pods on west serve the work.
-  5) Metrics refresh every ~15s — give it a few seconds after traffic starts.
+  Sidebar in Network Observer 2.x (no “Addresses” — that was the old name):
+    Topology · Services · Sites · Components · Processes
+
+  Click in this order for the demo:
+
+  1) Topology → Sites
+       Two site nodes linked (both labeled banking-si…). This IS the
+       multi-cluster map. Leave this open to show east ↔ west.
+  2) Topology → Components   (or left nav → Components)
+       Best live failover visual. Find / open "banking-service".
+       You should see processes (pods) on each site and traffic.
+       During SI failover: east process goes idle/disappears;
+       traffic concentrates on west while the client still hits
+       the east OpenShift Route.
+  3) Services
+       Application service / routing key "banking-service"
+       (listener + connector across sites).
+  4) Processes
+       Pod-level detail if you want to zoom into a single replica.
+
+  Tip: second screen on Topology → Components (banking-service) while
+  the terminal runs traffic. Metrics refresh ~every 15s.
+
+  There is no separate hub Observer like ACM+Kiali — this west console
+  already shows the whole application network.
 
 EOF
 }
@@ -100,6 +122,7 @@ cmd_preflight() {
   local tok result code serving rows base
   tok="$(failover_get_token "$(failover_keycloak_url)")"
   [[ -n "${tok}" ]] || { echo "FAIL: cannot get JWT from hub Keycloak" >&2; exit 1; }
+  failover_seed_both_clusters "${SI_NS}" "${tok}"
   base="$(entry_url)"
   result="$(failover_call_customers "${base}" "${tok}")"
   code="${result%%|*}"
@@ -107,8 +130,12 @@ cmd_preflight() {
   rows="$(echo "${result}" | cut -d'|' -f3)"
   echo
   echo "Baseline via ${base}"
-  failover_print_route_check "${ENTRY_CLUSTER}" "${result}"
+  failover_print_route_check "${ENTRY_CLUSTER}" "${result}" "${base}" "${SI_NS}"
   [[ "${code}" =~ ^2 ]] || { echo "FAIL: baseline API not healthy (see ${DETAIL_LOG})" >&2; exit 1; }
+  if [[ "${rows}" == "0" ]]; then
+    echo "FAIL: customer list still empty after seed — check POST /api/v1/customers" >&2
+    exit 1
+  fi
   if [[ "${serving}" == "?" ]]; then
     failover_say "WARN: no X-Banking-Cluster header yet — watch svc e/w counts + Network Observer."
   else
@@ -131,7 +158,7 @@ cmd_status() {
   local tok result
   tok="$(failover_get_token "$(failover_keycloak_url)")"
   result="$(failover_call_customers "$(entry_url)" "${tok}")"
-  failover_print_route_check entry "${result}"
+  failover_print_route_check entry "${result}" "$(entry_url)" "${SI_NS}"
 }
 
 cmd_traffic() {
@@ -146,13 +173,13 @@ wait_connector_drained() {
   local ctx="$1"
   local i st
   echo "Waiting for ${ctx} Connector banking-service to report no local pods..."
-  for i in $(seq 1 30); do
+  for i in $(seq 1 15); do
     st="$(oc --context "${ctx}" -n "${SI_NS}" get connector banking-service -o jsonpath='{.status.status}' 2>/dev/null || true)"
     if [[ "${st}" == "Error" ]]; then
       echo "  Connector status=${st} (local pods gone; SI should use ${PEER_CLUSTER})"
       return 0
     fi
-    sleep 2
+    sleep 1
   done
   echo "  WARN: Connector did not reach Error status (last=${st:-unknown}); sampling anyway" >&2
 }
@@ -162,7 +189,8 @@ cmd_fail_backend() {
   failover_banner "FAIL backend — Service Interconnect failover"
   failover_say "Story: kill ${FAIL_CLUSTER} banking-service. Keep calling the ${ENTRY_CLUSTER} Route."
   failover_say "Expect: API stays OK. svc ${FAIL_CLUSTER}→0, ${PEER_CLUSTER} stays ≥1. serving→${PEER_CLUSTER}."
-  failover_say "Watch: Network Observer → Topology / banking-service."
+  failover_say "Watch: Network Observer → Topology → Components → banking-service."
+  failover_say "Optional: Perses (acm) Banking failover compare — namespace banking-si-apps — ./scripts/perses-url.sh"
   echo
   failover_say "Pausing Argo self-heal; scaling ${FAIL_CLUSTER}/banking-service → 0"
   failover_pause_argo "${FAIL_CLUSTER}" banking-si-service
@@ -172,7 +200,7 @@ cmd_fail_backend() {
   failover_legend
   failover_say "Sampling via ${ENTRY_CLUSTER} OpenShift Route (SI is the only failover path)."
   echo
-  failover_sample_window "si-failover" "$(entry_url)" "${SI_NS}" 25
+  failover_sample_window "si-failover" "$(entry_url)" "${SI_NS}" "${SAMPLE_COUNT}"
   local tok result code serving fail_r
   tok="$(failover_get_token "$(failover_keycloak_url)")"
   result="$(failover_call_customers "$(entry_url)" "${tok}")"
@@ -199,10 +227,13 @@ cmd_fail_ingress() {
   local tok result_fail result_peer
   tok="$(failover_get_token "$(failover_keycloak_url)")"
   failover_say "Calling both OpenShift Routes:"
-  result_fail="$(failover_call_customers "$(failover_route_url "${FAIL_CLUSTER}" "${SI_NS}")" "${tok}")"
-  failover_print_route_check "${FAIL_CLUSTER}" "${result_fail}"
-  result_peer="$(failover_call_customers "$(failover_route_url "${PEER_CLUSTER}" "${SI_NS}")" "${tok}")"
-  failover_print_route_check "${PEER_CLUSTER}" "${result_peer}"
+  local url_fail url_peer
+  url_fail="$(failover_route_url "${FAIL_CLUSTER}" "${SI_NS}")"
+  url_peer="$(failover_route_url "${PEER_CLUSTER}" "${SI_NS}")"
+  result_fail="$(failover_call_customers "${url_fail}" "${tok}")"
+  failover_print_route_check "${FAIL_CLUSTER}" "${result_fail}" "${url_fail}" "${SI_NS}"
+  result_peer="$(failover_call_customers "${url_peer}" "${tok}")"
+  failover_print_route_check "${PEER_CLUSTER}" "${result_peer}" "${url_peer}" "${SI_NS}"
   echo
   if [[ ! "${result_fail%%|*}" =~ ^2 ]] && [[ "${result_peer%%|*}" =~ ^2 ]]; then
     echo "✓ Use the peer cluster OpenShift Route when ${FAIL_CLUSTER} ingress is down."
@@ -235,13 +266,12 @@ cmd_recover() {
     ok=1
   fi
 
-  local tok result code serving
+  local tok result code
   tok="$(failover_get_token "$(failover_keycloak_url)")"
   result="$(failover_call_customers "$(entry_url)" "${tok}")"
   code="${result%%|*}"
-  serving="$(echo "${result}" | cut -d'|' -f2)"
   echo
-  failover_print_route_check entry "${result}"
+  failover_print_route_check entry "${result}" "$(entry_url)" "${SI_NS}"
   printf '  %-5s svc=%s gw=%s\n' east \
     "$(failover_replicas east "${SI_NS}" banking-service)" \
     "$(failover_replicas east "${SI_NS}" api-gateway)"
@@ -276,19 +306,19 @@ cmd_demo() {
   failover_banner "Step 2 — Baseline traffic (${ENTRY_CLUSTER} Route)"
   failover_say "Calling: $(entry_url)"
   failover_say "Log file: ${DETAIL_LOG}"
-  failover_say "Leave Network Observer on Topology / banking-service while requests run."
+  failover_say "Leave Network Observer on Topology → Components (banking-service) while requests run."
   failover_legend
   failover_pause
 
   local base kc tid
   base="$(entry_url)"
   kc="$(failover_keycloak_url)"
-  failover_say "Sending traffic for ~12s so Observer can scrape metrics…"
+  failover_say "Sending traffic for ~${BASELINE_SECONDS}s so Observer can scrape metrics…"
   failover_traffic_loop "baseline" "${base}" "${SI_NS}" "${kc}" &
   tid=$!
   trap 'kill ${tid} 2>/dev/null || true; echo' EXIT
 
-  sleep 12
+  sleep "${BASELINE_SECONDS}"
   echo
   failover_say "Traffic is running in the background. Glance at Network Observer, then press Enter for SI failover."
   failover_pause

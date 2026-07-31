@@ -6,7 +6,7 @@ This demo targets three OpenShift clusters:
 
 | Cluster | Role |
 | --- | --- |
-| **acm** | RHACM hub, Conjur, Keycloak, Jenkins, ODF, Quay, Nexus, RHTAS, TPA, ACS, Dev Spaces, Kiali/promxy |
+| **acm** | RHACM hub, Conjur, Keycloak, Jenkins, ODF, Quay, Nexus, RHTAS, TPA, ACS, Dev Spaces, Kiali/promxy/Perses |
 | **east** / **west** | Managed clusters with GitOps, ESO, OSSM 3.4 ambient, PostgreSQL, Spring apps |
 
 Credentials are sourced from **CyberArk Conjur** on the hub via the **External Secrets Operator** on each cluster. Spring apps never talk to Conjur; they only mount Kubernetes Secrets that ESO materializes.
@@ -25,7 +25,7 @@ A parallel demo path uses **Service Interconnect** in `banking-si-*` namespaces 
 ```mermaid
 flowchart LR
   subgraph acm ["acm hub"]
-    HubSvc["RHACM · GitOps · Conjur · Keycloak<br/>Jenkins · ODF · Quay · Nexus · ACS<br/>RHTAS · TPA · Dev Spaces · Kiali"]
+    HubSvc["RHACM · GitOps · Conjur · Keycloak<br/>Jenkins · ODF · Quay · Nexus · ACS<br/>RHTAS · TPA · Dev Spaces · Kiali · Perses"]
   end
   subgraph east ["east"]
     EastSvc["GitOps · ESO · OSSM ambient<br/>api-gateway · banking-service · PostgreSQL"]
@@ -104,18 +104,19 @@ flowchart LR
 | Developer workspaces | OpenShift Dev Spaces on **acm** |
 | CI | Jenkins → Nexus → BuildConfig → Quay/RHTAS → ACS → GitOps |
 | CI | Jenkins on acm + OpenShift BuildConfig → Quay sign/attest |
+| Autoscaling | Custom Metrics Autoscaler Operator (CMA / KEDA) on east / west — CPU + Prometheus HTTP RPS, max 10 |
 
 ## GitOps ownership
 
-1. **acm:** [`gitops/bootstrap/acm-root.yaml`](../gitops/bootstrap/acm-root.yaml) → [`gitops/applications/acm`](../gitops/applications/acm) (Conjur, Keycloak, Jenkins, ODF, Quay, Nexus, ACS, RHTAS, TPA, Dev Spaces, hub ESO, Kiali, promxy, CI BuildConfigs).
+1. **acm:** [`gitops/bootstrap/acm-root.yaml`](../gitops/bootstrap/acm-root.yaml) → [`gitops/applications/acm`](../gitops/applications/acm) (Conjur, Keycloak, Jenkins, ODF, Quay, Nexus, ACS, RHTAS, TPA, Dev Spaces, hub ESO, Kiali, promxy, Perses/COO, CI BuildConfigs).
 2. **RHACM:** [`gitops/acm`](../gitops/acm) Placement + ApplicationSet generates Applications that sync `gitops/applications/{{east|west}}` to each ManagedCluster.
 3. **Managed cluster waves (east/west):**
-  - `0` platform operators (ESO, Sail, GitOps)
-   - `1` ESO operand
+  - `0` platform operators (ESO, Sail, GitOps, CMA / KEDA)
+   - `1` ESO operand, user-workload monitoring, `KedaController`
    - `2` mesh (Istio / CNI / ZTunnel / east-west GW / DestinationRule)
    - `3` `ClusterSecretStore` + app `ExternalSecret`s (Conjur URL → acm)
-  - `4+` PostgreSQL, banking-service, api-gateway (mesh demo; OpenShift Routes)
-  - `4–8` banking-si-* stack (SI demo; isolated namespaces + OpenShift Routes)
+   - `4+` PostgreSQL, banking-service, api-gateway (mesh demo; OpenShift Routes; ScaledObjects)
+   - `4–8` banking-si-* stack (SI demo; isolated namespaces + OpenShift Routes; ScaledObjects)
 
 
 Details: [secrets-management.md](secrets-management.md), [multi-cluster.md](multi-cluster.md).
@@ -125,8 +126,11 @@ Details: [secrets-management.md](secrets-management.md), [multi-cluster.md](mult
 - Clients obtain an access token from the **hub** Keycloak realm `banking`.
 - **api-gateway** validates the JWT (`issuer-uri`) and proxies `/api/**` to **banking-service**.
 - **banking-service** is also an OAuth2 resource server.
-- Actuator health endpoints remain unauthenticated for probes.
+- Actuator health and prometheus endpoints remain unauthenticated for probes / UWM scrape.
+- **banking-service** readiness includes the DB health indicator; Deployments use startup/readiness/liveness probes tuned for JVM + PostgreSQL.
 - Database and admin passwords are not stored in Git; Conjur on acm is the source of truth.
+
+Autoscaling detail: [keda-autoscaling.md](keda-autoscaling.md).
 
 ## Mesh failover
 

@@ -1,0 +1,183 @@
+apiVersion: perses.dev/v1alpha2
+kind: PersesDashboard
+metadata:
+  name: banking-failover-compare
+  namespace: acm-observability
+  labels:
+    app.kubernetes.io/part-of: banking-demo
+    cluster: acm
+  annotations:
+    perses.dev/tags: "banking,failover,multi-cluster"
+spec:
+  config:
+    display:
+      name: "Banking failover compare (east vs west)"
+      description: >-
+        Side-by-side east/west request rate and banking-service ready replicas.
+        Use during mesh or SI failover demos while traffic hits the entry Route.
+    duration: 30m
+    refreshInterval: 15s
+    variables:
+      - kind: ListVariable
+        spec:
+          name: apps_ns
+          allowAllValue: false
+          allowMultiple: false
+          plugin:
+            kind: StaticListVariable
+            spec:
+              values:
+                - label: Mesh (banking-apps)
+                  value: banking-apps
+                - label: Service Interconnect (banking-si-apps)
+                  value: banking-si-apps
+          defaultValue: banking-apps
+    panels:
+      eastRequestRate:
+        kind: Panel
+        spec:
+          display:
+            name: "EAST — HTTP request rate"
+          plugin:
+            kind: TimeSeriesChart
+            spec: {}
+          queries:
+            - kind: TimeSeriesQuery
+              spec:
+                plugin:
+                  kind: PrometheusTimeSeriesQuery
+                  spec:
+                    query: >-
+                      sum(
+                        rate(http_server_requests_seconds_count{
+                          namespace="$apps_ns",
+                          cluster="east",
+                          uri=~"/api/.*"
+                        }[1m])
+                      )
+      westRequestRate:
+        kind: Panel
+        spec:
+          display:
+            name: "WEST — HTTP request rate"
+          plugin:
+            kind: TimeSeriesChart
+            spec: {}
+          queries:
+            - kind: TimeSeriesQuery
+              spec:
+                plugin:
+                  kind: PrometheusTimeSeriesQuery
+                  spec:
+                    query: >-
+                      sum(
+                        rate(http_server_requests_seconds_count{
+                          namespace="$apps_ns",
+                          cluster="west",
+                          uri=~"/api/.*"
+                        }[1m])
+                      )
+      bothRequestRate:
+        kind: Panel
+        spec:
+          display:
+            name: "HTTP request rate — east vs west"
+          plugin:
+            kind: TimeSeriesChart
+            spec: {}
+          queries:
+            - kind: TimeSeriesQuery
+              spec:
+                plugin:
+                  kind: PrometheusTimeSeriesQuery
+                  spec:
+                    query: >-
+                      sum by (cluster) (
+                        rate(http_server_requests_seconds_count{
+                          namespace="$apps_ns",
+                          cluster=~"east|west",
+                          uri=~"/api/.*"
+                        }[1m])
+                      )
+      bankingReadyReplicas:
+        kind: Panel
+        spec:
+          display:
+            name: "banking-service ready replicas"
+          plugin:
+            kind: TimeSeriesChart
+            spec: {}
+          queries:
+            - kind: TimeSeriesQuery
+              spec:
+                plugin:
+                  kind: PrometheusTimeSeriesQuery
+                  spec:
+                    query: >-
+                      max by (cluster) (
+                        kube_deployment_status_replicas_ready{
+                          namespace="$apps_ns",
+                          deployment="banking-service",
+                          cluster=~"east|west"
+                        }
+                      )
+      gatewayReadyReplicas:
+        kind: Panel
+        spec:
+          display:
+            name: "api-gateway ready replicas"
+          plugin:
+            kind: TimeSeriesChart
+            spec: {}
+          queries:
+            - kind: TimeSeriesQuery
+              spec:
+                plugin:
+                  kind: PrometheusTimeSeriesQuery
+                  spec:
+                    query: >-
+                      max by (cluster) (
+                        kube_deployment_status_replicas_ready{
+                          namespace="$apps_ns",
+                          deployment="api-gateway",
+                          cluster=~"east|west"
+                        }
+                      )
+    layouts:
+      - kind: Grid
+        spec:
+          display:
+            title: "Failover story"
+            collapse:
+              open: true
+          items:
+            - x: 0
+              y: 0
+              width: 12
+              height: 7
+              content:
+                $ref: "#/spec/panels/eastRequestRate"
+            - x: 12
+              y: 0
+              width: 12
+              height: 7
+              content:
+                $ref: "#/spec/panels/westRequestRate"
+            - x: 0
+              y: 7
+              width: 24
+              height: 7
+              content:
+                $ref: "#/spec/panels/bothRequestRate"
+            - x: 0
+              y: 14
+              width: 12
+              height: 7
+              content:
+                $ref: "#/spec/panels/bankingReadyReplicas"
+            - x: 12
+              y: 14
+              width: 12
+              height: 7
+              content:
+                $ref: "#/spec/panels/gatewayReadyReplicas"

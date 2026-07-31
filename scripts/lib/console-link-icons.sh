@@ -27,3 +27,8 @@ console_link_icon_rekor() {
 console_link_icon_kiali() {
   printf '%s' 'https://raw.githubusercontent.com/kiali/kiali/master/frontend/src/assets/img/kiali/icon-lightbkg.svg'
 }
+
+# Perses — https://github.com/perses/perses (project logo)
+console_link_icon_perses() {
+  printf '%s' 'https://raw.githubusercontent.com/perses/perses/main/docs/static/logo_perses_light_bg.svg'
+}

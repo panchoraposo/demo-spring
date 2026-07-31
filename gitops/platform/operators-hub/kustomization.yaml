@@ -9,6 +9,8 @@ resources:
   - subscription-openshift-gitops.yaml
   - subscription-devworkspace.yaml
   - subscription-devspaces.yaml
+  - namespace-coo.yaml
+  - subscription-coo.yaml
   - namespace-rhbk.yaml
   - subscription-rhbk.yaml
   - namespace-odf.yaml

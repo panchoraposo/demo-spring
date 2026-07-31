@@ -1,0 +1,140 @@
+apiVersion: perses.dev/v1alpha2
+kind: PersesDashboard
+metadata:
+  name: banking-http-overview
+  namespace: acm-observability
+  labels:
+    app.kubernetes.io/part-of: banking-demo
+    cluster: acm
+  annotations:
+    perses.dev/tags: "banking,http,multi-cluster"
+spec:
+  config:
+    display:
+      name: "Banking HTTP (multi-cluster)"
+      description: "Spring HTTP request rates via hub promxy (east + west Thanos)."
+    duration: 1h
+    refreshInterval: 30s
+    variables:
+      - kind: ListVariable
+        spec:
+          name: cluster
+          allowAllValue: true
+          allowMultiple: true
+          plugin:
+            kind: StaticListVariable
+            spec:
+              values:
+                - label: east
+                  value: east
+                - label: west
+                  value: west
+          defaultValue: east
+      - kind: ListVariable
+        spec:
+          name: namespace
+          allowAllValue: true
+          allowMultiple: true
+          plugin:
+            kind: StaticListVariable
+            spec:
+              values:
+                - label: banking-apps (mesh)
+                  value: banking-apps
+                - label: banking-si-apps (SI)
+                  value: banking-si-apps
+          defaultValue: banking-apps
+    panels:
+      requestRateByCluster:
+        kind: Panel
+        spec:
+          display:
+            name: "HTTP request rate by cluster"
+          plugin:
+            kind: TimeSeriesChart
+            spec: {}
+          queries:
+            - kind: TimeSeriesQuery
+              spec:
+                plugin:
+                  kind: PrometheusTimeSeriesQuery
+                  spec:
+                    query: >-
+                      sum by (cluster, namespace) (
+                        rate(http_server_requests_seconds_count{
+                          namespace=~"$namespace",
+                          cluster=~"$cluster"
+                        }[5m])
+                      )
+      requestRateByUri:
+        kind: Panel
+        spec:
+          display:
+            name: "HTTP request rate by URI"
+          plugin:
+            kind: TimeSeriesChart
+            spec: {}
+          queries:
+            - kind: TimeSeriesQuery
+              spec:
+                plugin:
+                  kind: PrometheusTimeSeriesQuery
+                  spec:
+                    query: >-
+                      topk(10,
+                        sum by (cluster, uri) (
+                          rate(http_server_requests_seconds_count{
+                            namespace=~"$namespace",
+                            cluster=~"$cluster",
+                            uri=~"/api/.*"
+                          }[5m])
+                        )
+                      )
+      errorRate:
+        kind: Panel
+        spec:
+          display:
+            name: "HTTP 5xx rate"
+          plugin:
+            kind: TimeSeriesChart
+            spec: {}
+          queries:
+            - kind: TimeSeriesQuery
+              spec:
+                plugin:
+                  kind: PrometheusTimeSeriesQuery
+                  spec:
+                    query: >-
+                      sum by (cluster, namespace) (
+                        rate(http_server_requests_seconds_count{
+                          namespace=~"$namespace",
+                          cluster=~"$cluster",
+                          status=~"5.."
+                        }[5m])
+                      )
+    layouts:
+      - kind: Grid
+        spec:
+          display:
+            title: "Application HTTP"
+            collapse:
+              open: true
+          items:
+            - x: 0
+              y: 0
+              width: 24
+              height: 8
+              content:
+                $ref: "#/spec/panels/requestRateByCluster"
+            - x: 0
+              y: 8
+              width: 12
+              height: 8
+              content:
+                $ref: "#/spec/panels/requestRateByUri"
+            - x: 12
+              y: 8
+              width: 12
+              height: 8
+              content:
+                $ref: "#/spec/panels/errorRate"

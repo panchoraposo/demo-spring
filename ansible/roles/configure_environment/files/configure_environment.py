@@ -209,6 +209,8 @@ data:
         - static_configs:
             - targets:
                 - {east_thanos}:443
+          labels:
+            cluster: east
           ignore_error: true
           scheme: https
           http_client:
@@ -218,6 +220,8 @@ data:
         - static_configs:
             - targets:
                 - {west_thanos}:443
+          labels:
+            cluster: west
           ignore_error: true
           scheme: https
           http_client:

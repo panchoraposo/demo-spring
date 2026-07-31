@@ -75,36 +75,40 @@ West exposes `AccessGrant`; east redeems an `AccessToken`:
 
 The console lives on the **west** cluster (Route `banking-si-network-observer` in `banking-si-apps`). Log in with an OpenShift user for **west** (not ACM/Kiali).
 
+That single Observer **is** the multi-cluster view: it aggregates the whole Service Interconnect application network (east + west). There is no separate hub console like ACM+Kiali; Topology / Components already span sites.
+
 ## Presenting the live demo
 
 ```bash
 ./scripts/demo-si-failover.sh           # interactive — press Enter between steps
 ```
 
-### Network Observer — what to click
+### Network Observer — closest to a Kiali graph
+
+Network Observer **2.x** sidebar: **Topology · Services · Sites · Components · Processes**  
+(There is no **Addresses** menu — that name was retired; use **Services**.)
 
 1. Open the URL from `./scripts/si/console-url.sh` (west).
-2. Authenticate with west OpenShift credentials.
-3. **Topology** — two sites linked (`banking-si` east ↔ west).
-4. **Sites** — both Ready, `sitesInNetwork=2`.
-5. **Components / Addresses** — routing key `banking-service`.
-6. Metrics scrape about every **15s**. Start traffic, then wait a few seconds before expecting graph activity.
+2. Authenticate with west OpenShift credentials (`kube:admin` / west user).
+3. **Topology → Sites** — two linked `banking-si` nodes (multi-site map).
+4. **Topology → Components** (or left nav **Components**) → open **`banking-service`** — best live failover visual (processes per site + traffic). When east backend is drained, activity concentrates on west while clients still hit the **east** Route.
+5. **Services** — application service / routing key `banking-service`.
+6. **Processes** — optional pod-level drill-down.
+7. Metrics scrape about every **15s**. Start traffic, then wait a few seconds.
 
-Cross-site SI traffic is clearest when you drain east `banking-service`: east `api-gateway` still receives calls, Skupper forwards work to west pods.
+Pair with the terminal cards: curl target URL, `★ EAST/WEST ★`, pretty customer JSON.
 
-### What the terminal status line means
+Optional third screen on **acm**: Perses **Banking failover compare** (`./scripts/perses-url.sh`) with namespace `banking-si-apps` — HTTP rate and ready replicas by `cluster=east|west` via hub promxy.
 
-| Field | Meaning |
-| --- | --- |
-| `API OK/FAIL` | Client still got a successful response (`200`) or an error |
-| `serving=` | `X-Banking-Cluster` (`east`/`west`). `~west` = header missing, inferred from pod counts |
-| `rows=` | Customer records returned (`0` is OK if that cluster DB is empty) |
-| `svc e/w` | `banking-service` readyReplicas on east / west (SI proof) |
-| `gw e/w` | `api-gateway` readyReplicas on east / west (ingress proof) |
+### What the terminal shows
 
-Full request bodies go to `.demo-si-failover.log`, not the status line.
+Each sample prints a **request/response card**:
 
-Both this script and `demo-mesh-failover.sh` share `scripts/lib/failover-demo.sh` so the status line and recover behavior match.
+- `▶ REQUEST` — full `curl` against the OpenShift Route URL  
+- `◀ RESPONSE` — HTTP status, `★ EAST/WEST ★` (serving cluster), pod counts, path story  
+- customer list + pretty JSON body (preflight seeds Ada/Grace/Alan on **both** DBs)
+
+Full dumps also go to `.demo-si-failover.log`. Shared with mesh via `scripts/lib/failover-demo.sh`.
 
 ### Step cheat sheet
 

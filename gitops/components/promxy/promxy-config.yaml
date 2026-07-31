@@ -12,6 +12,9 @@ data:
         - static_configs:
             - targets:
                 - thanos-querier-openshift-monitoring.apps.cluster-4487j.4487j.sandbox2772.opentlc.com:443
+          # Injected at query time for Perses / multi-cluster PromQL (cluster=east|west).
+          labels:
+            cluster: east
           ignore_error: true
           scheme: https
           http_client:
@@ -21,6 +24,8 @@ data:
         - static_configs:
             - targets:
                 - thanos-querier-openshift-monitoring.apps.cluster-mj6n9.mj6n9.sandbox990.opentlc.com:443
+          labels:
+            cluster: west
           ignore_error: true
           scheme: https
           http_client:

@@ -1,0 +1,12 @@
+apiVersion: observability.openshift.io/v1alpha1
+kind: UIPlugin
+metadata:
+  name: monitoring
+  labels:
+    app.kubernetes.io/part-of: banking-demo
+    cluster: acm
+spec:
+  type: Monitoring
+  monitoring:
+    perses:
+      enabled: true

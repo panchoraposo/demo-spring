@@ -43,17 +43,30 @@ failover_init_log() {
 failover_legend() {
   cat <<'EOF'
 
-Status line (what the audience should watch):
-  API          → OK 200 = request succeeded | FAIL xxx = client saw an error
-  serving      → which cluster ran banking-service (X-Banking-Cluster: east|west)
-                 "~west" means header missing; inferred from pod counts
-  rows         → customer records returned (0 is fine if that cluster DB is empty)
-  svc e/w      → banking-service readyReplicas on east / west  (backend story)
-  gw  e/w      → api-gateway readyReplicas on east / west      (ingress story)
+Each request prints a demo card:
+  ▶ curl target URL (which OpenShift Route you are hitting)
+  ◀ HTTP status + ★ EAST/WEST ★ (which cluster ran banking-service)
+  customer list + pretty JSON body (Ada / Grace / Alan)
+  pod counts east/west for banking-service and api-gateway
 
-Full request dumps → detail log file (not this line).
+Watch ★ WEST ★ appear while east banking-service pods = 0 → that is failover.
 
 EOF
+}
+
+# Compact JSON for screen + log.
+failover_compact_body() {
+  local file="$1"
+  jq -c . "${file}" 2>/dev/null || tr '\n' ' ' < "${file}"
+}
+
+# Encode/decode body so it survives command substitution (no |/newline issues).
+failover_b64_encode() {
+  printf '%s' "$1" | base64 | tr -d '\n'
+}
+
+failover_b64_decode() {
+  printf '%s' "$1" | base64 --decode 2>/dev/null || printf '%s' "$1" | base64 -D 2>/dev/null || true
 }
 
 failover_peer_of() {
@@ -92,11 +105,11 @@ failover_route_url() {
   echo "https://$(oc --context "${ctx}" -n "${ns}" get route api-gateway -o jsonpath='{.spec.host}')"
 }
 
-# Returns: code|serving|rows|snippet
+# Returns: code|serving|rows|body_b64
 # serving is the X-Banking-Cluster header, or "?" if absent.
 failover_call_customers() {
   local base="$1" token="$2"
-  local hdrs body code cluster bytes snippet rows
+  local hdrs body code cluster bytes rows compact body_b64
   hdrs="$(mktemp)"
   body="$(mktemp)"
   code="$(curl -sk -D "${hdrs}" -o "${body}" -w '%{http_code}' \
@@ -108,13 +121,154 @@ failover_call_customers() {
     | tr -d '\r' | sed -E 's/^[^:]+:[[:space:]]*//')"
   [[ -n "${cluster}" ]] || cluster="?"
   bytes="$(wc -c < "${body}" | tr -d ' ')"
-  snippet="$(head -c 160 "${body}" | tr '\n' ' ')"
   rows="$(jq -r 'if type=="array" then length else "?" end' "${body}" 2>/dev/null || echo "?")"
+  compact="$(failover_compact_body "${body}")"
+  body_b64="$(failover_b64_encode "${compact}")"
   failover_detail "---- $(date -u +%Y-%m-%dT%H:%M:%SZ) GET ${base}/api/v1/customers"
   failover_detail "HTTP ${code}  serving=${cluster}  rows=${rows}  bytes=${bytes}"
-  failover_detail "body: ${snippet}"
+  failover_detail "body: ${compact}"
   rm -f "${hdrs}" "${body}"
-  printf '%s|%s|%s|%s\n' "${code}" "${cluster}" "${rows}" "${snippet}"
+  printf '%s|%s|%s|%s\n' "${code}" "${cluster}" "${rows}" "${body_b64}"
+}
+
+# Full decoded JSON body from a call result (may be empty string).
+failover_result_json() {
+  local result="$1"
+  local b64
+  b64="$(echo "${result}" | cut -d'|' -f4)"
+  [[ -n "${b64}" ]] || return 0
+  failover_b64_decode "${b64}"
+}
+
+failover_serving_label() {
+  case "$1" in
+    east|~east) echo "EAST" ;;
+    west|~west) echo "WEST" ;;
+    "?"|"") echo "UNKNOWN" ;;
+    *) echo "$(printf '%s' "$1" | tr '[:lower:]' '[:upper:]')" ;;
+  esac
+}
+
+failover_print_customers() {
+  local json="$1"
+  if [[ -z "${json}" || "${json}" == "null" ]]; then
+    echo "    (no body)"
+    return
+  fi
+  if ! echo "${json}" | jq -e 'type=="array"' >/dev/null 2>&1; then
+    echo "    (non-JSON or error body)"
+    return
+  fi
+  local n
+  n="$(echo "${json}" | jq 'length')"
+  if [[ "${n}" == "0" ]]; then
+    echo "    (empty list — run preflight to seed demo customers)"
+    return
+  fi
+  echo "${json}" | jq -r '.[] | "    #\(.id)  \(.firstName) \(.lastName)    \(.email)"'
+}
+
+failover_print_body_pretty() {
+  local json="$1"
+  if [[ -z "${json}" ]]; then
+    echo "    (empty)"
+    return
+  fi
+  # Color when stdout is a TTY; focused fields for the audience.
+  if [[ -t 1 ]]; then
+    echo "${json}" | jq -C '[.[]? | {id, firstName, lastName, email}] // .' 2>/dev/null \
+      | sed 's/^/    /' && return
+  fi
+  echo "${json}" | jq '[.[]? | {id, firstName, lastName, email}] // .' 2>/dev/null \
+    | sed 's/^/    /' || echo "    ${json}"
+}
+
+failover_story_path() {
+  local serving="$1" ns="$2"
+  local east_svc west_svc
+  east_svc="$(failover_replicas east "${ns}" banking-service)"
+  west_svc="$(failover_replicas west "${ns}" banking-service)"
+  case "$(failover_serving_label "${serving}")" in
+    WEST)
+      if [[ "${east_svc}" == "0" ]]; then
+        echo "    path: client → east Route → east api-gateway ══Skupper/mesh══▶ west banking-service"
+      else
+        echo "    path: client → Route → api-gateway → west banking-service"
+      fi
+      ;;
+    EAST)
+      echo "    path: client → east Route → east api-gateway → east banking-service"
+      ;;
+    *)
+      echo "    path: client → OpenShift Route → api-gateway → banking-service"
+      ;;
+  esac
+}
+
+failover_post_customer() {
+  local base="$1" token="$2" first="$3" last="$4" email="$5" nid="$6"
+  local code
+  code="$(curl -sk -o /dev/null -w '%{http_code}' -X POST \
+    -H "Authorization: Bearer ${token}" \
+    -H "Content-Type: application/json" \
+    -H "Accept: application/json" \
+    "${base}/api/v1/customers" \
+    -d "{\"firstName\":\"${first}\",\"lastName\":\"${last}\",\"email\":\"${email}\",\"nationalId\":\"${nid}\"}" \
+    || echo 000)"
+  echo "${code}"
+}
+
+# Seed a few demo customers when GET /customers returns []. Call against each
+# cluster Route so east and west DBs both have data for failover demos.
+failover_ensure_demo_customers() {
+  local base="$1" token="$2" label="${3:-cluster}"
+  local result code rows created=0
+  result="$(failover_call_customers "${base}" "${token}")"
+  code="${result%%|*}"
+  rows="$(echo "${result}" | cut -d'|' -f3)"
+  if [[ ! "${code}" =~ ^2 ]]; then
+    failover_say "WARN: cannot seed ${label} — GET customers returned HTTP ${code}"
+    return 1
+  fi
+  if [[ "${rows}" != "0" && "${rows}" != "?" ]]; then
+    failover_say "${label}: already has ${rows} customer(s) — skipping seed"
+    return 0
+  fi
+  failover_say "${label}: DB empty — seeding demo customers…"
+  local first last email nid http
+  # Stable demo identities (idempotent enough: skip if email already exists → 4xx).
+  while IFS='|' read -r first last email nid; do
+    [[ -n "${first}" ]] || continue
+    http="$(failover_post_customer "${base}" "${token}" "${first}" "${last}" "${email}" "${nid}")"
+    if [[ "${http}" =~ ^2 ]]; then
+      created=$((created + 1))
+      failover_say "  + ${first} ${last} (${email}) HTTP ${http}"
+    elif [[ "${http}" == "409" || "${http}" == "400" ]]; then
+      failover_say "  · ${email} already present (HTTP ${http})"
+    else
+      failover_say "  WARN: create ${email} → HTTP ${http}"
+    fi
+  done <<'EOF'
+Ada|Lovelace|ada@bank.demo|NID-DEMO-001
+Grace|Hopper|grace@bank.demo|NID-DEMO-002
+Alan|Turing|alan@bank.demo|NID-DEMO-003
+EOF
+  result="$(failover_call_customers "${base}" "${token}")"
+  rows="$(echo "${result}" | cut -d'|' -f3)"
+  failover_say "${label}: now rows=${rows} (created ${created})"
+  [[ "${rows}" != "0" ]]
+}
+
+# Seed entry + peer Routes so failover still returns a non-empty body.
+failover_seed_both_clusters() {
+  local ns="$1" token="$2"
+  local entry peer
+  entry="$(failover_route_url "${ENTRY_CLUSTER:-east}" "${ns}")"
+  peer="$(failover_route_url "${PEER_CLUSTER:-west}" "${ns}")"
+  echo
+  failover_say "Ensuring demo customers on both cluster DBs (so body is not [] after failover)…"
+  failover_ensure_demo_customers "${entry}" "${token}" "${ENTRY_CLUSTER:-east}" || true
+  failover_ensure_demo_customers "${peer}" "${token}" "${PEER_CLUSTER:-west}" || true
 }
 
 # When the response header is missing, infer serving cluster from replica counts
@@ -143,17 +297,51 @@ failover_infer_serving() {
   echo "?"
 }
 
-failover_show_line() {
-  local code="$1" serving="$2" rows="$3" phase="$4" ns="$5"
-  local east_svc west_svc east_gw west_gw mark
+# High-impact request/response card for the live demo.
+# Args: base_url code serving rows phase ns json_body
+failover_show_exchange() {
+  local base="$1" code="$2" serving="$3" rows="$4" phase="$5" ns="$6" json="${7:-}"
+  local url="${base%/}/api/v1/customers"
+  local east_svc west_svc east_gw west_gw label mark
   east_svc="$(failover_replicas east "${ns}" banking-service)"
   west_svc="$(failover_replicas west "${ns}" banking-service)"
   east_gw="$(failover_replicas east "${ns}" api-gateway)"
   west_gw="$(failover_replicas west "${ns}" api-gateway)"
-  if [[ "${code}" =~ ^2 ]]; then mark="OK "; else mark="FAIL"; fi
-  printf '\r\033[K[%s] %-14s  API %s %-3s  serving=%-5s  rows=%-3s  svc e/w=%s/%s  gw e/w=%s/%s' \
-    "$(date +%H:%M:%S)" "${phase}" "${mark}" "${code}" "${serving}" "${rows}" \
-    "${east_svc}" "${west_svc}" "${east_gw}" "${west_gw}"
+  label="$(failover_serving_label "${serving}")"
+  if [[ "${code}" =~ ^2 ]]; then mark="OK"; else mark="FAIL"; fi
+
+  echo
+  echo "════════════════════════════════════════════════════════════════"
+  printf ' %s   %s\n' "$(date +%H:%M:%S)" "${phase}"
+  echo "────────────────────────────────────────────────────────────────"
+  echo " ▶  REQUEST"
+  echo "    GET ${url}"
+  echo "    curl -sk \\"
+  echo "      -H 'Authorization: Bearer \$TOKEN' \\"
+  echo "      -H 'Accept: application/json' \\"
+  echo "      '${url}'"
+  echo "────────────────────────────────────────────────────────────────"
+  printf ' ◀  RESPONSE  HTTP %s (%s)   served by  ★ %s ★\n' "${code}" "${mark}" "${label}"
+  printf '    banking-service pods:  east=%-3s west=%s\n' "${east_svc}" "${west_svc}"
+  printf '    api-gateway pods:      east=%-3s west=%s\n' "${east_gw}" "${west_gw}"
+  failover_story_path "${serving}" "${ns}"
+  echo "────────────────────────────────────────────────────────────────"
+  echo "    customers (${rows}):"
+  failover_print_customers "${json}"
+  echo
+  echo "    body:"
+  failover_print_body_pretty "${json}"
+  echo "════════════════════════════════════════════════════════════════"
+}
+
+# Back-compat wrapper (older call sites).
+failover_show_line() {
+  local code="$1" serving="$2" rows="$3" phase="$4" ns="$5" body="${6:-}" base="${7:-}"
+  if [[ -n "${base}" ]]; then
+    failover_show_exchange "${base}" "${code}" "${serving}" "${rows}" "${phase}" "${ns}" "${body}"
+  else
+    failover_show_exchange "?" "${code}" "${serving}" "${rows}" "${phase}" "${ns}" "${body}"
+  fi
 }
 
 failover_pause_argo() {
@@ -260,68 +448,84 @@ failover_wait_deploy() {
 
 failover_traffic_loop() {
   local phase="$1" base="$2" ns="$3" kc="${4:-$(failover_keycloak_url)}"
-  local tok result code serving rows ok=0 fail=0
+  local tok result code serving rows json ok=0 fail=0
   tok="$(failover_get_token "${kc}")"
   [[ -n "${tok}" ]] || { echo "[${phase}] no token"; return 1; }
-  echo "Traffic → ${base}"
-  echo "Screen: one status line | details → ${DETAIL_LOG:-"(no log)"}"
-  echo "CTRL+C to stop."
   echo
+  echo "Live traffic against OpenShift Route:"
+  echo "  ${base}/api/v1/customers"
+  echo "Detail log → ${DETAIL_LOG:-"(none)"}   CTRL+C to stop."
   while true; do
     result="$(failover_call_customers "${base}" "${tok}")"
     code="${result%%|*}"
     serving="$(failover_infer_serving "$(echo "${result}" | cut -d'|' -f2)" "${code}" "${ns}")"
     rows="$(echo "${result}" | cut -d'|' -f3)"
+    json="$(failover_result_json "${result}")"
     if [[ "${code}" =~ ^2 ]]; then
       ok=$((ok + 1))
-      failover_show_line "${code}" "${serving}" "${rows}" "${phase} #${ok}" "${ns}"
+      failover_show_exchange "${base}" "${code}" "${serving}" "${rows}" "${phase} #${ok}" "${ns}" "${json}"
     else
       fail=$((fail + 1))
-      failover_show_line "${code}" "${serving}" "${rows}" "${phase} !${fail}" "${ns}"
+      failover_show_exchange "${base}" "${code}" "${serving}" "${rows}" "${phase} FAIL#${fail}" "${ns}" "${json}"
       if [[ "${code}" == "401" || "${code}" == "403" ]]; then
         tok="$(failover_get_token "${kc}")"
       fi
     fi
-    sleep "${INTERVAL:-1}"
+    sleep "${INTERVAL:-0.4}"
   done
 }
 
 failover_sample_window() {
-  local phase="$1" base="$2" ns="$3" n="${4:-25}"
-  local kc tok result code serving rows ok=0 fail=0 i last="?"
+  local phase="$1" base="$2" ns="$3" n="${4:-${SAMPLE_COUNT:-8}}"
+  local kc tok result code serving rows json ok=0 fail=0 i last="?"
   local seen_east=0 seen_west=0
+  local gap="${SAMPLE_INTERVAL:-${INTERVAL:-0.4}}"
   kc="$(failover_keycloak_url)"
   tok="$(failover_get_token "${kc}")"
+  echo
+  echo "Sampling ${n}× against:"
+  echo "  ${base}/api/v1/customers"
   for i in $(seq 1 "${n}"); do
     result="$(failover_call_customers "${base}" "${tok}")"
     code="${result%%|*}"
     serving="$(failover_infer_serving "$(echo "${result}" | cut -d'|' -f2)" "${code}" "${ns}")"
     rows="$(echo "${result}" | cut -d'|' -f3)"
+    json="$(failover_result_json "${result}")"
     last="${serving}"
     case "${serving}" in
       east|~east) seen_east=1 ;;
       west|~west) seen_west=1 ;;
     esac
     if [[ "${code}" =~ ^2 ]]; then ok=$((ok + 1)); else fail=$((fail + 1)); fi
-    failover_show_line "${code}" "${serving}" "${rows}" "${phase} ${i}/${n}" "${ns}"
-    sleep 1
+    failover_show_exchange "${base}" "${code}" "${serving}" "${rows}" "${phase} ${i}/${n}" "${ns}" "${json}"
+    sleep "${gap}"
   done
   echo
-  echo
-  echo "Result: ${ok} OK / ${fail} errors   last serving=${last}"
-  if [[ "${seen_east}" -eq 1 ]]; then failover_say "Observed serving east (header or inferred)."; fi
-  if [[ "${seen_west}" -eq 1 ]]; then failover_say "Observed serving west (header or inferred)."; fi
+  echo "Result: ${ok} OK / ${fail} errors   last served by ★ $(failover_serving_label "${last}") ★"
+  if [[ "${seen_east}" -eq 1 ]]; then failover_say "Observed traffic served on EAST."; fi
+  if [[ "${seen_west}" -eq 1 ]]; then failover_say "Observed traffic served on WEST."; fi
 }
 
+# Args: label result [base_url] [ns]
 failover_print_route_check() {
-  local label="$1" result="$2"
-  local code serving rows
+  local label="$1" result="$2" base="${3:-}" ns="${4:-${BANKING_NS:-banking-si-apps}}"
+  local code serving rows json
   code="${result%%|*}"
   serving="$(echo "${result}" | cut -d'|' -f2)"
   rows="$(echo "${result}" | cut -d'|' -f3)"
+  json="$(failover_result_json "${result}")"
+  if [[ -n "${base}" ]]; then
+    failover_show_exchange "${base}" "${code}" "${serving}" "${rows}" "check ${label}" "${ns}" "${json}"
+    return
+  fi
   if [[ "${code}" =~ ^2 ]]; then
-    printf '  %-5s  API OK  %-3s   serving=%-5s  rows=%s\n' "${label}" "${code}" "${serving}" "${rows}"
+    printf '  %-5s  API OK  %-3s   served by ★ %s ★   rows=%s\n' \
+      "${label}" "${code}" "$(failover_serving_label "${serving}")" "${rows}"
+    failover_print_customers "${json}"
+    echo "    body:"
+    failover_print_body_pretty "${json}"
   else
     printf '  %-5s  API FAIL %-3s  (expected if this ingress was drained)\n' "${label}" "${code}"
+    [[ -n "${json}" ]] && { echo "    body:"; failover_print_body_pretty "${json}"; }
   fi
 }

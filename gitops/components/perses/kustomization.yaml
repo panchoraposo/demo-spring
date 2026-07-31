@@ -1,0 +1,10 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+# Red Hat build of Perses on the ACM hub (Cluster Observability Operator UIPlugin).
+# Datasource: promxy → east/west Thanos Querier (same federation as Kiali).
+resources:
+  - uiplugin-monitoring.yaml
+  - datasource-promxy.yaml
+  - dashboard-banking-http.yaml
+  - dashboard-failover-compare.yaml

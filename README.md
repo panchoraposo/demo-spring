@@ -37,7 +37,8 @@ flowchart LR
 | API call (SI) | Client → east/west OpenShift Route → `api-gateway` → SI logical `banking-service` → local PostgreSQL |
 | Secrets | Conjur on acm → ESO on acm/east/west → Kubernetes Secrets |
 | Supply chain | Dev Spaces / Jenkins on acm → BuildConfig → Quay + RHTAS → Git tag bump → GitOps sync |
-| Observability | Hub Kiali (mesh) · west Network Observer (SI) · promxy |
+| Observability | Hub Kiali (mesh) · west Network Observer (SI) · promxy · Perses (hub dashboards) |
+| Autoscaling | Custom Metrics Autoscaler (KEDA) — CPU + Prometheus HTTP RPS, max 10 |
 
 Detail and component table: [docs/architecture.md](docs/architecture.md).
 
@@ -60,6 +61,7 @@ Detail and component table: [docs/architecture.md](docs/architecture.md).
 | SCA / SBOM analytics | Red Hat Trusted Profile Analyzer + RHDA |
 | Policy / image check | Red Hat Advanced Cluster Security (ACS) on acm |
 | Inner loop | OpenShift Dev Spaces (acm) ← **Gitea** `banking/demo-spring` |
+| Autoscaling | Custom Metrics Autoscaler Operator (CMA / KEDA) on east / west |
 | CI | Jenkins ← Gitea → Nexus/Maven → BuildConfig → Quay/RHTAS → ACS → GitOps |
 
 Dev Spaces factory (Gitea): `./scripts/print-devspaces-gitea-factory.sh`
@@ -104,6 +106,7 @@ All routes are exposed through the gateway and require a valid JWT from Keycloak
 4. Optional: `scripts/bootstrap-gitea.sh`, `scripts/apply-console-banners.sh`, `scripts/apply-console-links.sh`.
 5. Open the hub credentials dashboard Route in `namespace/dashboard`, get a JWT from hub Keycloak realm `banking`, call either cluster gateway.
 6. Optional SI path: `./scripts/si/link-sites.sh` → `./scripts/demo-si-failover.sh` ([docs](docs/service-interconnect-failover.md)).
+7. Optional autoscaling demo: `./scripts/demo-keda-scale.sh` ([docs](docs/keda-autoscaling.md)).
 
 See [ansible/README.md](ansible/README.md), [docs/multi-cluster.md](docs/multi-cluster.md), and [docs/getting-started.md](docs/getting-started.md).
 
@@ -112,6 +115,7 @@ See [ansible/README.md](ansible/README.md), [docs/multi-cluster.md](docs/multi-c
 - [Architecture](docs/architecture.md)
 - [Multi-cluster](docs/multi-cluster.md)
 - [Service Interconnect failover](docs/service-interconnect-failover.md)
+- [KEDA / Custom Metrics Autoscaler](docs/keda-autoscaling.md)
 - [Ansible installer](ansible/README.md)
 - [Supply chain (ODF, Quay, RHTAS, TPA, Dev Spaces)](docs/supply-chain.md)
 - [Getting started](docs/getting-started.md)

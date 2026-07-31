@@ -37,6 +37,7 @@ resources:
   - jenkins.yaml
   - ci-buildconfig.yaml
   - kiali-multicluster.yaml
+  - perses.yaml
 
 replacements:
   - source:
@@ -79,6 +80,8 @@ replacements:
       - select: { kind: Application, name: ci-buildconfig }
         fieldPaths: [ spec.source.repoURL ]
       - select: { kind: Application, name: kiali-multicluster }
+        fieldPaths: [ spec.source.repoURL ]
+      - select: { kind: Application, name: perses }
         fieldPaths: [ spec.source.repoURL ]
       # Multi-source apps: patch only the $values git source.
       - select: { kind: Application, name: jenkins }
@@ -124,6 +127,8 @@ replacements:
       - select: { kind: Application, name: ci-buildconfig }
         fieldPaths: [ spec.source.targetRevision ]
       - select: { kind: Application, name: kiali-multicluster }
+        fieldPaths: [ spec.source.targetRevision ]
+      - select: { kind: Application, name: perses }
         fieldPaths: [ spec.source.targetRevision ]
       # Multi-source apps: patch only the $values git source.
       - select: { kind: Application, name: jenkins }

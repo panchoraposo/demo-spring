@@ -74,12 +74,13 @@ oc --context acm apply -k gitops/acm
    - Peering: [`scripts/mesh/exchange-remote-secrets.sh`](../scripts/mesh/exchange-remote-secrets.sh)
 10. Hub Kiali multi-cluster secrets: [`scripts/mesh/sync-kiali-multicluster-secrets.sh`](../scripts/mesh/sync-kiali-multicluster-secrets.sh)
 11. Cluster metrics for Kiali graphs: [`scripts/mesh/enable-user-workload-monitoring.sh`](../scripts/mesh/enable-user-workload-monitoring.sh) + mesh `PodMonitor`s, then hub promxy [`scripts/mesh/sync-promxy.sh`](../scripts/mesh/sync-promxy.sh)
-12. Console UX:
+12. Perses (multi-cluster PromQL dashboards on acm): Cluster Observability Operator + GitOps [`gitops/components/perses`](../gitops/components/perses) (datasource = promxy). Open with [`scripts/perses-url.sh`](../scripts/perses-url.sh).
+13. Console UX:
     - Banners: [`scripts/apply-console-banners.sh`](../scripts/apply-console-banners.sh)
-    - ApplicationMenu links: [`scripts/apply-console-links.sh`](../scripts/apply-console-links.sh)
-13. Credentials dashboard (Ansible): `ansible-playbook -i ansible/inventory.example.yml ansible/playbooks/dashboard.yml`
-14. Live mesh failover demo: [`scripts/demo-mesh-failover.sh`](../scripts/demo-mesh-failover.sh) (Kiali on ACM; OpenShift Routes)
-15. Optional SI failover: [`scripts/si/link-sites.sh`](../scripts/si/link-sites.sh) → [`scripts/demo-si-failover.sh`](../scripts/demo-si-failover.sh) (Network Observer on west) — [docs](service-interconnect-failover.md)
+    - ApplicationMenu links: [`scripts/apply-console-links.sh`](../scripts/apply-console-links.sh) (includes Perses)
+14. Credentials dashboard (Ansible): `ansible-playbook -i ansible/inventory.example.yml ansible/playbooks/dashboard.yml`
+15. Live mesh failover demo: [`scripts/demo-mesh-failover.sh`](../scripts/demo-mesh-failover.sh) (Kiali + Perses on ACM; OpenShift Routes)
+16. Optional SI failover: [`scripts/si/link-sites.sh`](../scripts/si/link-sites.sh) → [`scripts/demo-si-failover.sh`](../scripts/demo-si-failover.sh) (Network Observer on west; Perses for HTTP/pod compare) — [docs](service-interconnect-failover.md)
 
 Managed cluster GitOps prerequisite: Subscription in `gitops/platform/operators-managed` (synced once Applications start).
 
@@ -108,14 +109,17 @@ Both demos enter via **per-cluster OpenShift Routes** (no shared global DNS):
 
 Kiali on ACM: `https://$(oc --context acm -n istio-system get route kiali -o jsonpath='{.spec.host}')`
 
+Perses on ACM (Observe → Dashboards): `./scripts/perses-url.sh` — multi-cluster panels via promxy (`cluster=east|west`). During failover, open **Banking failover compare** while traffic runs.
+
 ## CI images / supply chain
 
 Jenkins on **acm** builds via OpenShift BuildConfigs, mirrors to **Quay**, generates SBOM + attestation + signature (RHTAS), then bumps `newTag`/`newName` on **both** east and west overlays. Details: [ci-cd.md](ci-cd.md), [supply-chain.md](supply-chain.md).
 
 Console UX on acm:
 - Banner **Hub Cluster** — GitOps [`gitops/components/console-banners`](../gitops/components/console-banners) (+ script for east/west).
-- ApplicationMenu links (Gitea, Jenkins, Quay, Rekor Search UI, Kiali) — [`scripts/apply-console-links.sh`](../scripts/apply-console-links.sh).
+- ApplicationMenu links (Gitea, Jenkins, Quay, Rekor Search UI, Kiali, Perses) — [`scripts/apply-console-links.sh`](../scripts/apply-console-links.sh).
 - Service Mesh console (OSSMC) — [`gitops/components/kiali-multicluster/ossmconsole.yaml`](../gitops/components/kiali-multicluster/ossmconsole.yaml).
+- Perses dashboards — [`gitops/components/perses`](../gitops/components/perses) (COO UIPlugin + promxy datasource).
 
 ## Repo paths
 

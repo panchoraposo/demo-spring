@@ -19,6 +19,7 @@
 # Keep Kiali open on a second screen. Detail → .demo-failover.log
 #
 # Commands: demo | preflight | traffic | fail | fail-ingress | recover | status
+# Env: SAMPLE_COUNT=8 SAMPLE_INTERVAL=0.4 BASELINE_SECONDS=5 INTERVAL=0.4
 #═══════════════════════════════════════════════════════════════════════════
 set -euo pipefail
 
@@ -26,7 +27,10 @@ HUB_CONTEXT="${HUB_CONTEXT:-acm}"
 FAIL_CLUSTER="${FAIL_CLUSTER:-east}"
 ENTRY_CLUSTER="${ENTRY_CLUSTER:-east}"
 PEER_CLUSTER="${PEER_CLUSTER:-}"
-INTERVAL="${INTERVAL:-1}"
+INTERVAL="${INTERVAL:-0.4}"
+SAMPLE_COUNT="${SAMPLE_COUNT:-8}"
+SAMPLE_INTERVAL="${SAMPLE_INTERVAL:-${INTERVAL}}"
+BASELINE_SECONDS="${BASELINE_SECONDS:-5}"
 BANKING_NS="${BANKING_NS:-banking-apps}"
 DB_NS="${DB_NS:-banking-db}"
 CLIENT_ID="${BANKING_CLIENT_ID:-banking-cli}"
@@ -73,6 +77,7 @@ storyboard() {
   echo
   failover_say "Watch in parallel: Kiali graph (banking-apps) on the hub."
   failover_say "    $(kiali_url || echo '(Kiali URL unavailable)')"
+  failover_say "Optional: Perses failover dashboard (Observe → Dashboards) — ./scripts/perses-url.sh"
   failover_legend
 }
 
@@ -102,12 +107,17 @@ cmd_preflight() {
   failover_say "Calling the API once (JWT from hub Keycloak)…"
   tok="$(failover_get_token "$(failover_keycloak_url)")"
   [[ -n "${tok}" ]] || { echo "  FAIL: cannot get JWT" >&2; exit 1; }
+  failover_seed_both_clusters "${BANKING_NS}" "${tok}"
   result="$(failover_call_customers "$(entry_url)" "${tok}")"
   code="${result%%|*}"
   serving="$(echo "${result}" | cut -d'|' -f2)"
   rows="$(echo "${result}" | cut -d'|' -f3)"
-  failover_print_route_check "${ENTRY_CLUSTER}" "${result}"
+  failover_print_route_check "${ENTRY_CLUSTER}" "${result}" "$(entry_url)" "${BANKING_NS}"
   [[ "${code}" =~ ^2 ]] || { echo "  FAIL: API not healthy — see ${DETAIL_LOG}" >&2; exit 1; }
+  if [[ "${rows}" == "0" ]]; then
+    echo "  FAIL: customer list still empty after seed — check POST /api/v1/customers" >&2
+    exit 1
+  fi
 
   if [[ "${serving}" == "?" ]]; then
     failover_say "WARN: no X-Banking-Cluster header — watch svc e/w counts + Kiali."
@@ -138,7 +148,7 @@ cmd_status() {
   local tok result
   tok="$(failover_get_token "$(failover_keycloak_url)")"
   result="$(failover_call_customers "$(entry_url)" "${tok}")"
-  failover_print_route_check entry "${result}"
+  failover_print_route_check entry "${result}" "$(entry_url)" "${BANKING_NS}"
 }
 
 cmd_traffic() {
@@ -161,9 +171,9 @@ cmd_fail() {
   oc --context "${FAIL_CLUSTER}" -n "${BANKING_NS}" scale deploy/banking-service --replicas=0
   echo
   failover_legend
-  failover_say "Sampling ${ENTRY_CLUSTER} Route for ~25s…"
+  failover_say "Sampling ${ENTRY_CLUSTER} Route (${SAMPLE_COUNT} requests)…"
   echo
-  failover_sample_window "mesh-failover" "$(entry_url)" "${BANKING_NS}" 25
+  failover_sample_window "mesh-failover" "$(entry_url)" "${BANKING_NS}" "${SAMPLE_COUNT}"
   echo
   local tok result code serving fail_r
   tok="$(failover_get_token "$(failover_keycloak_url)")"
@@ -190,10 +200,13 @@ cmd_fail_ingress() {
   local tok result_fail result_peer
   tok="$(failover_get_token "$(failover_keycloak_url)")"
   failover_say "Calling both OpenShift Routes:"
-  result_fail="$(failover_call_customers "$(failover_route_url "${FAIL_CLUSTER}" "${BANKING_NS}")" "${tok}")"
-  failover_print_route_check "${FAIL_CLUSTER}" "${result_fail}"
-  result_peer="$(failover_call_customers "$(failover_route_url "${PEER_CLUSTER}" "${BANKING_NS}")" "${tok}")"
-  failover_print_route_check "${PEER_CLUSTER}" "${result_peer}"
+  local url_fail url_peer
+  url_fail="$(failover_route_url "${FAIL_CLUSTER}" "${BANKING_NS}")"
+  url_peer="$(failover_route_url "${PEER_CLUSTER}" "${BANKING_NS}")"
+  result_fail="$(failover_call_customers "${url_fail}" "${tok}")"
+  failover_print_route_check "${FAIL_CLUSTER}" "${result_fail}" "${url_fail}" "${BANKING_NS}"
+  result_peer="$(failover_call_customers "${url_peer}" "${tok}")"
+  failover_print_route_check "${PEER_CLUSTER}" "${result_peer}" "${url_peer}" "${BANKING_NS}"
   echo
   if [[ ! "${result_fail%%|*}" =~ ^2 ]] && [[ "${result_peer%%|*}" =~ ^2 ]]; then
     echo "✓ Clients switch to the peer cluster Route when ${FAIL_CLUSTER} ingress is down."
@@ -226,7 +239,7 @@ cmd_recover() {
   result="$(failover_call_customers "$(entry_url)" "${tok}")"
   code="${result%%|*}"
   echo
-  failover_print_route_check entry "${result}"
+  failover_print_route_check entry "${result}" "$(entry_url)" "${BANKING_NS}"
   printf '  %-5s svc=%s gw=%s\n' east \
     "$(failover_replicas east "${BANKING_NS}" banking-service)" \
     "$(failover_replicas east "${BANKING_NS}" api-gateway)"
@@ -272,7 +285,7 @@ cmd_demo() {
   failover_traffic_loop "baseline" "${gw}" "${BANKING_NS}" "${kc}" &
   tid=$!
   trap 'kill ${tid} 2>/dev/null || true; echo' EXIT
-  sleep 10
+  sleep "${BASELINE_SECONDS}"
   echo
   echo
   failover_say "Baseline traffic is running. Next we break ${FAIL_CLUSTER}."

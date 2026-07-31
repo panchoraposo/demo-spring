@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Application launcher ConsoleLinks on acm:
-#   Gitea, Jenkins, Quay, Rekor Search UI, Kiali
+#   Gitea, Jenkins, Quay, Rekor Search UI, Kiali, Perses (hub console)
 # Discovers Route hosts so the demo stays portable across cluster domains.
 # Each link uses the official community-project logo (HTTPS imageURL).
 set -euo pipefail
@@ -102,6 +102,13 @@ nexus_href() {
   [[ -n "${host}" ]] && echo "https://${host}"
 }
 
+# Perses is a console UIPlugin (Observe → Dashboards), not a standalone Route.
+perses_href() {
+  local console
+  console="$(oc --context "${CTX}" whoami --show-console 2>/dev/null || true)"
+  [[ -n "${console}" ]] && echo "${console%/}/monitoring/dashboards"
+}
+
 apply_link banking-demo-gitea "Gitea" "$(gitea_href)" "$(console_link_icon_gitea)"
 apply_link banking-demo-jenkins "Jenkins" "$(jenkins_href)" "$(console_link_icon_jenkins)"
 apply_link banking-demo-quay "Quay" "$(quay_href)" "$(console_link_icon_quay)"
@@ -109,6 +116,7 @@ apply_link banking-demo-nexus "Nexus" "$(nexus_href)" "$(console_link_icon_quay)
 apply_link banking-demo-acs "ACS Central" "$(acs_href)" "$(console_link_icon_rekor)"
 apply_link banking-demo-rekor-search-ui "Rekor Search UI" "$(rekor_search_ui_href)" "$(console_link_icon_rekor)"
 apply_link banking-demo-kiali "Kiali" "$(kiali_href)" "$(console_link_icon_kiali)"
+apply_link banking-demo-perses "Perses Dashboards" "$(perses_href)" "$(console_link_icon_perses)"
 
 # Drop the old Rekor API ConsoleLink name if it still exists from earlier installs.
 oc --context "${CTX}" delete consolelink banking-demo-rekor --ignore-not-found >/dev/null 2>&1 || true
