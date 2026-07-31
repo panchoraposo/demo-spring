@@ -29,12 +29,16 @@ SCM for CI is **Gitea on acm** (not GitHub). Inner-loop fix of Critical CVEs:
 ./scripts/bootstrap-gitea-jenkins-webhook.sh
 ```
 
-1. Open the factory URL → workspace clones `https://gitea-…/banking/demo-spring.git`.
-   - If TLS fails on `raw.gitea-…`, re-run `bootstrap-devspaces-gitea-raw.sh`, or use the
+1. Open the factory URL → workspace clones `https://gitea.<apps>/banking/demo-spring.git`.
+   - Git `user.name` / `user.email` are pre-set (`Demo Developer` / `demo@banking.local`).
+   - If TLS fails on `raw.gitea.…`, re-run `bootstrap-devspaces-gitea-raw.sh`, or use the
      script’s **Fallback (rawdevfile)** URL / “Continue with default devfile”.
 2. Edit `apps/banking-service/pom.xml` (e.g. `<tomcat.version>10.1.35</tomcat.version>`).
 3. Commit and push to `main` (Git credentials: Gitea user `git` / `BankingGitCiChangeMe!` or a PAT).
 4. Jenkins `banking-service-ci` runs (webhook, or SCM poll within ~1 minute).
+
+Short demo hosts (acm): `gitea`, `jenkins`, `nexus`, `conjur`, `rhda`, `sso`, `devspaces`.
+Spokes: `gateway`, `si-gateway` (plus `keycloak-banking`).
 
 ### Maven / Nexus
 
