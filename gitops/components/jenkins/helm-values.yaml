@@ -46,6 +46,23 @@ controller:
   initializeOnce: false
   overwritePlugins: true
   overwritePluginsFromImage: true
+  # Chart always uses `yes n | cp -i` into EmptyDir plugin-dir; after an init
+  # CrashLoop that volume still has plugins and the copy fails forever. Clear it first.
+  customInitContainers:
+    - name: clear-plugin-dir
+      image: docker.io/jenkins/jenkins:lts-jdk21
+      imagePullPolicy: IfNotPresent
+      command:
+        - sh
+        - -c
+        - rm -rf /var/jenkins_plugins/* /var/jenkins_plugins/.[!.]* 2>/dev/null || true
+      securityContext:
+        runAsUser: 1000
+        runAsGroup: 1000
+        allowPrivilegeEscalation: false
+      volumeMounts:
+        - name: plugin-dir
+          mountPath: /var/jenkins_plugins
 
   containerSecurityContext:
     runAsUser: 1000

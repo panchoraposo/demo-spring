@@ -47,11 +47,15 @@
     conjur_admin_user: admin
     conjur_admin_api_key: "{{ dash.conjur_admin_api_key | default('', true) or '(retrieve via conjurctl)' }}"
     kiali_url: "{{ dash.kiali_url }}"
+    nexus_url: "{{ dash.nexus_url | default('', true) }}"
     devspaces_url: "{{ dash.devspaces_url }}"
     rekor_url: "{{ dash.rekor_url }}"
     tuf_url: "{{ dash.tuf_url }}"
     east_gateway_url: "{{ dash.east_gateway_url }}"
     west_gateway_url: "{{ dash.west_gateway_url }}"
+    east_si_gateway_url: "{{ dash.east_si_gateway_url | default('', true) }}"
+    west_si_gateway_url: "{{ dash.west_si_gateway_url | default('', true) }}"
+    si_observer_url: "{{ dash.si_observer_url | default('', true) }}"
     db_user: banking
     db_password: banking-demo-change-me
     generated_at: "{{ lookup('pipe', 'date -u +%Y-%m-%dT%H:%M:%SZ') }}"

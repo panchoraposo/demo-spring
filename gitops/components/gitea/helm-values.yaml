@@ -19,10 +19,26 @@ postgresql:
         username: gitea
         password: gitea-demo-change-me
         database: gitea
+  volumePermissions:
+    enabled: true
   primary:
     persistence:
       enabled: true
       size: 8Gi
+    # OpenShift anyuid: MustRunAs SELinux; Bitnami RuntimeDefault seccomp is rejected.
+    podSecurityContext:
+      fsGroup: 1001
+      seccompProfile: null
+    containerSecurityContext:
+      runAsUser: 1001
+      runAsGroup: 1001
+      runAsNonRoot: true
+      allowPrivilegeEscalation: false
+      capabilities:
+        drop: ["ALL"]
+      seLinuxOptions:
+        level: s0:c32,c19
+      seccompProfile: null
 
 valkey-cluster:
   enabled: false
@@ -30,10 +46,25 @@ valkey-cluster:
 valkey:
   enabled: true
   architecture: standalone
+  volumePermissions:
+    enabled: true
   primary:
     persistence:
       enabled: true
       size: 1Gi
+    podSecurityContext:
+      fsGroup: 1001
+      seccompProfile: null
+    containerSecurityContext:
+      runAsUser: 1001
+      runAsGroup: 1001
+      runAsNonRoot: true
+      allowPrivilegeEscalation: false
+      capabilities:
+        drop: ["ALL"]
+      seLinuxOptions:
+        level: s0:c32,c19
+      seccompProfile: null
 
 persistence:
   enabled: true

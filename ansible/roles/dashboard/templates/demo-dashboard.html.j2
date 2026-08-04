@@ -454,6 +454,19 @@
           </div>
         </article>
 
+        <article class="card span-4">
+          <div class="card-top">
+            <div class="title"><span class="icon warm">◎</span> Network Observer</div>
+            <span class="badge">SI · west</span>
+          </div>
+          <div class="card-body">
+            <p class="note">Service Interconnect console for <code>banking-si-apps</code> (log in with <strong>west</strong> OpenShift user).</p>
+            <div class="actions">
+              <a class="btn btn-primary{% if not si_observer_url %} disabled{% endif %}" {% if si_observer_url %}href="{{ si_observer_url }}" target="_blank" rel="noopener"{% else %}aria-disabled="true"{% endif %}>Open Observer</a>
+            </div>
+          </div>
+        </article>
+
         <article class="card">
           <div class="card-top">
             <div class="title"><span class="icon blue">⌘</span> Dev Spaces</div>
@@ -496,7 +509,7 @@
     <section id="devops">
       <div class="section-head">
         <h2>DevOps</h2>
-        <p>Source control, CI, and container registry</p>
+        <p>Source control, CI, Maven cache, and container registry</p>
       </div>
       <div class="grid">
         <article class="card">
@@ -505,6 +518,7 @@
             <span class="badge">SCM</span>
           </div>
           <div class="card-body">
+            <p class="note">Short host <code>gitea.&lt;apps-domain&gt;</code>.</p>
             <div class="rows">
               <div class="row">
                 <span class="label">User</span>
@@ -519,6 +533,28 @@
             </div>
             <div class="actions">
               <a class="btn btn-primary{% if not gitea_url %} disabled{% endif %}" {% if gitea_url %}href="{{ gitea_url }}" target="_blank" rel="noopener"{% else %}aria-disabled="true"{% endif %}>Open Gitea</a>
+            </div>
+          </div>
+        </article>
+
+        <article class="card">
+          <div class="card-top">
+            <div class="title"><span class="icon">◆</span> Nexus</div>
+            <span class="badge">Maven</span>
+          </div>
+          <div class="card-body">
+            <p class="note">Short host <code>nexus.&lt;apps-domain&gt;</code> — <code>maven-public</code> (Central + Red Hat GA).</p>
+            {% if nexus_url %}
+            <div class="rows">
+              <div class="row">
+                <span class="label">URL</span>
+                <span class="value" data-copy>{{ nexus_url }}</span>
+                <button class="btn btn-copy" type="button" data-copy-btn>Copy</button>
+              </div>
+            </div>
+            {% endif %}
+            <div class="actions">
+              <a class="btn btn-primary{% if not nexus_url %} disabled{% endif %}" {% if nexus_url %}href="{{ nexus_url }}" target="_blank" rel="noopener"{% else %}aria-disabled="true"{% endif %}>Open Nexus</a>
             </div>
           </div>
         </article>
@@ -627,16 +663,16 @@
     <section id="apps">
       <div class="section-head">
         <h2>Demo applications</h2>
-        <p>API gateways on managed clusters</p>
+        <p>Short Route hosts — mesh <code>gateway.&lt;apps&gt;</code> · SI <code>si-gateway.&lt;apps&gt;</code></p>
       </div>
       <div class="grid">
         <article class="card">
           <div class="card-top">
-            <div class="title"><span class="icon">→</span> East gateway</div>
-            <span class="badge">east</span>
+            <div class="title"><span class="icon">→</span> East mesh gateway</div>
+            <span class="badge">mesh · east</span>
           </div>
           <div class="card-body">
-            <p class="note">Call with a banking JWT (<code>{{ banking_user }}</code> via Keycloak).</p>
+            <p class="note"><code>banking-apps</code> — JWT as <code>{{ banking_user }}</code>. Host prefix <code>gateway.</code></p>
             {% if east_gateway_url %}
             <div class="rows">
               <div class="row">
@@ -647,18 +683,18 @@
             </div>
             {% endif %}
             <div class="actions">
-              <a class="btn btn-primary{% if not east_gateway_url %} disabled{% endif %}" {% if east_gateway_url %}href="{{ east_gateway_url }}" target="_blank" rel="noopener"{% else %}aria-disabled="true"{% endif %}>Open East API</a>
+              <a class="btn btn-primary{% if not east_gateway_url %} disabled{% endif %}" {% if east_gateway_url %}href="{{ east_gateway_url }}" target="_blank" rel="noopener"{% else %}aria-disabled="true"{% endif %}>Open East mesh</a>
             </div>
           </div>
         </article>
 
         <article class="card">
           <div class="card-top">
-            <div class="title"><span class="icon">→</span> West gateway</div>
-            <span class="badge">west</span>
+            <div class="title"><span class="icon">→</span> West mesh gateway</div>
+            <span class="badge">mesh · west</span>
           </div>
           <div class="card-body">
-            <p class="note">Failover / multi-cluster path for the same banking APIs.</p>
+            <p class="note"><code>banking-apps</code> — mesh failover peer. Host prefix <code>gateway.</code></p>
             {% if west_gateway_url %}
             <div class="rows">
               <div class="row">
@@ -669,7 +705,51 @@
             </div>
             {% endif %}
             <div class="actions">
-              <a class="btn btn-primary{% if not west_gateway_url %} disabled{% endif %}" {% if west_gateway_url %}href="{{ west_gateway_url }}" target="_blank" rel="noopener"{% else %}aria-disabled="true"{% endif %}>Open West API</a>
+              <a class="btn btn-primary{% if not west_gateway_url %} disabled{% endif %}" {% if west_gateway_url %}href="{{ west_gateway_url }}" target="_blank" rel="noopener"{% else %}aria-disabled="true"{% endif %}>Open West mesh</a>
+            </div>
+          </div>
+        </article>
+
+        <article class="card">
+          <div class="card-top">
+            <div class="title"><span class="icon">⇄</span> East SI gateway</div>
+            <span class="badge">SI · east</span>
+          </div>
+          <div class="card-body">
+            <p class="note"><code>banking-si-apps</code> — Service Interconnect path. Host prefix <code>si-gateway.</code></p>
+            {% if east_si_gateway_url %}
+            <div class="rows">
+              <div class="row">
+                <span class="label">URL</span>
+                <span class="value" data-copy>{{ east_si_gateway_url }}</span>
+                <button class="btn btn-copy" type="button" data-copy-btn>Copy</button>
+              </div>
+            </div>
+            {% endif %}
+            <div class="actions">
+              <a class="btn btn-primary{% if not east_si_gateway_url %} disabled{% endif %}" {% if east_si_gateway_url %}href="{{ east_si_gateway_url }}" target="_blank" rel="noopener"{% else %}aria-disabled="true"{% endif %}>Open East SI</a>
+            </div>
+          </div>
+        </article>
+
+        <article class="card">
+          <div class="card-top">
+            <div class="title"><span class="icon">⇄</span> West SI gateway</div>
+            <span class="badge">SI · west</span>
+          </div>
+          <div class="card-body">
+            <p class="note"><code>banking-si-apps</code> — SI failover peer. Host prefix <code>si-gateway.</code></p>
+            {% if west_si_gateway_url %}
+            <div class="rows">
+              <div class="row">
+                <span class="label">URL</span>
+                <span class="value" data-copy>{{ west_si_gateway_url }}</span>
+                <button class="btn btn-copy" type="button" data-copy-btn>Copy</button>
+              </div>
+            </div>
+            {% endif %}
+            <div class="actions">
+              <a class="btn btn-primary{% if not west_si_gateway_url %} disabled{% endif %}" {% if west_si_gateway_url %}href="{{ west_si_gateway_url }}" target="_blank" rel="noopener"{% else %}aria-disabled="true"{% endif %}>Open West SI</a>
             </div>
           </div>
         </article>
@@ -691,12 +771,17 @@
             <div class="rows">
               <div class="row">
                 <span class="label">Hub</span>
-                <span class="value">acm — GitOps, Keycloak, Conjur, Jenkins, Quay, Dev Spaces, TPA, Kiali</span>
+                <span class="value">acm — GitOps, Keycloak (sso), Conjur, Jenkins, Gitea, Nexus, Quay, Dev Spaces, TPA, Kiali</span>
                 <span></span>
               </div>
               <div class="row">
                 <span class="label">Managed</span>
-                <span class="value">east / west — mesh, banking-service, api-gateway, regional DB</span>
+                <span class="value">east / west — mesh (gateway.*) · SI (si-gateway.*) · regional DB · CMA</span>
+                <span></span>
+              </div>
+              <div class="row">
+                <span class="label">Short hosts</span>
+                <span class="value">hub: gitea, jenkins, nexus, conjur, sso, devspaces · spokes: gateway, si-gateway</span>
                 <span></span>
               </div>
             </div>

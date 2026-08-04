@@ -1,0 +1,32 @@
+# Bitnami PostgreSQL/Valkey subcharts run as UID 1001; grant anyuid on OpenShift.
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: gitea-postgresql-anyuid
+  namespace: banking-git
+  labels:
+    app.kubernetes.io/part-of: banking-demo
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: system:openshift:scc:anyuid
+subjects:
+  - kind: ServiceAccount
+    name: gitea-postgresql
+    namespace: banking-git
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: gitea-valkey-anyuid
+  namespace: banking-git
+  labels:
+    app.kubernetes.io/part-of: banking-demo
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: system:openshift:scc:anyuid
+subjects:
+  - kind: ServiceAccount
+    name: gitea-valkey-primary
+    namespace: banking-git
