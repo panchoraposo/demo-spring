@@ -29,6 +29,7 @@ Required once after both meshes are Ready:
 ```bash
 scripts/mesh/sync-shared-cacerts.sh          # shared root → istio-system/cacerts
 scripts/mesh/exchange-remote-secrets.sh      # east ↔ west istiod peering
+scripts/mesh/sync-eastwest-gateway-ips.sh    # LB hostname → Gateway status IPs (AWS)
 ```
 
 GitOps sets `AMBIENT_ENABLE_MULTI_NETWORK=true`, `topology.istio.io/network` on
@@ -41,7 +42,13 @@ pilot env flag + EW Gateway discovery instead.
 
 ## Locality failover note
 
-The ambient reference repo primarily demonstrates `outlierDetection` circuit breaking. The DestinationRule here **adds** `localityLbSetting.failoverPriority: topology.istio.io/cluster` for east↔west traffic preference after ejection — validate on your clusters when both meshes are peered.
+`banking-service` is `istio.io/global=true` + `istio.io/use-waypoint=banking-service-waypoint`.
+The waypoint itself stays **cluster-local** (no `istio.io/global`) so ztunnel always sends
+L7 traffic to the **local** waypoint; that waypoint then fails over to peer endpoints over
+EW HBONE (needs `sync-eastwest-gateway-ips.sh` on AWS hostname LBs).
+
+DestinationRule `banking-service-failover` adds `outlierDetection` +
+`localityLbSetting.failoverPriority: topology.istio.io/cluster`.
 
 ## Not applied by Argo
 

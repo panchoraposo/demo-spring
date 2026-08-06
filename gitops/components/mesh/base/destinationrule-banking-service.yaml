@@ -15,13 +15,14 @@ spec:
         http1MaxPendingRequests: 32
         http2MaxRequests: 64
     outlierDetection:
-      consecutive5xxErrors: 3
-      interval: 5s
-      baseEjectionTime: 30s
+      # Align with Istio ambient multicluster failover guide (fast eject → peer).
+      consecutive5xxErrors: 1
+      interval: 1s
+      baseEjectionTime: 1m
       maxEjectionPercent: 100
       minHealthPercent: 0
     loadBalancer:
-      simple: LEAST_REQUEST
+      simple: ROUND_ROBIN
       localityLbSetting:
         enabled: true
         failoverPriority:

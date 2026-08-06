@@ -72,6 +72,7 @@ oc --context acm apply -k gitops/acm
 9. After both meshes are Ready:
    - Shared CA: [`scripts/mesh/sync-shared-cacerts.sh`](../scripts/mesh/sync-shared-cacerts.sh)
    - Peering: [`scripts/mesh/exchange-remote-secrets.sh`](../scripts/mesh/exchange-remote-secrets.sh)
+   - EW Gateway IPs (AWS hostname LBs): [`scripts/mesh/sync-eastwest-gateway-ips.sh`](../scripts/mesh/sync-eastwest-gateway-ips.sh)
 10. Hub Kiali multi-cluster secrets: [`scripts/mesh/sync-kiali-multicluster-secrets.sh`](../scripts/mesh/sync-kiali-multicluster-secrets.sh)
 11. Cluster metrics for Kiali graphs: [`scripts/mesh/enable-user-workload-monitoring.sh`](../scripts/mesh/enable-user-workload-monitoring.sh) + mesh `PodMonitor`s, then hub promxy [`scripts/mesh/sync-promxy.sh`](../scripts/mesh/sync-promxy.sh)
 12. Perses (multi-cluster PromQL dashboards on acm): Cluster Observability Operator + GitOps [`gitops/components/perses`](../gitops/components/perses) (datasource = promxy). Open with [`scripts/perses-url.sh`](../scripts/perses-url.sh).

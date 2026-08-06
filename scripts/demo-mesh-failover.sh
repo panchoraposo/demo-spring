@@ -87,6 +87,14 @@ cmd_preflight() {
   local kiali ok=1
   kiali="$(kiali_url)"
 
+  # AWS ELB hostnames must be resolved into Gateway status IPs so ambient
+  # NetworkGateways / waypoint EW HBONE can reach the peer cluster.
+  if [[ -x "${SCRIPT_DIR}/mesh/sync-eastwest-gateway-ips.sh" ]]; then
+    failover_say "Syncing east-west gateway IPs into Gateway status…"
+    "${SCRIPT_DIR}/mesh/sync-eastwest-gateway-ips.sh" || \
+      failover_say "WARN: EW gateway IP sync failed — mesh failover may not work."
+  fi
+
   failover_say "Entry Route (${ENTRY_CLUSTER}):  $(entry_url)"
   failover_say "Peer Route (${PEER_CLUSTER}):    $(failover_route_url "${PEER_CLUSTER}" "${BANKING_NS}")"
   failover_say "Kiali (second screen):           ${kiali:-MISSING}"

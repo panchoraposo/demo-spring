@@ -8,5 +8,8 @@ metadata:
   labels:
     app.kubernetes.io/part-of: banking-si-demo
 spec:
-  redemptionsAllowed: 5
-  expirationWindow: 24h
+  # Demo link is re-established by scripts/si/link-sites.sh. Keep a multi-day
+  # window so grants survive overnight and a Thursday afternoon workshop without
+  # mid-day re-linking (existing Links keep working; grant is for new redemptions).
+  redemptionsAllowed: 20
+  expirationWindow: 168h

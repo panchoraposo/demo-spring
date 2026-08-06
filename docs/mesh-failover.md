@@ -55,7 +55,8 @@ flowchart TB
 - **OIDC** from hub Keycloak (`banking-idp` / realm `banking`).
 - Responses include `X-Banking-Cluster: east|west` when the image includes `ClusterIdentityFilter`.
 - DestinationRule `banking-service-failover`: `outlierDetection` + `localityLbSetting.failoverPriority: topology.istio.io/cluster`.
-- Service `banking-service`: `istio.io/global=true` + waypoint.
+- Service `banking-service`: `istio.io/global=true` + waypoint (waypoint Service stays cluster-local).
+- On AWS: keep EW Gateway status IPs synced (`scripts/mesh/sync-eastwest-gateway-ips.sh` — also run from `demo-mesh-failover.sh preflight`).
 
 GitOps mesh details: [`gitops/components/mesh`](../gitops/components/mesh).
 
